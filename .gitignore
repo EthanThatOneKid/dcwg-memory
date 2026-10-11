@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# Build output
+_site/
+.wiki/
+
+# Local secrets and tooling
+secrets/

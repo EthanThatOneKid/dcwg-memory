@@ -1,0 +1,44 @@
+# Wiki paths, assets, and filename policy (wiki check / wiki lint).
+wiki:
+  # Markdown and data directories to index (relative to this file).
+  input:
+    - wiki
+  # Static files for custom CSS, logos, favicons (copied on wiki build).
+  assets:
+    - assets
+  # Full-filename regex for markdown files (lint.filename_pattern severity).
+  filename_pattern: "[A-Za-z0-9_()-]+\\.md"
+
+# RDF document URIs, prefixes, and graph build settings.
+graph:
+  context:
+    "@vocab": https://schema.org/
+    schema: https://schema.org/
+    wiki: https://EthanThatOneKid.github.io/dcwg-memory/
+    wazoo: https://schema.wazoo.dev/
+    foaf: http://xmlns.com/foaf/0.1/
+    dc: http://purl.org/dc/elements/1.1/
+    dcterms: http://purl.org/dc/terms/
+    sh: http://www.w3.org/ns/shacl#
+    xsd: http://www.w3.org/2001/XMLSchema#
+
+# Page layout and URL routing.
+site:
+  base_url: /dcwg-memory
+  url_style: dir
+
+# wiki link command output format and rename repair map.
+link:
+  style: standard
+
+# Integrity severities (wiki check): SHACL, JSON Schema, routes, layout files.
+check:
+  missing_layout_file: error
+  frontmatter_schema: error
+  missing_schema_ref: error
+
+# Convention severities (wiki lint): links, filenames, headings.
+lint:
+  broken_links: warning
+  filename_pattern: warning
+  link_style: warning

@@ -1,0 +1,10 @@
+{
+  "status": "OK",
+  "connector": "discord",
+  "fetched": 1,
+  "ingested": 0,
+  "skipped_by_appraisal": 0,
+  "actionable_candidates": 1,
+  "cursor": null,
+  "lastRun": "2026-10-11T21:40:19Z"
+}
