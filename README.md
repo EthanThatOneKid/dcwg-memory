@@ -52,6 +52,7 @@ source.
 | `wiki/Deno_Runtime_Handoff.md` | Terms of a handoff: possible, negotiable, or out of reach |
 | `wiki/Deno_Fork_Options.md` | One fork or two, and the naming candidates including what was rejected |
 | `wiki/Ende_Runtime.md` | Paul Anthony Webb's stripped fork, the first concrete fork to exist |
+| `wiki/Ende_vs_Dodo.md` | Why the two named forks are a project and a preference, not rivals |
 | `wiki/Fresh_Framework_Migration.md` | The Fresh precedent, and exactly how far the analogy holds |
 | `wiki/Luca_Casonato.md` | Fresh's creator and the handoff precedent's human through-line |
 

@@ -46,7 +46,7 @@ One correction is worth keeping, because it is the only check anyone ran on the 
 
 ## The concrete outcome
 
-`netop://ウィビ` shipped first, with [[Ende_Runtime]], a drop-in fork with no Node compatibility. The group's own compatibility fork has no name, no repository, and no owner as of the 2026-10-11 capture.
+`netop://ウィビ` shipped first, with [[Ende_Runtime]], a drop-in fork with no Node compatibility. The group's own compatibility fork has no name, no repository, and no owner as of the 2026-10-11 capture. See [[Ende_vs_Dodo]] for the two positions side by side.
 
 ## Open questions
 
