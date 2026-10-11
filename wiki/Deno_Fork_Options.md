@@ -50,5 +50,6 @@ One correction is worth keeping, because it is the only check anyone ran on the 
 
 ## Open questions
 
-- Whether the compatibility fork is a separate project or a configuration of Ende, now that a plugin ecosystem is on the table.
+- Whether the compatibility fork is a separate project or a configuration of Ende, now that a plugin ecosystem is on the table. See [[Runtime_Architecture_Proposals]].
 - Who maintains the compatibility fork if `netop://ウィビ` is maintaining the stripped one, since nobody in the log volunteered.
+- Whether the fork keeps Deno's compiled-in extension set or adopts the loadable one argued about later the same day. [[Prior_Art_Runtimes]] covers who has already built the latter.

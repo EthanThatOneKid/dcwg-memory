@@ -53,6 +53,8 @@ source.
 | `wiki/Deno_Fork_Options.md` | One fork or two, and the naming candidates including what was rejected |
 | `wiki/Ende_Runtime.md` | Paul Anthony Webb's stripped fork, the first concrete fork to exist |
 | `wiki/Ende_vs_Dodo.md` | Why the two named forks are a project and a preference, not rivals |
+| `wiki/Runtime_Architecture_Proposals.md` | Minimal core plus extensions, the host-language question, and the fork-versus-rewrite order |
+| `wiki/Prior_Art_Runtimes.md` | What already implements that design, read on 2026-10-11, and what is genuinely new |
 | `wiki/Fresh_Framework_Migration.md` | The Fresh precedent, and exactly how far the analogy holds |
 | `wiki/Luca_Casonato.md` | Fresh's creator and the handoff precedent's human through-line |
 

@@ -22,7 +22,7 @@ The group formed in reaction to the 2026-10-09 announcement that Cloudflare is a
 
 ## Evidence
 
-One capture so far: `raw/discord/2026-10-11_deno-core-working-group-talk.md`, the group's `#talk` channel from 10:10 AM to 1:44 PM on 2026-10-11. The server name and channel list are not in the capture, only the channel label `#talk`. Everything below that is not traceable to that capture is marked as unverified.
+Two captures so far: `raw/discord/2026-10-11_dcwg-talk.md`, the group's `#talk` channel from 10:10 AM to 1:44 PM on 2026-10-11, and `raw/discord/2026-10-11_dcwg-architecture.md`, an architecture channel from 3:13 PM to 3:45 PM the same day, opened by `andy` for proposing what the runtime should be made of. The server name and channel list are not in either capture, only the channel labels. Everything below that is not traceable to a capture is marked as unverified.
 
 ## What the group has settled on
 
@@ -48,3 +48,5 @@ Ethan reported on 2026-10-11 that he had reached out to Divy and Crowl: Divy Sri
 
 - [[Deno_Runtime_Handoff]]: what can and cannot be transferred.
 - [[Ende_Runtime]]: the one fork with a published roadmap.
+- [[Runtime_Architecture_Proposals]]: the second capture, where the group argued about the core.
+- [[Prior_Art_Runtimes]]: what already implements the architecture being proposed.
