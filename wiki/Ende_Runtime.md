@@ -32,7 +32,7 @@ Development happens on the author's own infrastructure at `eol.sh`. The project 
 
 ## Why it matters to the group
 
-It splits the fork question in two. Ende is the stripped fork; the compatibility fork that most of the group said they wanted still has no name, repository, or maintainer. See [[Deno_Fork_Options]].
+It splits the fork question in two. Ende is the stripped fork; the compatibility fork that most of the group said they wanted still has no name, repository, or maintainer. See [Deno fork options and naming](Deno_Fork_Options.md).
 
 The post also supplies the argument for urgency. It points at Disc, Deno's Postgres client, as the pattern to avoid: the team moved to Vercel, the community was handed a blessed fork, and it stopped receiving updates. The post's framing is that a fork organized after the maintainers leave is already late.
 

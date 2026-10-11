@@ -12,7 +12,7 @@ The group treats Fresh as the blueprint for a handoff: a Deno-flagship project t
 
 ## What Fresh is
 
-A full-stack, server-rendered web framework built on Preact and web standards, using islands architecture so that client JavaScript is a per-component decision. Created by Luca Casonato while he was at Deno, and used to build deno.com itself. See [[Luca_Casonato]].
+A full-stack, server-rendered web framework built on Preact and web standards, using islands architecture so that client JavaScript is a per-component decision. Created by Luca Casonato while he was at Deno, and used to build deno.com itself. See [Luca Casonato](Luca_Casonato.md).
 
 ## What actually moved
 
@@ -42,7 +42,7 @@ The same asymmetry shows up on crates.io. `deno_core` last published 2026-09-16,
 
 ## Where the analogy breaks
 
-Fresh is a framework on top of the runtime: it depends on Deno, is versioned independently, and its users pick it per project. Deno, `std`, and `rusty_v8` are the runtime, the standard library, and the V8 binding layer, and they carry release signing, registry scopes, and crate ownership with them. The group's own brief lists what has no Fresh equivalent: trademark licensing, binary signing certificates, and release pipeline secrets. See [[Deno_Runtime_Handoff]].
+Fresh is a framework on top of the runtime: it depends on Deno, is versioned independently, and its users pick it per project. Deno, `std`, and `rusty_v8` are the runtime, the standard library, and the V8 binding layer, and they carry release signing, registry scopes, and crate ownership with them. The group's own brief lists what has no Fresh equivalent: trademark licensing, binary signing certificates, and release pipeline secrets. See [Deno runtime handoff](Deno_Runtime_Handoff.md).
 
 ## Open questions
 

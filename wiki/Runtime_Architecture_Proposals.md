@@ -1,7 +1,7 @@
 ---
 '@type': schema:TechArticle
 schema:name: Runtime architecture proposals
-schema:description: The 2026-10-11 architecture thread: a minimal core with opt-in extensions, the host-language question (C#, Go, Rust), extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
+schema:description: The 2026-10-11 architecture thread on a minimal core with opt-in extensions, the host-language question (C#, Go, Rust), extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
 wazoo:source: dcwg
 wiki:priority: high
 ---
@@ -64,13 +64,13 @@ Only two things: that extensions should be authorable in TypeScript and Rust, an
 - Which language the host is written in. Three were proposed and none was eliminated on stated grounds.
 - Whether extensions load at runtime or bundle at build time. `andy` proposed a build step, `daniellacosse`'s prototype proposes a plugin boundary, and the two are different systems.
 - Whether the one-week prototype challenge happens. `andy` proposed it, `daniellacosse` said this particular week is impossible for him and asked whether others could commit, and `andy` said he would start prototyping in an unofficial capacity.
-- Whether any of this is worth doing at all, in light of what already exists. See [[Prior_Art_Runtimes]].
+- Whether any of this is worth doing at all, in light of what already exists. See [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md).
 
 ## Related
 
-- [[Prior_Art_Runtimes]]: the existing runtimes that already implement this design.
-- [[Deno_Fork_Options]]: the fork scope and naming thread from the same day.
-- [[Deno_Core_Working_Group]]: who is in the room.
+- [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): the existing runtimes that already implement this design.
+- [Deno fork options and naming](Deno_Fork_Options.md): the fork scope and naming thread from the same day.
+- [Deno Core Working Group](Deno_Core_Working_Group.md): who is in the room.
 
 ## Sources
 

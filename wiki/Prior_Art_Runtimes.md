@@ -1,14 +1,14 @@
 ---
 '@type': schema:TechArticle
 schema:name: Prior art for a minimal-core runtime
-schema:description: The projects that already implement a minimal core with opt-in extensions, checked against live repositories on 2026-10-11: Andromeda and Nova, LLRT, WinterJS, workerd, Bun, and the C# hosting precedent.
+schema:description: The projects that already implement a minimal core with opt-in extensions, checked against live repositories on 2026-10-11, covering Andromeda and Nova, LLRT, WinterJS, workerd, Bun, and the C# hosting precedent.
 wazoo:source: dcwg
 wiki:priority: high
 ---
 
 # Prior art for a minimal-core runtime
 
-The architecture thread in [[Runtime_Architecture_Proposals]] proposed a minimal core with extensions that can be added, removed, and authored in more than one language. Ethan's read in that thread was that the proposal is not substantially different from work that already exists. Every figure on this page was read from a live GitHub or documentation source on 2026-10-11,[^4] so a stale number here is dated rather than invisible.
+The architecture thread in [Runtime architecture proposals](Runtime_Architecture_Proposals.md) proposed a minimal core with extensions that can be added, removed, and authored in more than one language. Ethan's read in that thread was that the proposal is not substantially different from work that already exists. Every figure on this page was read from a live GitHub or documentation source on 2026-10-11,[^4] so a stale number here is dated rather than invisible.
 
 ## Andromeda already published this architecture
 
@@ -28,7 +28,7 @@ What Andromeda is not is a Deno replacement, and the reason is its engine. Its `
 | `wasmerio/winterjs`      | Rust          | SpiderMonkey   | WinterCG-compatible web runtime                    | 3,186 stars, last push 2026-03-17                                                                |
 | `cloudflare/workerd`     | C++           | V8             | The runtime the Deno acquisition consolidates onto | 8,918 stars, pushed 2026-10-11                                                                   |
 | `oven-sh/bun`            | Rust          | JavaScriptCore | Node-compatible, all-in-one                        | 96,197 stars, pushed 2026-10-11                                                                  |
-| `denoland/deno`          | Rust          | V8             | 31 extensions, compiled in                         | see [[Deno]]                                                                                     |
+| `denoland/deno`          | Rust          | V8             | 31 extensions, compiled in                         | see [Deno](Deno.md)                                                                              |
 
 Three things are worth pulling out of that table.
 
@@ -46,7 +46,7 @@ So the mechanism `andy` wants is available, and the cost is not the language but
 
 ## What is genuinely not prior art
 
-1. **The starting position.** Every project in the table above is greenfield or on a different engine. None starts from Deno's codebase, Deno's permission model, or Deno's user base, and none has the option of a handoff conversation with the current maintainers, which is the one asset the group has that Andromeda never did. See [[Deno_Runtime_Handoff]].
+1. **The starting position.** Every project in the table above is greenfield or on a different engine. None starts from Deno's codebase, Deno's permission model, or Deno's user base, and none has the option of a handoff conversation with the current maintainers, which is the one asset the group has that Andromeda never did. See [Deno runtime handoff](Deno_Runtime_Handoff.md).
 1. **The permission model.** `davey` called it the deciding feature and `w` is depending on it inside a game client. Nothing in the table offers an equivalent.
 1. **Extensions that load after the binary exists.** Andromeda and Deno both fix their extension set at build time. Loading an extension into an already-built runtime, in the style `andy` and `daniellacosse` discussed, is the only part of the proposal with no direct implementation to point at, and it is a smaller claim than "minimal core with extensions", because the second half of that sentence is the state of the art.
 

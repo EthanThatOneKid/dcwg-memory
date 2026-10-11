@@ -1,8 +1,12 @@
 # dcwg-memory: agent instructions
 
-Private repo. Discord captures name third parties and record coordination about
-approaching individual Deno maintainers. Never publish, mirror, or republish the
-contents.
+Public repo as of 2026-10-11, by Ethan's decision, including the captures. Discord
+captures name third parties and record coordination about approaching individual
+Deno maintainers, and that risk was raised and accepted: the record is worth more
+published and checkable than withheld. Everything committed here, `raw/` included,
+is world-readable immediately and is also published to the GitHub Pages site, so
+treat every addition as public from the first commit. Do not redact after the
+fact; if something should not be public, it does not belong in this repo.
 
 ## What this repo owns
 
@@ -32,7 +36,19 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
 - Filenames must match `wiki.filename_pattern` (`[A-Za-z0-9_()-]+\.md`): no
   spaces, no apostrophes. A handle that cannot be a filename goes in a
   participants page instead of a per-person page.
-- After any edit: `wiki check && wiki fmt --check && wiki lint`, all passing.
+- After any edit: `wiki fmt --check`, `wiki check --strict`, `wiki lint --strict`,
+  and `wiki render --check`, all passing. CI runs the same four on every push.
+- `build.py`, `layouts/`, and `assets/` come from `wazootech/wiki-templates`
+  (`wikipedia`). `build.py` writes `_site/<base_url>/`, and `deploy.yml` uploads
+  `_site/dcwg-memory` because the site is a project page at `/dcwg-memory/`.
+  Verify a change locally with `python build.py` before pushing.
+- `wiki.assets` lists `raw`, so the captures are copied verbatim into the
+  published site at `/dcwg-memory/raw/`. They are copied, never parsed, which is
+  what keeps `wiki fmt` from rewriting an append-only capture. Do not add `raw` to
+  `wiki.input`, and do not link to a capture with a markdown `.md` link: `wiki
+  lint --strict` treats `.md`, `.yaml`, `.yml`, and `.json` targets as wiki pages
+  and fails on a capture that is not one. `wiki/Captures.md` uses HTML anchors for
+  exactly that reason.
 
 ## Adding a Discord capture
 
@@ -42,11 +58,13 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
    not be inferred.
 2. Update `raw/discord/SUMMARY.json` counts.
 3. Fold anything durable into the wiki pages, attributing claims to handles.
-4. Run the three validation commands.
+4. Run the four validation commands, then `python build.py` if the site should
+   show the new capture, and add it to `wiki/Captures.md`.
 
 ## What this repo is not
 
-Not a public advocacy document and not a place for polished positions. The
-record's value is that a later session can tell what was observed, what was
-argued, and what was verified, and only the `wiki/` layer is allowed to conclude
-anything.
+Not an advocacy document and not a place for polished positions. The record's
+value is that a later session can tell what was observed, what was argued, and
+what was verified, and only the `wiki/` layer is allowed to conclude anything.
+Being public does not make it a press release: a page that argues a position
+still has to attribute the argument to whoever made it.

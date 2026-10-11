@@ -8,7 +8,7 @@ wiki:priority: high
 
 # Deno fork options and naming
 
-The working group's first substantive thread was not governance but identity: what a fork is called, and how much of Deno it keeps. Both questions turned out to be the same question, because the name a fork can use depends on whether it is continuing Deno or replacing it. See [[Deno_Runtime_Handoff]] for the terms that govern that.
+The working group's first substantive thread was not governance but identity: what a fork is called, and how much of Deno it keeps. Both questions turned out to be the same question, because the name a fork can use depends on whether it is continuing Deno or replacing it. See [Deno runtime handoff](Deno_Runtime_Handoff.md) for the terms that govern that.
 
 ## The two-fork thesis
 
@@ -46,10 +46,10 @@ One correction is worth keeping, because it is the only check anyone ran on the 
 
 ## The concrete outcome
 
-`netop://ウィビ` shipped first, with [[Ende_Runtime]], a drop-in fork with no Node compatibility. The group's own compatibility fork has no name, no repository, and no owner as of the 2026-10-11 capture. See [[Ende_vs_Dodo]] for the two positions side by side.
+`netop://ウィビ` shipped first, with [Ende](Ende_Runtime.md), a drop-in fork with no Node compatibility. The group's own compatibility fork has no name, no repository, and no owner as of the 2026-10-11 capture. See [Ende vs Dodo](Ende_vs_Dodo.md) for the two positions side by side.
 
 ## Open questions
 
-- Whether the compatibility fork is a separate project or a configuration of Ende, now that a plugin ecosystem is on the table. See [[Runtime_Architecture_Proposals]].
+- Whether the compatibility fork is a separate project or a configuration of Ende, now that a plugin ecosystem is on the table. See [Runtime architecture proposals](Runtime_Architecture_Proposals.md).
 - Who maintains the compatibility fork if `netop://ウィビ` is maintaining the stripped one, since nobody in the log volunteered.
-- Whether the fork keeps Deno's compiled-in extension set or adopts the loadable one argued about later the same day. [[Prior_Art_Runtimes]] covers who has already built the latter.
+- Whether the fork keeps Deno's compiled-in extension set or adopts the loadable one argued about later the same day. [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md) covers who has already built the latter.

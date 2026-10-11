@@ -8,7 +8,7 @@ wiki:priority: high
 
 # Ende vs Dodo
 
-These are not two forks. They are a project and a preference. [[Ende_Runtime]] is a fork with a named maintainer, a registered namespace, and a published roadmap that strips Deno down. Dodo is a name that came up once in the channel, for a fork that keeps Deno as it is, and nobody has started it. Comparing them as rival runtimes is the category error; comparing the two positions on compatibility is the useful comparison.
+These are not two forks. They are a project and a preference. [Ende](Ende_Runtime.md) is a fork with a named maintainer, a registered namespace, and a published roadmap that strips Deno down. Dodo is a name that came up once in the channel, for a fork that keeps Deno as it is, and nobody has started it. Comparing them as rival runtimes is the category error; comparing the two positions on compatibility is the useful comparison.
 
 ## What each one actually is
 
@@ -33,7 +33,7 @@ The two positions differ on four things, and only the first one is architectural
 | The namespace and binary name | Keeps the namespace so imports resolve             | Keeps Deno drop-in, so the same namespace                   |
 | Who carries maintenance       | One named maintainer, today                        | Unassigned                                                  |
 
-Both want the same `deno` namespace, and only one fork can hold the `deno` binary name. That is where the two would actually collide, and it is a question for [[Deno_Runtime_Handoff]] rather than for the fork designs.
+Both want the same `deno` namespace, and only one fork can hold the `deno` binary name. That is where the two would actually collide, and it is a question for [Deno runtime handoff](Deno_Runtime_Handoff.md) rather than for the fork designs.
 
 ## Naming: what each name buys
 

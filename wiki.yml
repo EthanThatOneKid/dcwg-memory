@@ -4,8 +4,12 @@ wiki:
   input:
     - wiki
   # Static files for custom CSS, logos, favicons (copied on wiki build).
+  # `raw` is copied verbatim so the captured evidence is downloadable from the
+  # published site at /dcwg-memory/raw/...; it is never parsed as wiki input,
+  # which keeps `wiki fmt` from rewriting an append-only capture.
   assets:
     - assets
+    - raw
   # Full-filename regex for markdown files (lint.filename_pattern severity).
   filename_pattern: "[A-Za-z0-9_()-]+\\.md"
 
@@ -24,6 +28,9 @@ graph:
 
 # Page layout and URL routing.
 site:
+  # Repo-local Wikipedia-style layout (from wazootech/wiki-templates).
+  layout: layouts/wikipedia.html
+  # GitHub Pages mounts the uploaded artifact at /dcwg-memory/.
   base_url: /dcwg-memory
   url_style: dir
 
@@ -39,6 +46,12 @@ check:
 
 # Convention severities (wiki lint): links, filenames, headings.
 lint:
-  broken_links: warning
-  filename_pattern: warning
-  link_style: warning
+  broken_links: error
+  filename_pattern: error
+  link_style: error
+
+# Markdown formatting options (wiki fmt).
+fmt:
+  wrap: "no"
+  end_of_line: lf
+  extensions: [gfm, front_matters, wikilink, toc, footnote]

@@ -47,7 +47,7 @@ Nothing has moved yet. The repositories, the crates, the JSR scopes, and the `de
 
 ## Why it matters to the working group
 
-An MIT runtime that nobody will develop is not dead code, it is an unowned one. The pieces that need an owner are the ones that cannot be re-derived from the source: the trademark, the registry scopes, the crate ownership, and the signing keys behind binary distribution. [[Deno_Runtime_Handoff]] works through which of those can move. [[Fresh_Framework_Migration]] is the one precedent the group has for a project that did move out of `denoland` cleanly.
+An MIT runtime that nobody will develop is not dead code, it is an unowned one. The pieces that need an owner are the ones that cannot be re-derived from the source: the trademark, the registry scopes, the crate ownership, and the signing keys behind binary distribution. [Deno runtime handoff](Deno_Runtime_Handoff.md) works through which of those can move. [Fresh framework migration](Fresh_Framework_Migration.md) is the one precedent the group has for a project that did move out of `denoland` cleanly.
 
 ## Sources
 

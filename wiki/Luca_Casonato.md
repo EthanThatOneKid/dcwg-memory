@@ -23,7 +23,7 @@ Named in the group's channel on 2026-10-11 as the person worth asking for advice
 ## Verified background
 
 - Former Deno core team member; GitHub profile now reads "Working @railwayapp. Prev @denoland core team. @tc39 delegate", with 2,386 followers as of 2026-10-11.
-- Creator of Fresh, the framework that became the group's handoff precedent. See [[Fresh_Framework_Migration]].
+- Creator of Fresh, the framework that became the group's handoff precedent. See [Fresh framework migration](Fresh_Framework_Migration.md).
 - TC39 delegate for Deno, and a participant in WinterCG, the W3C community group that Cloudflare, Deno, Shopify and others started to standardize server-side JavaScript runtime APIs.
 - Spoke about Deno and Deno Deploy on Software Engineering Radio episode 553 (2023), where the runtime-portability argument that the group is now revisiting is laid out.
 

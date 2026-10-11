@@ -32,7 +32,7 @@ The `[xout]` and `[OAI]` suffixes on some handles are server-side role or bot ta
 
 - `andy` acts as the server's operator, having made `daniellacosse` a moderator at 10:13 AM, and they speak for the compatibility-preserving fork ("Deno compatibility is a must imo").
 - `daniellacosse` is a moderator and proposed the single extensible-core-runtime architecture.
-- `netop://ウィビ` is building [[Ende_Runtime]] and is the one participant with a published plan.
+- `netop://ウィビ` is building [Ende](Ende_Runtime.md) and is the one participant with a published plan.
 - Ethan Davidson is the one who took an external action: reaching out to two Deno team members.
 - Stag Math offered to design logos and other art.
 - A welcome bot greets each arriving member with "Wave to say hi!", which is why the capture opens with several greeting lines rather than conversation.

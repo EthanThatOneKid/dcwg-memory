@@ -1,0 +1,6 @@
+SELECT ?page ?type
+WHERE {
+  ?page a ?type .
+  FILTER (strStarts(str(?page), str(wiki:)))
+}
+ORDER BY ?type ?page

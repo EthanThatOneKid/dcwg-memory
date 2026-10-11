@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  wiki:
+    name: Wiki check + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install wazootech-wiki==0.1.23
+      - name: Check formatting
+        run: wiki -c wiki.yml fmt --check
+      - name: Check wiki integrity
+        run: wiki -c wiki.yml check --strict -v
+      - name: Lint wiki conventions
+        run: wiki -c wiki.yml lint --strict -v
+      - name: Check rendered SPARQL blocks
+        run: wiki -c wiki.yml render --check -v

@@ -18,7 +18,7 @@ An informal group of Deno users coordinating on Discord, with the working name "
 
 ## Origin
 
-The group formed in reaction to the 2026-10-09 announcement that Cloudflare is acquiring Deno and that Deno will end its own runtime development after about a year of monthly bug-fix and security releases. The acquisition itself is recorded on [[Deno]].
+The group formed in reaction to the 2026-10-09 announcement that Cloudflare is acquiring Deno and that Deno will end its own runtime development after about a year of monthly bug-fix and security releases. The acquisition itself is recorded on [Deno](Deno.md).
 
 ## Evidence
 
@@ -34,7 +34,7 @@ Two captures so far: `raw/discord/2026-10-11_dcwg-talk.md`, the group's `#talk` 
 
 ## What the group has not settled
 
-- **The name.** Candidates raised on 2026-10-11: `endo` and `noend` (andy), `Pteryx` with the `ptx` command (`netop://ウィビ`), `dodo` (daniellacosse and `w`), and `Ende` (the name `netop://ウィビ` actually shipped). See [[Deno_Fork_Options]].
+- **The name.** Candidates raised on 2026-10-11: `endo` and `noend` (andy), `Pteryx` with the `ptx` command (`netop://ウィビ`), `dodo` (daniellacosse and `w`), and `Ende` (the name `netop://ウィビ` actually shipped). See [Deno fork options and naming](Deno_Fork_Options.md).
 - **One fork or several.** `netop://ウィビ` argued for at least two: a full-compatibility fork and his own stripped-down one. `daniellacosse` proposed instead a single core runtime whose features (KV, Deploy, Node compatibility) are modules you switch on per project.
 - **Whether to ask for `denoland/deno` itself or to start elsewhere.** Stag Math's reading of the thread: two parties, one stripped-down fork and one that keeps Deno core, with the possibility that "we may be given Deno itself."
 - **Who does release engineering.** Nobody has volunteered for builds, signing, release automation, or a CI matrix.
@@ -42,11 +42,11 @@ Two captures so far: `raw/discord/2026-10-11_dcwg-talk.md`, the group's `#talk` 
 
 ## Outreach
 
-Ethan reported on 2026-10-11 that he had reached out to Divy and Crowl: Divy Srivastava (`littledivy`) and Leo Kettmeir (`crowlKats`), both of Deno. Whether they responded is not in the capture. `daniellacosse` asked whether anyone already has a relationship with the current core maintainers; nobody answered before the capture ends. Reaching out to Luca Casonato, raised by `W7T2A` and seconded by Max P., was still just a proposal. See [[Luca_Casonato]] and [[Deno_Core_Working_Group_Participants]].
+Ethan reported on 2026-10-11 that he had reached out to Divy and Crowl: Divy Srivastava (`littledivy`) and Leo Kettmeir (`crowlKats`), both of Deno. Whether they responded is not in the capture. `daniellacosse` asked whether anyone already has a relationship with the current core maintainers; nobody answered before the capture ends. Reaching out to Luca Casonato, raised by `W7T2A` and seconded by Max P., was still just a proposal. See [Luca Casonato](Luca_Casonato.md) and [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md).
 
 ## Related
 
-- [[Deno_Runtime_Handoff]]: what can and cannot be transferred.
-- [[Ende_Runtime]]: the one fork with a published roadmap.
-- [[Runtime_Architecture_Proposals]]: the second capture, where the group argued about the core.
-- [[Prior_Art_Runtimes]]: what already implements the architecture being proposed.
+- [Deno runtime handoff](Deno_Runtime_Handoff.md): what can and cannot be transferred.
+- [Ende](Ende_Runtime.md): the one fork with a published roadmap.
+- [Runtime architecture proposals](Runtime_Architecture_Proposals.md): the second capture, where the group argued about the core.
+- [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): what already implements the architecture being proposed.

@@ -1,0 +1,6 @@
+# Keep committed text files LF on every platform.
+# `wiki fmt` writes CRLF in a Windows working tree regardless of
+# `wiki.yml`'s `fmt.end_of_line` (that option is currently inert), so git
+# normalization here is what keeps CRLF out of the repository: without it, a
+# Windows `wiki fmt` run would commit whole-file line-ending churn.
+* text=auto eol=lf

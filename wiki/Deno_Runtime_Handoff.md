@@ -8,7 +8,7 @@ wiki:priority: high
 
 # Deno runtime handoff
 
-What a handoff of the Deno runtime and standard library would have to move, and which of those pieces can actually move. Derived from a handoff brief captured at `raw/briefs/2026-10-11_deno-handoff-terms-and-feasibility.md` and checked against live repository state on 2026-10-11. Transferring a runtime is a different problem from transferring a web framework: [[Fresh_Framework_Migration]] moved one GitHub repository, while a runtime handoff drags trademark, registries, crates, and signing keys with it.
+What a handoff of the Deno runtime and standard library would have to move, and which of those pieces can actually move. Derived from a handoff brief captured at `raw/briefs/2026-10-11_deno-handoff-terms-and-feasibility.md` and checked against live repository state on 2026-10-11. Transferring a runtime is a different problem from transferring a web framework: [Fresh framework migration](Fresh_Framework_Migration.md) moved one GitHub repository, while a runtime handoff drags trademark, registries, crates, and signing keys with it.
 
 ## The two shapes of the deal
 
@@ -46,7 +46,7 @@ The brief's recommended sequence, and the one the Discord discussion converges o
 
 ## Open questions
 
-- Is `denoland` willing to transfer repositories, the organization, or neither? Not established. Ethan reached out to two Deno engineers on 2026-10-11; see [[Deno_Core_Working_Group_Participants]].
+- Is `denoland` willing to transfer repositories, the organization, or neither? Not established. Ethan reached out to two Deno engineers on 2026-10-11; see [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md).
 - Who holds the signing certificates today, and would they issue releases signed on behalf of a community entity?
 - Does JSR publication for `@std` require `denoland` scope rights that cannot be delegated?
 - Is there a maintainer willing to stay on as the bridge, which is the difference between a handover and a cold fork.

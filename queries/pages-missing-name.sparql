@@ -1,0 +1,7 @@
+SELECT ?page ?type
+WHERE {
+  ?page a ?type .
+  FILTER (strStarts(str(?page), str(wiki:)))
+  FILTER NOT EXISTS { ?page schema:name ?name . }
+}
+ORDER BY ?page

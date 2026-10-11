@@ -1,6 +1,6 @@
 # dcwg-memory
 
-Private memory repo for the Deno Core Working Group (DCWG): the community effort
+Public memory repo for the Deno Core Working Group (DCWG): the community effort
 to carry the Deno runtime forward after Cloudflare acquired Deno Land Inc. on
 2026-10-09 and Deno announced it would end its own runtime development.
 
@@ -8,11 +8,25 @@ Part of the `*-memory` family (`memory` is the hub). This repo owns one subject:
 what the group knows, proposes, and decides about forking, handoff, and
 stewardship of Deno.
 
-**Private on purpose.** The `raw/` captures are Discord conversations with named
-participants who did not agree to be published, and they contain coordination
-about approaching individual Deno maintainers. Do not make this repo public, do
-not mirror it into a public wiki, and do not republish participant identities or
-quotes outside this repo.
+**Public by Ethan's decision on 2026-10-11, including the captures.** The `raw/`
+files are Discord conversations with named participants who did not individually
+agree to be published, and they contain coordination about approaching individual
+Deno maintainers. That risk was raised and accepted: the record is worth more
+published and checkable than withheld. Nothing here is redacted, so a future edit
+that adds a name, a private message, or a maintainer contact has to assume it is
+world-readable the moment it is committed.
+
+## Published site
+
+The derived pages are published to GitHub Pages from `main` by
+`.github/workflows/deploy.yml`:
+
+- <https://ethanthatonekid.github.io/dcwg-memory/>
+
+The captures are published too, as static files copied verbatim by `build.py`
+from `raw/` to `/dcwg-memory/raw/`, and `wiki/Captures.md` links to them. They are
+copied as assets, never parsed as wiki input, so `wiki fmt` can never rewrite an
+append-only capture.
 
 ## Layout
 
@@ -21,7 +35,13 @@ raw/discord/             append-only channel captures, one file per session
 raw/briefs/              append-only briefs received from outside this repo
   SUMMARY.json           machine contract read by memory/scripts/memory_check.py
 wiki/                    the typed record, authored from the captures
+  Captures.md            index of the raw captures, linked from the site
+build.py                 site builder (from wazootech/wiki-templates, wikipedia)
+layouts/wikipedia.html   the layout that builder renders
+assets/                  theme CSS, JS, and logo, copied into the site
+queries/                 example SPARQL queries, from the template
 wiki.yml                 Wiki CLI config (wazootech-wiki)
+.github/workflows/       ci.yml (gates) and deploy.yml (GitHub Pages)
 ```
 
 ## Layers
@@ -46,6 +66,7 @@ source.
 
 | Page | What it holds |
 | --- | --- |
+| `wiki/Captures.md` | Index of the raw captures, and what is derived from each |
 | `wiki/Deno.md` | The runtime and the verified acquisition, end-of-life schedule, and asset state |
 | `wiki/Deno_Core_Working_Group.md` | What the group is, how it convened, and what it decided |
 | `wiki/Deno_Core_Working_Group_Participants.md` | Who was in the founding session, and which handles map to confirmed identities |
@@ -69,13 +90,18 @@ of the previous one.
 ## Validation
 
 ```bash
-wiki check        # config, frontmatter, routes
-wiki fmt --check  # canonical frontmatter/body formatting
-wiki lint         # links, filenames, headings
+wiki fmt --check        # canonical frontmatter/body formatting
+wiki check --strict -v  # config, frontmatter, routes
+wiki lint --strict -v   # links, filenames, headings
+wiki render --check -v  # SPARQL blocks in pages
+python build.py         # the site build the deploy workflow runs
 ```
 
 `python scripts/memory_check.py --root .` from the `memory` hub validates the
 `raw/` contracts and the append-only invariant.
+
+The same gates run in CI on every push and pull request, so a capture that gets
+rewritten or a page that links nowhere fails before it reaches the site.
 
 ## Provenance
 
