@@ -14,13 +14,13 @@ The repository is public, so these files are readable in place. The same files a
 
 ## Discord
 
-- [2026-10-11, #talk](https://github.com/EthanThatOneKid/dcw-memory/blob/main/raw/discord/2026-10-11_dcwg-talk.md): the founding session. Names proposed for a fork, the two-fork split, compatibility scope, and how to approach the current Deno maintainers.
-- [2026-10-11, architecture](https://github.com/EthanThatOneKid/dcw-memory/blob/main/raw/discord/2026-10-11_dcwg-architecture.md): the afternoon architecture channel. A minimal core with opt-in extensions, the host-language debate, extensions authored in TypeScript, console as an extension, and the order of fork, handoff, or rewrite.
+- [2026-10-11, #talk](https://ethanthatonekid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-talk.md): the founding session. Names proposed for a fork, the two-fork split, compatibility scope, and how to approach the current Deno maintainers.
+- [2026-10-11, architecture](https://ethanthatonekid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-architecture.md): the afternoon architecture channel. A minimal core with opt-in extensions, the host-language debate, extensions authored in TypeScript, console as an extension, and the order of fork, handoff, or rewrite.
 
 ## Pasted briefs
 
-- [Deno handoff: terms and feasibility](https://github.com/EthanThatOneKid/dcw-memory/blob/main/raw/briefs/2026-10-11_deno-handoff-terms-and-feasibility.md): a received argument about what Deno Land Inc. and Cloudflare might agree to, reproduced as received rather than as verified fact.
-- [Fresh migration precedent](https://github.com/EthanThatOneKid/dcw-memory/blob/main/raw/briefs/2026-10-11_fresh-migration-precedent.md): the Fresh framework's move to an independent organization, used as the model for a Deno handoff.
+- [Deno handoff: terms and feasibility](https://ethanthatonekid.github.io/dcwg-memory/raw/briefs/2026-10-11_deno-handoff-terms-and-feasibility.md): a received argument about what Deno Land Inc. and Cloudflare might agree to, reproduced as received rather than as verified fact.
+- [Fresh migration precedent](https://ethanthatonekid.github.io/dcwg-memory/raw/briefs/2026-10-11_fresh-migration-precedent.md): the Fresh framework's move to an independent organization, used as the model for a Deno handoff.
 
 ## What is derived from them
 
