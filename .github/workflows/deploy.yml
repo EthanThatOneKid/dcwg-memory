@@ -18,6 +18,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Enables Pages for the repository if it is not already enabled, and
+      # exposes the site's base URL to later steps.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
