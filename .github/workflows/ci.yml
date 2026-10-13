@@ -24,3 +24,22 @@ jobs:
         run: wiki -c wiki.yml lint --strict -v
       - name: Check rendered SPARQL blocks
         run: wiki -c wiki.yml render --check -v
+
+  connector:
+    name: Discord connector check + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type check
+        working-directory: tools/discord
+        run: deno check ingest.ts
+      - name: Test
+        working-directory: tools/discord
+        run: deno test -A
+      - name: Every page has an inbound link
+        run: deno run -A tools/discord/orphans.ts
+      - name: Capture index matches the tree
+        run: deno run -A tools/discord/index_page.ts --check

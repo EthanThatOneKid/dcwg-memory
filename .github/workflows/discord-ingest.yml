@@ -1,0 +1,132 @@
+name: Discord ingest
+
+# One run = pull new channel activity over the Discord REST API, write it as an
+# append-only capture, let the model fold it into the wiki pages, then validate
+# and push. The connector refuses to write anything the repo's own gates reject:
+# if `wiki fmt --check`, `wiki check --strict`, `wiki lint --strict`,
+# `wiki render --check`, or `build.py` fails, the page edits are reverted and the
+# run reports NEEDS_ATTENTION instead of committing prose that does not pass.
+#
+# Why this pushes straight to main instead of opening a pull request: the cursor
+# in raw/discord/.cursor has to advance for the next run to know where to resume.
+# A cursor parked in an unmerged PR would make every daily run re-fetch the same
+# range and add another capture for it. The gates are the review step here.
+#
+# Required repository secrets:
+#   DCWG_DISCORD_BOT_TOKEN  the capture bot's token (its own application)
+#   DODO_OPENROUTER_API_KEY inference for the wiki pass, on a free model by
+#                           default. ANTHROPIC_API_KEY also works if set, and
+#                           --provider picks between them; a free OpenRouter key
+#                           is capped at 50 requests/day, which one daily run
+#                           stays well inside.
+# Neither is ever echoed: the connector reads them from the environment and
+# never accepts a token as a command-line argument.
+
+on:
+  schedule:
+    # 13:17 UTC = 06:17 America/Los_Angeles during PDT, 05:17 during PST.
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Fetch and print, change nothing"
+        type: boolean
+        default: false
+      skip_wiki:
+        description: "Capture only; do not touch the wiki pages"
+        type: boolean
+        default: false
+      model:
+        description: "Model for the wiki pass (blank = the provider's default)"
+        type: string
+        default: ""
+      provider:
+        description: "anthropic or openrouter (blank = whichever key is set)"
+        type: string
+        default: ""
+
+concurrency:
+  group: discord-ingest
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    env:
+      # venue=channel-id, one per line. Add a line to capture another channel.
+      VENUES: |
+        dcwg-talk=1558888938842624093
+      # github.event.inputs is a string map that is empty on a scheduled run, so
+      # every one of these falls back in the shell rather than in an expression.
+      MODEL: ${{ github.event.inputs.model }}
+      PROVIDER: ${{ github.event.inputs.provider }}
+      DRY_RUN: ${{ github.event.inputs.dry_run }}
+      SKIP_WIKI: ${{ github.event.inputs.skip_wiki }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.x"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the wiki CLI (same pin as CI)
+        run: pip install wazootech-wiki==0.1.23
+
+      - name: Unit-test the connector before trusting it
+        run: deno test -A
+        working-directory: tools/discord
+
+      - name: Ingest
+        env:
+          DCWG_DISCORD_BOT_TOKEN: ${{ secrets.DCWG_DISCORD_BOT_TOKEN }}
+          # The connector reads OPENROUTER_API_KEY; the secret is named with a
+          # prefix to match the other project-scoped keys on this account.
+          OPENROUTER_API_KEY: ${{ secrets.DODO_OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          status=0
+          while IFS='=' read -r venue channel; do
+            [ -z "$venue" ] && continue
+            echo "::group::$venue ($channel)"
+            # --limit 0 drains the backlog, so a daily run cannot leave a gap
+            # behind a message cap.
+            args=(--channel "$channel" --venue "$venue" --root . --limit 0)
+            # Only pin a model or provider when one was asked for: passing the
+            # other provider's default id would send an unknown model to the one
+            # that is actually configured.
+            if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
+            if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
+            [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
+            [ "${SKIP_WIKI:-false}" = "true" ] && args+=(--skip-wiki)
+            if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then
+              status=1
+            fi
+            echo "::endgroup::"
+          done <<< "$VENUES"
+          exit "$status"
+
+      - name: Report what changed
+        if: always()
+        run: |
+          git status --short
+          git --no-pager diff --stat
+
+      - name: Commit and push
+        if: ${{ success() && github.event.inputs.dry_run != 'true' }}
+        run: |
+          git config user.name "dcwg-ingest"
+          git config user.email "dcwg-ingest@users.noreply.github.com"
+          git add -A raw/discord wiki
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          git commit -m "ingest: Discord activity for $(date -u +%Y-%m-%d)"
+          git push

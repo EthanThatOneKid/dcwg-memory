@@ -8,24 +8,30 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the two captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 4 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
-The repository is public, so these files are readable in place. The same files are also served verbatim by this site under `/dcwg-memory/raw/`, so the evidence travels with the pages that cite it.
+The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
 ## Discord
 
-- [2026-10-11, #talk](https://ethanthatonekid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-talk.md): the founding session. Names proposed for a fork, the two-fork split, compatibility scope, and how to approach the current Deno maintainers.
-- [2026-10-11, architecture](https://ethanthatonekid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-architecture.md): the afternoon architecture channel. A minimal core with opt-in extensions, the host-language debate, extensions authored in TypeScript, console as an extension, and the order of fork, handoff, or rewrite.
+- [Deno Core Working Group Discord, architecture ideas — 2026-10-11](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-architecture.md): Append-only capture of the architecture-ideas channel on 2026-10-11: a minimal core with opt-in extensions, C# or Go or Rust for the host, extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
+- [Deno Core Working Group Discord, #talk — 2026-10-11](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-talk.md): Append-only capture of one day of Deno Core Working Group Discord chatter about forking Deno after the Cloudflare acquisition: naming candidates, compatibility scope, and how to approach the current maintainers.
 
 ## Pasted briefs
 
-- [Deno handoff: terms and feasibility](https://ethanthatonekid.github.io/dcwg-memory/raw/briefs/2026-10-11_deno-handoff-terms-and-feasibility.md): a received argument about what Deno Land Inc. and Cloudflare might agree to, reproduced as received rather than as verified fact.
-- [Fresh migration precedent](https://ethanthatonekid.github.io/dcwg-memory/raw/briefs/2026-10-11_fresh-migration-precedent.md): the Fresh framework's move to an independent organization, used as the model for a Deno handoff.
+- [Deno handoff: terms for a mutually beneficial transfer, and a feasibility matrix](https://EthanThatOneKid.github.io/dcwg-memory/raw/briefs/2026-10-11_deno-handoff-terms-and-feasibility.md): Received analysis framing the Fresh migration as a blueprint for a Deno handoff, listing core handoff terms (trademark, registry scopes, crates, CI signing, governance) and sorting denoland org assets into feasible, negotiable, and impossible.
+- [Luca Casonato and the Fresh Migration as a Handoff Precedent](https://EthanThatOneKid.github.io/dcwg-memory/raw/briefs/2026-10-11_fresh-migration-precedent.md): Received brief on Luca Casonato's role in moving the Fresh web framework to its own GitHub organization, offered as the model for a Deno handoff.
 
 ## What is derived from them
 
-- [Deno Core Working Group](Deno_Core_Working_Group.md): who was in the room and what the group is.
-- [Runtime architecture proposals](Runtime_Architecture_Proposals.md): the minimal-core design argued on 2026-10-11.
-- [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): the projects that already implement it.
-- [Deno fork options and naming](Deno_Fork_Options.md): the two-fork thesis and the naming candidates.
-- [Ende vs Dodo](Ende_vs_Dodo.md): the one fork with an owner against the one that is still a name.
+- [Deno](Deno.md): A JavaScript, TypeScript, and WebAssembly runtime built on V8 and Rust, created by Ryan Dahl and Bert Belder, whose own development ends about a year after Cloudflare acquired Deno Land Inc. on 2026-10-09.
+- [Deno Core Working Group](Deno_Core_Working_Group.md): An informal group of Deno users organizing on Discord to keep the runtime alive after Cloudflare acquired Deno Land Inc. and Deno ended its own runtime development.
+- [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md): The Discord handles visible in the group's #talk capture, with the public identity behind each handle where one could be confirmed.
+- [Deno fork options and naming](Deno_Fork_Options.md): The two-fork thesis, the naming candidates weighed on 2026-10-11 (Ende, dodo, endo, noend, Pteryx), and what the group agreed a fork must preserve.
+- [Deno runtime handoff](Deno_Runtime_Handoff.md): What a community handoff of the Deno runtime, std, and rusty_v8 would have to transfer, split into what is possible, what needs negotiation, and what is not on the table.
+- [Ende](Ende_Runtime.md): A planned drop-in Deno fork by Paul Anthony Webb that keeps the namespace for compatibility and drops Node compatibility, Deno Deploy, KV, and Jupyter; not public yet, soft launch planned for December 2026.
+- [Ende vs Dodo](Ende_vs_Dodo.md): Why Ende and Dodo are not competing runtimes. Ende is a fork with an owner, a registered namespace, and a published roadmap; Dodo is a name the group liked for a compatibility fork that nobody has started.
+- [Fresh framework migration](Fresh_Framework_Migration.md): Fresh, Deno's full-stack web framework, moved out of the denoland GitHub organization into freshframework. The verified facts of that move, and which of them transfer to a runtime handoff.
+- [Luca Casonato](Luca_Casonato.md): Creator of the Fresh web framework and former Deno core team member, now at Railway; named in the group as the person who has already done a Deno-project handoff.
+- [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): The projects that already implement a minimal core with opt-in extensions, checked against live repositories on 2026-10-11, covering Andromeda and Nova, LLRT, WinterJS, workerd, Bun, and the C# hosting precedent.
+- [Runtime architecture proposals](Runtime_Architecture_Proposals.md): The 2026-10-11 architecture thread on a minimal core with opt-in extensions, the host-language question (C#, Go, Rust), extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
