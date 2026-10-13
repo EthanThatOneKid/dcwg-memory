@@ -13,8 +13,8 @@ name: Discord ingest
 # range and add another capture for it. The gates are the review step here.
 #
 # Required repository secrets:
-#   DCWG_DISCORD_BOT_TOKEN  the capture bot's token (its own application)
-#   DODO_OPENROUTER_API_KEY inference for the wiki pass, on a free model by
+#   DISCORD_BOT_TOKEN       the capture bot's token (its own application)
+#   OPENROUTER_API_KEY      inference for the wiki pass, on a free model by
 #                           default. ANTHROPIC_API_KEY also works if set, and
 #                           --provider picks between them; a free OpenRouter key
 #                           is capped at 50 requests/day, which one daily run
@@ -85,10 +85,12 @@ jobs:
 
       - name: Ingest
         env:
-          DCWG_DISCORD_BOT_TOKEN: ${{ secrets.DCWG_DISCORD_BOT_TOKEN }}
-          # The connector reads OPENROUTER_API_KEY; the secret is named with a
-          # prefix to match the other project-scoped keys on this account.
-          OPENROUTER_API_KEY: ${{ secrets.DODO_OPENROUTER_API_KEY }}
+          # Repository secrets are scoped to this repo, so the bare names are
+          # unambiguous here. The process env var stays prefixed because Zo
+          # secrets are account-wide and a bare DISCORD_BOT_TOKEN on this host
+          # is another project's bot.
+          DCWG_DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           status=0

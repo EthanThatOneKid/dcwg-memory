@@ -80,11 +80,14 @@ tools ship with the connector because the invite is the one step that needs a
 human: Discord has no API that creates an application or a bot user, so the
 application is made in the portal and only the invite is mechanical.
 
-The connector has its own Discord application and its own bot token, read from
-`DCWG_DISCORD_BOT_TOKEN` in Zo secrets. It is a separate concern from every other
-project's bots: never point it at another project's token, and never widen its
-permissions past read access to the channels it archives. A capture bot that
-cannot post cannot write into the record it is archiving.
+The connector has its own Discord application and its own bot token. In the
+repository it is the secret `DISCORD_BOT_TOKEN`; on this host it is read from
+`DCWG_DISCORD_BOT_TOKEN` in Zo secrets, because Zo secrets are account-wide and
+a bare `DISCORD_BOT_TOKEN` here belongs to another project's bot. It is a
+separate concern from every other project's bots: never point it at another
+project's token, and never widen its permissions past read access to the
+channels it archives. A capture bot that cannot post cannot write into the
+record it is archiving.
 
 REST history is not gated by the privileged Message Content intent. Measured
 2026-10-12: an app with neither content flag set (`flags` 8388608) still read
@@ -101,7 +104,7 @@ when they pass. It pushes rather than opening a pull request because the cursor 
 cursor parked in an unmerged pull request would make every run re-fetch the same
 range. The gates are the review step, and a failing gate reverts the pass's page
 edits while leaving the capture in place. It needs two repository secrets,
-`DCWG_DISCORD_BOT_TOKEN` and `DODO_OPENROUTER_API_KEY`. Inference runs on OpenRouter
+`DISCORD_BOT_TOKEN` and `OPENROUTER_API_KEY`. Inference runs on OpenRouter
 by default on a free model (`nvidia/nemotron-3-super-120b-a12b:free`), which was
 verified to honour the strict `json_schema` the page edits need; `ANTHROPIC_API_KEY`
 also works and `--provider` picks between them. A free OpenRouter key allows 50
