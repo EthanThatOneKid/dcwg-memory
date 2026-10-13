@@ -15,7 +15,12 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, Output } from "ai";
 import { z } from "zod";
-import { checkEditablePath, MAX_PAGE_BYTES, WIKI_PREFIX } from "./guard.ts";
+import {
+  checkEditablePath,
+  MAX_PAGE_BYTES,
+  WIKI_PREFIX,
+  hasFrontmatter,
+} from "./guard.ts";
 import type { DiscordMessage } from "./discord.ts";
 
 /** Sonnet-class by default: the pass writes prose into a public record, so a
@@ -89,6 +94,9 @@ Hard rules, all enforced by the connector and by CI:
   layouts/, assets/, or any file outside ${WIKI_PREFIX}.
 - Never write a markdown link whose target ends in .md: the wiki's lint gate rejects
   them. Refer to another wiki page by name in backticks.
+- Keep each page's existing YAML frontmatter exactly as it is and change only the
+  body. Rewriting the block, or dropping it for a horizontal rule, loses the page's
+  type and source, and the connector refuses an edit that strips a page's frontmatter.
 - Attribute every claim to the handle that made it. Never assert consensus nobody
   stated, never upgrade a proposal into a decision, and never invent a quote, date,
   participant, or outcome.
@@ -184,7 +192,10 @@ async function readLastUpdated(root: string): Promise<string | undefined> {
  * Refuse a proposal outright if any part of it is not writable. Returning a
  * non-empty list means nothing gets written, so a partial apply cannot happen.
  */
-export function guardProposal(edits: PageEdit[]): string[] {
+export function guardProposal(
+  edits: PageEdit[],
+  prior?: Map<string, string | null>,
+): string[] {
   const problems: string[] = [];
   const seen = new Set<string>();
   for (const edit of edits) {
@@ -195,6 +206,13 @@ export function guardProposal(edits: PageEdit[]): string[] {
     seen.add(edit.path);
     if (!(edit.content ?? "").trim()) problems.push(`${edit.path}: refusing to write an empty page`);
     if (bytes > MAX_PAGE_BYTES) problems.push(`${edit.path}: page exceeds ${MAX_PAGE_BYTES} bytes`);
+
+    // A page that had frontmatter must still have it. Rewriting the block into
+    // body text passes the wiki gates, so nothing else would catch it.
+    const was = prior?.get(edit.path);
+    if (was && hasFrontmatter(was) && !hasFrontmatter(edit.content ?? "")) {
+      problems.push(`${edit.path}: the edit strips the page's YAML frontmatter`);
+    }
   }
   return problems;
 }
@@ -273,10 +291,11 @@ export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult>
   const proposed = (result.output ?? { edits: [], notes: "" }) as PageEdits;
   const edits = proposed.edits ?? [];
 
-  const problems = guardProposal(edits);
+  const prior = await snapshotPages(input.root, edits.map((e) => e.path));
+
+  const problems = guardProposal(edits, prior);
   if (problems.length) return { problems };
 
-  const prior = await snapshotPages(input.root, edits.map((e) => e.path));
   const revert = () => restorePages(input.root, prior);
 
   const usage = result.usage ?? {};

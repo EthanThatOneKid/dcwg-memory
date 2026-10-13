@@ -49,6 +49,36 @@ Deno.test("guardProposal refuses the ways a proposal can go wrong", () => {
   assert(problems.some((p) => p.includes("exceeds")), problems.join("; "));
 });
 
+Deno.test("guardProposal protects a page's frontmatter", () => {
+  const prior = new Map<string, string | null>([
+    ["wiki/Typed.md", "---\n'@type': schema:TechArticle\n---\n\n# Typed\n"],
+    ["wiki/Plain.md", "# Plain\n"],
+    ["wiki/New.md", null],
+  ]);
+
+  // Rewriting the block into body text is what actually happened once: the wiki
+  // gates do not require frontmatter, so they all passed on the flattened page.
+  const stripped = guardProposal(
+    [{ path: "wiki/Typed.md", content: "'@type': schema:TechArticle\n\n# Typed\n", reason: "edit" }],
+    prior,
+  );
+  assert(stripped.some((p) => p.includes("strips the page's YAML frontmatter")), stripped.join("; "));
+
+  // Keeping the block is the normal case and must stay clean.
+  assertEquals(
+    guardProposal(
+      [{ path: "wiki/Typed.md", content: "---\n'@type': schema:TechArticle\n---\n\n# Typed\n\nMore.\n", reason: "edit" }],
+      prior,
+    ),
+    [],
+  );
+
+  // A page that never had frontmatter is not suddenly required to have some,
+  // and a page this pass creates has nothing to preserve.
+  assertEquals(guardProposal([{ path: "wiki/Plain.md", content: "# Plain\n\nMore.\n", reason: "edit" }], prior), []);
+  assertEquals(guardProposal([{ path: "wiki/New.md", content: "# New\n", reason: "create" }], prior), []);
+});
+
 Deno.test("snapshot then restore returns the tree to its prior state", async () => {
   const root = await Deno.makeTempDir();
   try {

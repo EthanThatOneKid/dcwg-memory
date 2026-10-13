@@ -109,13 +109,20 @@ by default on a free model (`nvidia/nemotron-3-super-120b-a12b:free`), which was
 verified to honour the strict `json_schema` the page edits need; `ANTHROPIC_API_KEY`
 also works and `--provider` picks between them. A free OpenRouter key allows 50
 requests a day, and one daily run over one venue stays well inside that. A
-reasoning model is the trade: a measured run cost ~17k input and ~11k output
-tokens and took about two minutes, at no charge.
+reasoning model is the trade: the first real run, a 593-message backfill, cost
+~25k input and ~24k output tokens and took about three minutes, at no charge.
 
 If the pass or a gate fails, the capture stays and the page edits are reverted, so
-a bad inference never commits prose that does not pass the repo's own checks. The
-manual steps above remain the fallback until the capture bot is in the server;
-that invite and the first backfill are tracked in the repo's follow-up issue.
+a bad inference never commits prose that does not pass the repo's own checks. One
+failure the gates cannot catch is an edit that flattens a page's YAML frontmatter
+into body text: `wiki check` and `wiki lint` do not require frontmatter, so they
+pass on the flattened page. The write guard refuses that edit, and the prompt says
+to leave frontmatter alone.
+
+The connector is verified end to end: `Dodo [DCWG]` (app `1559632041484484709`) is
+installed in the server, and a full backfill of `#talk` read 593 messages in about
+four seconds. The manual steps above remain the fallback for a venue the bot cannot
+see.
 
 ## Maintaining the wiki: the self-healing pass
 
