@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/main/cli/schemas/config-file.v1.json",
+  "nodeModulesDir": "none",
+  "tasks": {
+    "build": "deno run -A build.ts",
+    "check": "deno check build.ts"
+  },
+  "imports": {
+    "@std/path": "jsr:@std/path@^1.0.0",
+    "@wazoo/wiki": "jsr:@wazoo/wiki@0.7.0",
+    "@wazoo/wiki/theme": "jsr:@wazoo/wiki@0.7.0/theme",
+    "prismjs": "npm:prismjs@1.30.0"
+  },
+  "minimumDependencyAge": 0,
+  "fmt": {
+    "include": ["build.ts", "deno.json"]
+  },
+  "lint": {
+    "include": ["build.ts"]
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "useUnknownInCatchVariables": true
+  }
+}

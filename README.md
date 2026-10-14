@@ -23,7 +23,7 @@ The derived pages are published to GitHub Pages from `main` by
 
 - <https://ethanthatonekid.github.io/dcwg-memory/>
 
-The captures are published too, as static files copied verbatim by `build.py`
+The captures are published too, as static files copied verbatim by `build.ts`
 from `raw/` to `/dcwg-memory/raw/`, and `wiki/Captures.md` links to them. They are
 copied as assets, never parsed as wiki input, so `wiki fmt` can never rewrite an
 append-only capture.
@@ -33,14 +33,15 @@ append-only capture.
 ```
 raw/discord/             append-only channel captures, one file per session
 raw/briefs/              append-only briefs received from outside this repo
-  SUMMARY.json           machine contract read by memory/scripts/memory_check.py
+  SUMMARY.json           machine contract the connector maintains
 wiki/                    the typed record, authored from the captures
   Captures.md            index of the raw captures, linked from the site
-build.py                 site builder (from wazootech/wiki-templates, wikipedia)
+build.ts                 theme config for the engine's buildThemedSite
+deno.json                import map for the site build (@wazoo/wiki/theme)
 layouts/wikipedia.html   the layout that builder renders
 assets/                  theme CSS, JS, and logo, copied into the site
 queries/                 example SPARQL queries, from the template
-wiki.yml                 Wiki CLI config (wazootech-wiki)
+wiki.yml                 Wiki CLI config (@wazoo/wiki)
 .github/workflows/       ci.yml (gates) and deploy.yml (GitHub Pages)
 ```
 
@@ -90,15 +91,13 @@ of the previous one.
 ## Validation
 
 ```bash
-wiki fmt --check        # canonical frontmatter/body formatting
-wiki check --strict -v  # config, frontmatter, routes
-wiki lint --strict -v   # links, filenames, headings
-wiki render --check -v  # SPARQL blocks in pages
-python build.py         # the site build the deploy workflow runs
+deno task --config tools/discord/deno.json gates  # fmt, check, lint, render, orphans
+deno task build                                  # the site build the deploy workflow runs
 ```
 
-`python scripts/memory_check.py --root .` from the `memory` hub validates the
-`raw/` contracts and the append-only invariant.
+The first runs the five gates, which is what CI runs on every push. `deno task
+build` writes `_site/<base_url>/`, and `deploy.yml` uploads `_site/dcwg-memory`.
+Nothing in either path needs Python.
 
 The same gates run in CI on every push and pull request, so a capture that gets
 rewritten or a page that links nowhere fails before it reaches the site.

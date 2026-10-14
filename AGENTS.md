@@ -18,8 +18,9 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
 
 - `raw/` is append-only evidence and the only source of truth: `raw/discord/`
   holds verbatim channel captures, `raw/briefs/` holds briefs received from
-  outside the repo. Never edit or rename either; add a new file. The hub's
-  `memory/scripts/memory_check.py` fails when a capture is modified or deleted.
+  outside the repo. Never edit or rename either; add a new file. The connector
+  only ever adds a capture, and nothing in the gates detects a rewrite, so the
+  invariant rests on review.
 - A capture is verbatim, including typos, wrong claims, and handle spellings.
   Corrections belong in `wiki/`, not in the capture.
 - `raw/<source>/SUMMARY.json` is connector-owned. Do not hand-edit beyond
@@ -41,17 +42,25 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
   `check --strict`, `lint --strict`, `render --check`, and the orphan check, and
   exits non-zero on any failure. CI runs the same set on every push, plus a
   connector job (`deno check`, `deno test`, and `index_page.ts --check`).
-- The engine is Deno. The `wiki` command on `PATH` is still the retired Python
-  build (`wazootech-wiki==0.1.23`); the live engine is `@wazoo/wiki`, pinned in
-  `tools/discord/deno.json` and embedded, so the connector shells out to nothing.
-  For a one-off CLI run use `deno run -A --min-dep-age 0 jsr:@wazoo/wiki/cli <cmd>`
-  rather than the `wiki` on `PATH`, which is a different engine.
-- `build.py`, `layouts/`, and `assets/` come from `wazootech/wiki-templates`
-  (`wikipedia`). `build.py` writes `_site/<base_url>/`, and `deploy.yml` uploads
+- Everything here is Deno. The live engine is `@wazoo/wiki`, pinned in
+  `tools/discord/deno.json` and embedded, so the connector shells out to nothing,
+  and pinned in `deno.json` for the site build. The `wiki` on `PATH`
+  (`/usr/local/bin/wiki`, 0.6.0) is a `deno install` of that same CLI, so a
+  one-off `wiki <cmd>` now runs the live engine. There is no Python in this repo
+  and no `pip install` in any workflow.
+- `build.ts`, `layouts/`, and `assets/` come from `wazootech/wiki-templates`
+  (`wikipedia`). From engine 0.7.0 the page loop, token substitution, infobox,
+  TOC, backlinks, categories, and metadata panels are the engine's
+  `buildThemedSite` (`@wazoo/wiki/theme`), so `build.ts` is ~80 lines of theme
+  config: the layout path, the title suffix, and Prism highlighting for the
+  metadata panels. It writes `_site/<base_url>/`, and `deploy.yml` uploads
   `_site/dcwg-memory` because the site is a project page at `/dcwg-memory/`.
-  `build.py` is the last Python in this repo and it cannot move yet: it imports
-  the Python engine as a library and the `wikipedia` theme has no Deno port in
-  `wiki-templates`. It is not on the ingest path, only the site build.
+  `deno.json` pins the engine exactly and sets `minimumDependencyAge: 0`, because
+  Deno's default 24-hour age policy refuses a pin published the same day and
+  would fail the deploy.
+- One capability did not survive the move off the Python engine: the metadata
+  panel's RDF/XML tab is gone, because the engine cannot serialize RDF/XML yet
+  and says so in the panel rather than offering a format it cannot produce.
 - `wiki.assets` lists `raw`, so the captures are copied verbatim into the
   published site at `/dcwg-memory/raw/`. They are copied, never parsed, which is
   what keeps `wiki fmt` from rewriting an append-only capture. Do not add `raw` to
@@ -67,7 +76,7 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
    not be inferred.
 2. Update `raw/discord/SUMMARY.json` counts.
 3. Fold anything durable into the wiki pages, attributing claims to handles.
-4. Run the gates below, then `python build.py` if the published site should
+4. Run the gates below, then `deno task build` if the published site should
    show the new capture. Do not hand-edit `wiki/Captures.md`: it is generated from
    the tree by `tools/discord/index_page.ts`, and `--check` fails when it drifts.
 
