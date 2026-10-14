@@ -8,22 +8,18 @@ on:
 
 jobs:
   wiki:
-    name: Wiki check + lint
+    name: Wiki gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: denoland/setup-deno@v2
         with:
-          python-version: "3.12"
-      - run: pip install wazootech-wiki==0.1.23
-      - name: Check formatting
-        run: wiki -c wiki.yml fmt --check
-      - name: Check wiki integrity
-        run: wiki -c wiki.yml check --strict -v
-      - name: Lint wiki conventions
-        run: wiki -c wiki.yml lint --strict -v
-      - name: Check rendered SPARQL blocks
-        run: wiki -c wiki.yml render --check -v
+          deno-version: v2.x
+      # fmt (which writes), check --strict, lint --strict, render --check, and
+      # the orphan check. The engine is embedded, so this job needs no Python and
+      # no `pip install`; it exits non-zero on any failure.
+      - name: Run the five gates
+        run: deno task --config tools/discord/deno.json gates
 
   connector:
     name: Discord connector check + test
@@ -39,7 +35,5 @@ jobs:
       - name: Test
         working-directory: tools/discord
         run: deno test -A
-      - name: Every page has an inbound link
-        run: deno run -A tools/discord/orphans.ts
       - name: Capture index matches the tree
         run: deno run -A tools/discord/index_page.ts --check
