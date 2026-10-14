@@ -1,0 +1,13 @@
+{
+  "tasks": {
+    "build": "deno run -A build.ts",
+    "check": "deno check build.ts"
+  },
+  "imports": {
+    "@std/path": "jsr:@std/path@^1",
+    "@wazoo/wiki/theme": "jsr:@wazoo/wiki@^0.6.0/theme"
+  },
+  "fmt": {
+    "lineWidth": 80
+  }
+}
