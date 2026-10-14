@@ -10,6 +10,7 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   buildPrompt,
+  CAPTURE_CHAR_CAP,
   guardProposal,
   readPages,
   restorePages,
@@ -126,6 +127,16 @@ Deno.test("buildPrompt carries the captures, the pages, and the last-run stamp",
   assert(prompt.includes("NEW MESSAGE TEXT"), prompt);
   assert(prompt.includes("wiki/Talk.md"), prompt);
   assert(prompt.includes("existing claim"), prompt);
+});
+Deno.test("buildPrompt keeps the newest messages when a capture exceeds the cap", () => {
+  const oldest = "OLDEST MESSAGE, already folded into the wiki";
+  const newest = "NEWEST MESSAGE, the reason the run started";
+  const capture = `${oldest}\n${"x".repeat(CAPTURE_CHAR_CAP)}\n${newest}`;
+  assert(capture.length > CAPTURE_CHAR_CAP, "fixture must exceed the cap");
+  const prompt = buildPrompt(input(), [], capture);
+  assert(prompt.includes(newest), "the newest message must survive the cap");
+  assert(!prompt.includes(oldest), "the oldest content is the part to drop");
+  assert(prompt.includes("elided by the connector"), "the elision must be announced");
 });
 
 Deno.test("runWikiPass refuses to run without a key instead of guessing", async () => {

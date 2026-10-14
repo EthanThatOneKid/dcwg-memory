@@ -150,9 +150,21 @@ export interface WikiPassApplied {
 
 export type WikiPassResult = WikiPassApplied | WikiPassRejected;
 
+/**
+ * Trim an over-long input from the old end, not the new one.
+ *
+ * A capture is chronological and ascending, so its newest messages are its last
+ * characters. This pass exists to fold in the latest activity, and a channel that
+ * grows past the cap is exactly when that matters: keeping the head would feed the
+ * model material the wiki already reflects while silently discarding the messages
+ * the run was started for. The elision is announced so the model knows the input
+ * is partial rather than assuming it is the whole capture.
+ */
 function clip(text: string, cap: number, label: string): string {
   if (text.length <= cap) return text;
-  return `${text.slice(0, cap)}\n\n[${label} truncated at ${cap} characters by the connector]`;
+  const elided = text.length - cap;
+  return `[${label}: first ${elided} characters elided by the connector, newest ${cap} kept]\n\n` +
+    text.slice(-cap);
 }
 
 /** List the wiki pages the pass may edit. */
