@@ -1,5 +1,5 @@
 ---
-'@type': schema:TechArticle
+"@type": schema:TechArticle
 schema:name: Fresh framework migration
 schema:description: Fresh, Deno's full-stack web framework, moved out of the denoland GitHub organization into freshframework. The verified facts of that move, and which of them transfer to a runtime handoff.
 wazoo:source: dcwg
@@ -31,9 +31,15 @@ The redirect is the mechanism the handoff brief leans on: GitHub answers request
 The registry did not follow the organization. JSR still records the repository for `@fresh/core` as owned by `denoland`, with the linkage frozen at 2024:
 
 ```json
-{"scope": "fresh", "name": "core",
- "githubRepository": {"owner": "denoland", "name": "fresh",
-                      "createdAt": "2024-03-27T09:21:50.889759Z"}}
+{
+  "scope": "fresh",
+  "name": "core",
+  "githubRepository": {
+    "owner": "denoland",
+    "name": "fresh",
+    "createdAt": "2024-03-27T09:21:50.889759Z"
+  }
+}
 ```
 
 `@std/path` carries the same shape, with `owner: denoland` and a 2023 linkage. So the GitHub org transfer left the package provenance pointing at the old owner, and JSR's metadata was not rewritten. For a runtime handoff, where `jsr:@std/*` and the `deno` publish scope are core infrastructure rather than a single framework package, this is the difference that matters: a framework can move and keep publishing, but whoever holds the scope is the one who decides.

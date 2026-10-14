@@ -1,5 +1,5 @@
 ---
-'@type': schema:SoftwareApplication
+"@type": schema:SoftwareApplication
 schema:name: Deno
 schema:description: A JavaScript, TypeScript, and WebAssembly runtime built on V8 and Rust, created by Ryan Dahl and Bert Belder, whose own development ends about a year after Cloudflare acquired Deno Land Inc. on 2026-10-09.
 schema:applicationCategory: DeveloperApplication

@@ -125,7 +125,9 @@ export function renderCapturesIndex(input: {
   const { siteOrigin, captures, pages } = input;
   const lines: string[] = [
     "---",
-    "'@type': schema:TechArticle",
+    // Double-quoted, because the engine's formatter canonicalizes to this and the
+    // index must be byte-identical to what a regeneration produces.
+    '"@type": schema:TechArticle',
     "schema:name: Captures",
     "schema:description: The verbatim source captures this memory is built from, published unredacted alongside the derived pages.",
     "wazoo:source: dcwg",

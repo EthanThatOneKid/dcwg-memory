@@ -1,5 +1,5 @@
 ---
-'@type': schema:TechArticle
+"@type": schema:TechArticle
 schema:name: Prior art for a minimal-core runtime
 schema:description: The projects that already implement a minimal core with opt-in extensions, checked against live repositories on 2026-10-11, covering Andromeda and Nova, LLRT, WinterJS, workerd, Bun, and the C# hosting precedent.
 wazoo:source: dcwg

@@ -1,5 +1,5 @@
 ---
-'@type': schema:SoftwareApplication
+"@type": schema:SoftwareApplication
 schema:name: Ende
 schema:description: A planned drop-in Deno fork by Paul Anthony Webb that keeps the namespace for compatibility and drops Node compatibility, Deno Deploy, KV, and Jupyter; not public yet, soft launch planned for December 2026.
 schema:applicationCategory: DeveloperApplication

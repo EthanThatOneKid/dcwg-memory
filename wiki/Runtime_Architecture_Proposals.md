@@ -1,5 +1,5 @@
 ---
-'@type': schema:TechArticle
+"@type": schema:TechArticle
 schema:name: Runtime architecture proposals
 schema:description: The 2026-10-11 architecture thread on a minimal core with opt-in extensions, the host-language question (C#, Go, Rust), extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
 wazoo:source: dcwg

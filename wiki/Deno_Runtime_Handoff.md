@@ -1,5 +1,5 @@
 ---
-'@type': schema:TechArticle
+"@type": schema:TechArticle
 schema:name: Deno runtime handoff
 schema:description: What a community handoff of the Deno runtime, std, and rusty_v8 would have to transfer, split into what is possible, what needs negotiation, and what is not on the table.
 wazoo:source: dcwg

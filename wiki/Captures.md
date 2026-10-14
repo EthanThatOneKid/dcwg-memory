@@ -1,5 +1,5 @@
 ---
-'@type': schema:TechArticle
+"@type": schema:TechArticle
 schema:name: Captures
 schema:description: The verbatim source captures this memory is built from, published unredacted alongside the derived pages.
 wazoo:source: dcwg

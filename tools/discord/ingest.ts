@@ -20,6 +20,8 @@ import { captureDay, nextCapturePath, renderCapture, DEFAULT_TAGS, DEFAULT_SERVE
 import { checkEditablePath, validateSummary } from "./guard.ts";
 import { buildPrompt, readPages, runWikiPass, writePage } from "./wiki.ts";
 import { writeCapturesIndex } from "./index_page.ts";
+import { findOrphans } from "./orphans.ts";
+import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { DiscordMessage } from "./discord.ts";
 import type { PageEdit, Provider } from "./wiki.ts";
 
@@ -44,6 +46,8 @@ Options:
   --provider <name>     anthropic or openrouter (default: whichever key is set)
   --model <id>          model id for the wiki pass (default: provider-specific)
   --skip-wiki           capture only; do not touch wiki pages
+  --attempts <n>        how many times the page pass may be retried against the gates
+                        (default 2: one retry, because the usual failure is correctable)
   --no-gates            skip the repo validation commands (local iteration only)
   --dry-run             fetch and render, but write nothing and call no model
   -h, --help            show this help
@@ -67,6 +71,8 @@ interface Args {
   model?: string;
   skipWiki: boolean;
   noGates: boolean;
+  /** How many times the page pass may be retried against the gates. */
+  attempts: number;
   dryRun: boolean;
 }
 
@@ -81,6 +87,7 @@ function parseArgs(argv: string[]): Args {
     tokenEnv: "DCWG_DISCORD_BOT_TOKEN",
     skipWiki: false,
     noGates: false,
+    attempts: 2,
     dryRun: false,
   };
   let tagsExplicit = false;
@@ -116,6 +123,7 @@ function parseArgs(argv: string[]): Args {
         break;
       }
       case "--all": args.all = true; break;
+      case "--attempts": args.attempts = Number(value()); break;
       case "--skip-wiki": args.skipWiki = true; break;
       case "--no-gates": args.noGates = true; break;
       case "--dry-run": args.dryRun = true; break;
@@ -143,31 +151,7 @@ function requireToken(name: string): string {
   return token;
 }
 
-interface CommandResult {
-  cmd: string;
-  ok: boolean;
-  output: string;
-}
-
-async function run(cmd: string[], cwd: string): Promise<CommandResult> {
-  const proc = new Deno.Command(cmd[0], { args: cmd.slice(1), cwd, stdout: "piped", stderr: "piped" });
-  const { code, stdout, stderr } = await proc.output();
-  const decoder = new TextDecoder();
-  const output = (decoder.decode(stdout) + decoder.decode(stderr)).trim();
-  return { cmd: cmd.join(" "), ok: code === 0, output };
-}
-
 /** The repo's own validation, in the order AGENTS.md prescribes. */
-export const GATES: string[][] = [
-  ["wiki", "-c", "wiki.yml", "fmt"],
-  ["wiki", "-c", "wiki.yml", "fmt", "--check"],
-  ["wiki", "-c", "wiki.yml", "check", "--strict"],
-  ["wiki", "-c", "wiki.yml", "lint", "--strict"],
-  ["wiki", "-c", "wiki.yml", "render", "--check"],
-  ["deno", "run", "-A", "tools/discord/orphans.ts"],
-  ["python3", "build.py"],
-];
-
 async function readJson(path: string): Promise<Record<string, unknown>> {
   try {
     return JSON.parse(await Deno.readTextFile(path));
@@ -307,75 +291,110 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     );
   }
 
-  const wiki = await runWikiPass({
-    root,
-    messages,
-    channelName,
-    capturePath,
-    cursorBefore: after,
-    provider: args.provider,
-    model: args.model,
-  });
+  // The capture is written once, above; only the page pass iterates. A failed
+  // gate is not fatal on the first attempt: the failures go back to the model as
+  // feedback and the pass runs again, because the usual failure is a correctable
+  // detail (a page left with no inbound link, a frontmatter block flattened into
+  // body text) rather than a bad reading of the capture.
+  let feedback: string | undefined;
+  let written: string[] = [];
+  let notes = "";
+  let usage: { inputTokens?: number; outputTokens?: number } = {};
+  let lastFailure = "";
+  let passed = false;
 
-  if ("problems" in wiki) {
+  for (let attempt = 1; attempt <= args.attempts; attempt++) {
+    const wiki = await runWikiPass({
+      root,
+      messages,
+      channelName,
+      capturePath,
+      cursorBefore: after,
+      provider: args.provider,
+      model: args.model,
+      feedback,
+    });
+
+    if ("problems" in wiki) {
+      lastFailure = `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
+      feedback = lastFailure;
+      console.log(`attempt ${attempt}/${args.attempts} rejected by the write guard`);
+      continue;
+    }
+
+    const unwritable = wiki.edits.find((edit) =>
+      !checkEditablePath(edit.path, new TextEncoder().encode(edit.content).length).ok
+    );
+    if (unwritable) {
+      await wiki.revert();
+      const check = checkEditablePath(unwritable.path, new TextEncoder().encode(unwritable.content).length);
+      lastFailure = `the model proposed a path it may not write (${unwritable.path}: ${"reason" in check ? check.reason : "no reason given"})`;
+      feedback = lastFailure;
+      console.log(`attempt ${attempt}/${args.attempts} proposed an unwritable path`);
+      continue;
+    }
+
+    written = wiki.edits.map((edit) => edit.path);
+    notes = wiki.notes;
+    usage = wiki.usage;
+    for (const edit of wiki.edits) await writePage(root, edit as PageEdit);
+    console.log(
+      `attempt ${attempt}/${args.attempts}: ${written.length} page edit(s): ${written.join(", ") || "none"}`,
+    );
+
+    await writeCapturesIndex(root);
+
+    if (args.noGates) {
+      summary.ingested = written.length;
+      await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
+      return report(
+        { venue: args.venue, channel: args.channel, capture: capturePath, pages: written, gates: "skipped" },
+        "OK",
+        `wrote ${capturePath} and ${written.length} page edit(s); gates skipped`,
+      );
+    }
+
+    const outcomes = await runWikiGates(`${root}/wiki.yml`);
+    const orphans = await findOrphans(root);
+    if (orphans.length) {
+      outcomes.push({
+        name: "orphans",
+        ok: false,
+        output: `no inbound link from another page:\n  - ${orphans.join("\n  - ")}`,
+      });
+    }
+
+    const failed = outcomes.filter((outcome) => !outcome.ok);
+    if (failed.length === 0) {
+      passed = true;
+      break;
+    }
+
+    // Undo this attempt before the next one: the model must see the pages as
+    // they were, not as its own rejected edit left them.
+    await wiki.revert();
+    await writeCapturesIndex(root);
+    lastFailure = gateFeedback(outcomes);
+    feedback = lastFailure;
+    console.log(
+      `attempt ${attempt}/${args.attempts} failed ${failed.map((outcome) => outcome.name).join(", ")}`,
+    );
+  }
+
+  if (!passed) {
     summary.status = "NEEDS_ATTENTION";
     await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
     return report(
-      { venue: args.venue, channel: args.channel, day, captured: messages.length, capture: capturePath, problems: wiki.problems },
+      {
+        venue: args.venue,
+        channel: args.channel,
+        capture: capturePath,
+        attempts: args.attempts,
+        output: lastFailure.slice(-1200),
+      },
       "NEEDS_ATTENTION",
-      `wrote ${capturePath}, but the wiki pass was rejected:\n  - ${wiki.problems.join("\n  - ")}`,
+      `wrote ${capturePath}, but the page pass failed a gate on all ${args.attempts} attempt(s), so the page edits were reverted:\n${lastFailure.slice(-1200)}`,
     );
-  }
-
-  const written: string[] = [];
-  for (const edit of wiki.edits) {
-    const bytes = new TextEncoder().encode(edit.content).length;
-    const check = checkEditablePath(edit.path, bytes);
-    if (!check.ok) {
-      await wiki.revert();
-      summary.status = "NEEDS_ATTENTION";
-      await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
-      return report(
-        { venue: args.venue, channel: args.channel, capture: capturePath, rejected: edit.path },
-        "NEEDS_ATTENTION",
-        `wrote ${capturePath}, but the model proposed a path it may not write (${edit.path}: ${check.reason}). Nothing else was changed.`,
-      );
-    }
-    written.push(edit.path);
-  }
-
-  for (const edit of wiki.edits) {
-    await writePage(root, edit as PageEdit);
-  }
-  console.log(`wiki pass proposed ${written.length} page edit(s): ${written.join(", ") || "none"}`);
-
-  const indexChanged = await writeCapturesIndex(root);
-  if (indexChanged) console.log("regenerated wiki/Captures.md from the tree");
-
-  if (args.noGates) {
-    await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
-    return report(
-      { venue: args.venue, channel: args.channel, capture: capturePath, pages: written, gates: "skipped" },
-      "OK",
-      `wrote ${capturePath} and ${written.length} page edit(s); gates skipped`,
-    );
-  }
-
-  if (written.length || indexChanged) {
-    for (const gate of GATES) {
-      const result = await run(gate, root);
-      if (!result.ok) {
-        await wiki.revert();
-        await writeCapturesIndex(root);
-        summary.status = "NEEDS_ATTENTION";
-        await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
-        return report(
-          { venue: args.venue, channel: args.channel, capture: capturePath, failedGate: result.cmd, output: result.output.slice(-1200) },
-          "NEEDS_ATTENTION",
-          `wrote ${capturePath}, but \`${result.cmd}\` failed, so the page edits were reverted:\n${result.output.slice(-1200)}`,
-        );
-      }
-    }
   }
 
   const summaryErrors = validateSummary(summary);
@@ -399,8 +418,8 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       capture: capturePath,
       captured: messages.length,
       pages: written,
-      usage: wiki.usage,
-      notes: wiki.notes,
+      usage,
+      notes,
     },
     "OK",
     `wrote ${capturePath} (${messages.length} messages) and updated ${written.length} page(s); all gates pass`,

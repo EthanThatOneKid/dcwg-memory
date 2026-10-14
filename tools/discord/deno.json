@@ -2,7 +2,8 @@
   "tasks": {
     "ingest": "deno run -A ingest.ts",
     "test": "deno test -A",
-    "check": "deno check ingest.ts"
+    "check": "deno check ingest.ts",
+    "gates": "deno run -A gates.ts"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1",
@@ -10,7 +11,8 @@
     "ai": "npm:ai@^7.0.0",
     "@ai-sdk/anthropic": "npm:@ai-sdk/anthropic@^4.0.0",
     "zod": "npm:zod@^4.0.0",
-    "@openrouter/ai-sdk-provider": "npm:@openrouter/ai-sdk-provider@^3.0.0"
+    "@openrouter/ai-sdk-provider": "npm:@openrouter/ai-sdk-provider@^3.0.0",
+    "@wazoo/wiki": "jsr:@wazoo/wiki@^0.6.0"
   },
   "fmt": {
     "lineWidth": 100

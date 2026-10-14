@@ -50,8 +50,13 @@ lint:
   filename_pattern: error
   link_style: error
 
-# Markdown formatting options (wiki fmt).
-fmt:
-  wrap: "no"
-  end_of_line: lf
-  extensions: [gfm, front_matters, wikilink, toc, footnote]
+# Markdown formatting options (wiki fmt) are deliberately not set here.
+#
+# The two engines spell them differently and each rejects the other's keys, so a
+# shared config is only possible by leaving them at the defaults. The Deno
+# engine (`@wazoo/wiki`, 0.2.0+) defaults to `textWrap: "never"` and
+# `newLineKind: "lf"`, which is what this repo used to ask for; the retired
+# Python engine (`wazootech-wiki==0.1.23`) also accepts the config without them.
+# Do not reintroduce a `fmt:` block while `build.py` still loads this file
+# through the Python engine: it fails with `Invalid key 'textWrap'`, and that
+# would take the Pages deploy down with it.

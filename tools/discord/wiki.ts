@@ -122,6 +122,8 @@ export interface WikiPassInput {
   captureText?: string;
   /** Last-run stamp to show the model. Defaults to raw/discord/SUMMARY.json. */
   lastUpdated?: string;
+  /** Why the previous attempt was rejected, so a retry can fix it. */
+  feedback?: string;
 }
 
 export interface WikiPassRejected {
@@ -159,6 +161,12 @@ export function buildPrompt(input: WikiPassInput, pages: Array<{ path: string; t
   const parts: string[] = [];
   parts.push(`LAST UPDATED: ${input.lastUpdated ?? "(unknown)"}`);
   parts.push(`CHANNEL: #${input.channelName}`);
+  if (input.feedback) {
+    parts.push(
+      "YOUR PREVIOUS ATTEMPT WAS REJECTED. Nothing from it was kept. Fix exactly this and "
+        + "return a corrected set of edits:\n\n" + input.feedback,
+    );
+  }
   parts.push(`NEW CAPTURE (verbatim messages; the only new information in this task):`);
   parts.push(
     `--- BEGIN capture ${input.capturePath} ---\n${

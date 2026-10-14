@@ -1,5 +1,5 @@
 ---
-'@type': schema:Organization
+"@type": schema:Organization
 schema:name: Deno Core Working Group
 schema:description: An informal group of Deno users organizing on Discord to keep the runtime alive after Cloudflare acquired Deno Land Inc. and Deno ended its own runtime development.
 schema:keywords:

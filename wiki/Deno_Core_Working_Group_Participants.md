@@ -1,5 +1,5 @@
 ---
-'@type': schema:ItemList
+"@type": schema:ItemList
 schema:name: Deno Core Working Group participants
 schema:description: "The Discord handles visible in the group's #talk capture, with the public identity behind each handle where one could be confirmed."
 wazoo:source: dcwg
