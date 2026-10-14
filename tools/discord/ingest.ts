@@ -341,6 +341,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     console.log(
       `attempt ${attempt}/${args.attempts}: ${written.length} page edit(s): ${written.join(", ") || "none"}`,
     );
+    for (const adjustment of wiki.adjustments) console.log(`  adjusted: ${adjustment}`);
 
     await writeCapturesIndex(root);
 

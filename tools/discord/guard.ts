@@ -59,6 +59,28 @@ export const MAX_PAGE_BYTES = 128 * 1024;
 export function hasFrontmatter(text: string): boolean {
   return /^---\r?\n/.test(text);
 }
+/** A page's opening frontmatter block, including its trailing newline. */
+const FRONTMATTER_BLOCK = /^(---\r?\n[\s\S]*?\r?\n---\r?\n)/;
+
+/**
+ * Put a page's frontmatter back when a proposal dropped it.
+ *
+ * The prompt requires the block verbatim, but a model that returns body-only
+ * content would otherwise fail the whole pass, and a refused pass never advances
+ * the cursor, so the same run would repeat forever. Carrying the block forward is
+ * what the prompt already asked for, applied deterministically instead of
+ * requested. Returns the repaired content, or null when nothing needed repair.
+ */
+export function carryFrontmatterForward(
+  prior: string | null | undefined,
+  content: string,
+): string | null {
+  if (!prior || !hasFrontmatter(prior)) return null;
+  if (hasFrontmatter(content)) return null;
+  const match = FRONTMATTER_BLOCK.exec(prior);
+  if (!match) return null;
+  return `${match[1]}\n${content.replace(/^\r?\n+/, "")}`;
+}
 
 export type PathCheck = { ok: true } | { ok: false; reason: string };
 

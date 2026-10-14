@@ -121,11 +121,25 @@ reasoning model is the trade: the first real run, a 593-message backfill, cost
 ~25k input and ~24k output tokens and took about three minutes, at no charge.
 
 If the pass or a gate fails, the capture stays and the page edits are reverted, so
-a bad inference never commits prose that does not pass the repo's own checks. One
-failure the gates cannot catch is an edit that flattens a page's YAML frontmatter
-into body text: `wiki check` and `wiki lint` do not require frontmatter, so they
-pass on the flattened page. The write guard refuses that edit, and the prompt says
-to leave frontmatter alone.
+a bad inference never commits prose that does not pass the repo's own checks. The
+reverted pass leaves the cursor where it was, which is deliberate: the next run
+re-fetches the same range and retries rather than skipping material the wiki never
+absorbed. The cost is that a pass which fails for a reason the model cannot fix
+repeats every day, so the two failures the model reliably produced are handled in
+code before the guard sees the proposal (`adjustProposal` in `tools/discord/wiki.ts`):
+an edit to `wiki/Captures.md` is dropped, because the connector rebuilds that index
+from the tree right after applying a pass, and a page that had frontmatter keeps it,
+because carrying the block forward is what the prompt already asked for. Both are
+reported as `adjusted:` lines in the run. A proposal that still breaks a rule after
+that is refused and the pass is retried.
+
+One failure the gates cannot catch is an edit that flattens a page's YAML frontmatter
+into body text: `wiki check` and `wiki lint` do not require frontmatter, so they pass
+on the flattened page. The write guard refuses that edit as the backstop, and the
+connector's frontmatter carry-forward is what keeps it from sinking the run. To see
+what the model actually returned when a pass is refused, set `DCWG_DUMP_PROPOSAL` to
+a path; the guard's message names the page and never the content, and the content is
+the part a prompt fix depends on.
 
 The connector is verified end to end: `Dodo [DCWG]` (app `1559632041484484709`) is
 installed in the server, and a full backfill of `#talk` read 593 messages in about
