@@ -13,7 +13,7 @@
     "jsr:@std/yaml@^1.0.5": "1.3.0",
     "jsr:@wazoo/linked-markdown@0.1": "0.1.0",
     "jsr:@wazoo/sparql-engine@0.4.4": "0.4.4",
-    "jsr:@wazoo/wiki@0.6": "0.6.0",
+    "jsr:@wazoo/wiki@0.7.0": "0.7.0",
     "npm:@dprint/formatter@0.5.1": "0.5.1",
     "npm:@dprint/json@0.21.3": "0.21.3",
     "npm:@dprint/markdown@0.20.0": "0.20.0",
@@ -31,6 +31,7 @@
     "npm:lax-markup@0.3.2": "0.3.2",
     "npm:markdown-it@^14.1.0": "14.3.2",
     "npm:n3@2": "2.7.12",
+    "npm:prismjs@1.30.0": "1.30.0",
     "npm:rdf-validate-shacl@0.6.5": "0.6.5",
     "npm:rdfjs-inference-engine@0.2.2": "0.2.2",
     "npm:yaml@2.9.1": "2.9.1"
@@ -83,8 +84,8 @@
         "npm:@rdfjs/types"
       ]
     },
-    "@wazoo/wiki@0.6.0": {
-      "integrity": "c2fd0d4b5fd595330dfd7dec59e7252c4d0520405d0dc90c72bb1ed0e01e4348",
+    "@wazoo/wiki@0.7.0": {
+      "integrity": "34be58cf4140d8ae5a590e5628c1dbe96cf7f085a3309a167e1268e689b1b891",
       "dependencies": [
         "jsr:@std/fs",
         "jsr:@std/path@1",
@@ -1656,6 +1657,9 @@
     "prelude-ls@1.2.1": {
       "integrity": "sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g=="
     },
+    "prismjs@1.30.0": {
+      "integrity": "sha512-DEvV2ZF2r2/63V+tK8hQvrR2ZGn10srHbXviTlcv7Kpzw8jWiNTqbVgjO3IY8RxrrOUF8VPMQQFysYYYv0YZxw=="
+    },
     "process@0.11.10": {
       "integrity": "sha512-cdGef/drWFoydD1JsMzuFf8100nZl+GT+yacc2bEced5f9Rjk4z+WtFUTBu9PhOi9j/jfmBPu0mMEY4wIdAF8A=="
     },
@@ -1898,7 +1902,8 @@
   "workspace": {
     "dependencies": [
       "jsr:@std/path@1",
-      "jsr:@wazoo/wiki@0.6"
+      "jsr:@wazoo/wiki@0.7.0",
+      "npm:prismjs@1.30.0"
     ]
   }
 }

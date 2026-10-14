@@ -49,13 +49,18 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
   one-off `wiki <cmd>` now runs the live engine. There is no Python in this repo
   and no `pip install` in any workflow.
 - `build.ts`, `layouts/`, and `assets/` come from `wazootech/wiki-templates`
-  (`wikipedia`). `build.ts` is that theme written against the engine's published
-  `@wazoo/wiki/theme` entrypoint, so the site build is Deno like everything else
-  and this repo holds no Python. It writes `_site/<base_url>/`, and `deploy.yml`
-  uploads `_site/dcwg-memory` because the site is a project page at
-  `/dcwg-memory/`. One feature did not survive the port: the metadata panel's
-  RDF/XML tab is gone, because the engine cannot serialize RDF/XML yet and says
-  so in the panel rather than offering a format it cannot produce.
+  (`wikipedia`). From engine 0.7.0 the page loop, token substitution, infobox,
+  TOC, backlinks, categories, and metadata panels are the engine's
+  `buildThemedSite` (`@wazoo/wiki/theme`), so `build.ts` is ~80 lines of theme
+  config: the layout path, the title suffix, and Prism highlighting for the
+  metadata panels. It writes `_site/<base_url>/`, and `deploy.yml` uploads
+  `_site/dcwg-memory` because the site is a project page at `/dcwg-memory/`.
+  `deno.json` pins the engine exactly and sets `minimumDependencyAge: 0`, because
+  Deno's default 24-hour age policy refuses a pin published the same day and
+  would fail the deploy.
+- One capability did not survive the move off the Python engine: the metadata
+  panel's RDF/XML tab is gone, because the engine cannot serialize RDF/XML yet
+  and says so in the panel rather than offering a format it cannot produce.
 - `wiki.assets` lists `raw`, so the captures are copied verbatim into the
   published site at `/dcwg-memory/raw/`. They are copied, never parsed, which is
   what keeps `wiki fmt` from rewriting an append-only capture. Do not add `raw` to

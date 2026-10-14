@@ -36,7 +36,7 @@ raw/briefs/              append-only briefs received from outside this repo
   SUMMARY.json           machine contract the connector maintains
 wiki/                    the typed record, authored from the captures
   Captures.md            index of the raw captures, linked from the site
-build.ts                 site builder (from wazootech/wiki-templates, wikipedia)
+build.ts                 theme config for the engine's buildThemedSite
 deno.json                import map for the site build (@wazoo/wiki/theme)
 layouts/wikipedia.html   the layout that builder renders
 assets/                  theme CSS, JS, and logo, copied into the site
