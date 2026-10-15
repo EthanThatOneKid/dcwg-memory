@@ -3,6 +3,13 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # An ingest run commits and pushes with the repository's GITHUB_TOKEN, and
+  # GitHub starts no new workflow run for an event that token produced, so
+  # `push` alone never fires here and the published site stays one ingest
+  # behind. Trigger on the ingest run finishing instead.
+  workflow_run:
+    workflows: ["Discord ingest"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +23,9 @@ concurrency:
 
 jobs:
   build:
+    # An ingest that failed pushes nothing, so skip the redeploy rather than
+    # republish identical content.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       # Enables Pages for the repository if it is not already enabled, and
