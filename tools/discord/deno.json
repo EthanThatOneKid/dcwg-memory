@@ -3,6 +3,7 @@
     "ingest": "deno run -A ingest.ts",
     "test": "deno test -A",
     "check": "deno check ingest.ts",
+    "invite": "deno run -A invite.ts",
     "gates": "deno run -A gates.ts"
   },
   "imports": {
