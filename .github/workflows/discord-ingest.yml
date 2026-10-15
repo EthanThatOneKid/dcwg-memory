@@ -58,8 +58,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # venue=channel-id, one per line. Add a line to capture another channel.
+      # A venue is the channel plus every thread under it, so a forum works here
+      # too: its posts are threads, and each one is captured under its own heading.
       VENUES: |
-        dcwg-talk=1558888938842624093
+        dcwg-brainstorm=1558965777850302546
+        dcwg-propose=1559218298128695386
       # github.event.inputs is a string map that is empty on a scheduled run, so
       # every one of these falls back in the shell rather than in an expression.
       MODEL: ${{ github.event.inputs.model }}

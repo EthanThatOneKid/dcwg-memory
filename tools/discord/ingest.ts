@@ -15,13 +15,28 @@
  *   ANTHROPIC_API_KEY        used by the wiki pass only
  */
 
-import { fetchChannelMeta, fetchMessages, snowflakeFromIso, isoUtc } from "./discord.ts";
-import { captureDay, nextCapturePath, renderCapture, DEFAULT_TAGS, DEFAULT_SERVER_LABEL } from "./capture.ts";
+import {
+  fetchChannelMeta,
+  fetchMessages,
+  fetchVenueThreads,
+  isForum,
+  isoUtc,
+  snowflakeFromIso,
+  threadTitle,
+} from "./discord.ts";
+import {
+  captureDay,
+  DEFAULT_SERVER_LABEL,
+  DEFAULT_TAGS,
+  nextCapturePath,
+  renderCapture,
+} from "./capture.ts";
 import { checkEditablePath, validateSummary } from "./guard.ts";
 import { buildPrompt, readPages, runWikiPass, writePage } from "./wiki.ts";
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
 import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
+import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
 import type { PageEdit, Provider } from "./wiki.ts";
 
@@ -32,14 +47,20 @@ Usage:
 
 Required:
   --channel <id>        Discord channel id to capture
-  --venue <venue>       capture venue slug, e.g. dcwg-talk (names the file)
+  --venue <venue>       capture venue slug, e.g. dcwg-brainstorm (names the file)
+
+A venue is the channel plus every thread under it. A forum holds nothing else:
+its posts are threads, and the post body is the first message of one. A text
+channel's threads are captured too, because its top-level history never returns
+them.
 
 Options:
   --out <dir>           capture directory (default: raw/discord)
   --root <dir>          repo root (default: current directory)
   --server <label>      server name for the capture prose
   --tag <tag>           repeatable; defaults to ${DEFAULT_TAGS.join(", ")}
-  --limit <n>           max messages to pull (default 200; 0 means no cap)
+  --limit <n>           max messages to pull per channel and per thread
+                        (default 200; 0 means no cap)
   --all                 ignore the cursor and pull from the channel's first message
   --since <iso>         ISO-8601 UTC lower bound (overrides the cursor)
   --token-env <name>    env var holding the bot token (default: DCWG_DISCORD_BOT_TOKEN)
@@ -212,35 +233,91 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
 
   const channel = await fetchChannelMeta(args.channel, token);
   const channelName = channel.name ?? args.channel;
+  const forum = isForum(channel.type);
 
   const cursorStore = await readJson(cursorPath);
-  let after: string | null = null;
-  if (args.since) after = String(snowflakeFromIso(args.since));
-  else if (!args.all && typeof cursorStore[args.channel] === "string") after = cursorStore[args.channel] as string;
 
-  // With nothing to resume from, start at the channel's first message and walk
-  // forward. Anchoring on "now" instead, with a cap, keeps the newest N and
-  // advances the cursor past everything older: measured 2026-10-15, that left
-  // the 395 messages between the last capture and the newest 200 unreachable,
-  // because the next run resumed from the newest id and never looked back.
-  if (!after) after = "0";
-
-  const fetched = await fetchMessages(args.channel, token, { after, limit: args.limit });
-  if (args.limit > 0 && fetched.length >= args.limit) {
-    console.error(
-      `warning: hit the ${args.limit}-message cap; this run took the oldest ${args.limit} ` +
-        `message(s) after the cursor, and the next run resumes where this one stopped. ` +
-        `Re-run with --limit 0 to drain the backlog in one pass.`,
-    );
+  /**
+   * Where a channel or a thread resumes.
+   *
+   * An explicit --since or --all wins over the stored cursor, and something never
+   * seen before starts at its first message. Anchoring on "now" instead, with a
+   * cap, keeps the newest N and advances the cursor past everything older:
+   * measured 2026-10-15, that left the 395 messages between the last capture and
+   * the newest 200 unreachable, because the next run resumed from the newest id
+   * and never looked back.
+   */
+  function resumeFrom(id: string): string {
+    if (args.since) return String(snowflakeFromIso(args.since));
+    if (args.all) return "0";
+    const stored = cursorStore[id];
+    return typeof stored === "string" ? stored : "0";
   }
 
-  const messages: DiscordMessage[] = fetched.filter((m) => !m.author?.bot);
+  function warnIfCapped(count: number, where: string): void {
+    if (args.limit > 0 && count >= args.limit) {
+      console.error(
+        `warning: hit the ${args.limit}-message cap on ${where}; this run took the oldest ` +
+          `${args.limit} message(s) after the cursor, and the next run resumes where this one ` +
+          `stopped. Re-run with --limit 0 to drain the backlog in one pass.`,
+      );
+    }
+  }
+
+  const sections: CaptureSection[] = [];
+  /**
+   * The cursor keys this run may advance, each with the newest message id for it.
+   *
+   * The stored cursor is keyed by channel id and by thread id, because a thread is
+   * its own message stream with its own resume point. Advancing a channel's key to
+   * a thread's newest id would be a bug rather than a shortcut: the two streams
+   * interleave in time, so the next run would skip the channel's own messages that
+   * are older than that thread message.
+   */
+  const advances = new Map<string, string>();
+
+  let topLevelResume: string | null = null;
+  if (!forum) {
+    topLevelResume = resumeFrom(args.channel);
+    const fetched = await fetchMessages(args.channel, token, {
+      after: topLevelResume,
+      limit: args.limit,
+    });
+    warnIfCapped(fetched.length, `#${channelName}`);
+    const messages = fetched.filter((m) => !m.author?.bot);
+    if (messages.length) {
+      sections.push({ messages });
+      advances.set(args.channel, messages[messages.length - 1].id);
+    }
+  }
+
+  // Threads are captured whatever the channel type. For a forum they are the whole
+  // venue, since its top-level history holds only the post starters and no replies;
+  // for a text channel they are content its top-level history never returns, so
+  // skipping them would silently drop whole side discussions.
+  for (const thread of await fetchVenueThreads(channel, token)) {
+    const fetched = await fetchMessages(thread.id, token, {
+      after: resumeFrom(thread.id),
+      limit: args.limit,
+    });
+    warnIfCapped(fetched.length, `thread ${thread.id}`);
+    const messages = fetched.filter((m) => !m.author?.bot);
+    if (!messages.length) continue;
+    sections.push({ title: threadTitle(thread), messages });
+    advances.set(thread.id, messages[messages.length - 1].id);
+  }
+
+  const messages: DiscordMessage[] = sections
+    .flatMap((section) => section.messages)
+    .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0));
+
   if (!messages.length) {
     return report({ venue: args.venue, channel: args.channel, captured: 0 }, "OK", `no new messages in #${channelName}`);
   }
 
   const text = renderCapture({
     messages,
+    sections,
     channelId: args.channel,
     channelName,
     tags: args.tags,
@@ -269,7 +346,10 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   const nowIso = isoUtc(new Date().toISOString());
   {
     const store: Record<string, unknown> = await readJson(cursorPath) as Record<string, unknown>;
-    store[args.channel] = messages[messages.length - 1].id;
+    // Only the keys this connector will read again are advanced. For a forum that
+    // is the thread ids and never the channel id, because a forum's own channel id
+    // is not a resume point and a cursor nothing reads is just a stale claim.
+    for (const [id, newest] of advances) store[id] = newest;
     store._lastRun = nowIso;
     await Deno.writeTextFile(cursorPath, JSON.stringify(store, null, 2) + "\n");
   }
@@ -316,7 +396,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       messages,
       channelName,
       capturePath,
-      cursorBefore: after,
+      cursorBefore: topLevelResume,
       provider: args.provider,
       model: args.model,
       feedback,

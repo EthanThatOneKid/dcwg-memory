@@ -93,10 +93,18 @@ per-channel cursor in `raw/discord/.cursor`, and rewrites the connector-owned
 `raw/discord/SUMMARY.json` counts. `raw/discord/.cursor` is a sibling of
 `SUMMARY.json`, so `memory-check` treats both as mutable while captures stay
 append-only. Run it with
-`deno task ingest -- --channel <id> --venue <venue>`; `deno test` covers
+`deno task ingest --channel <id> --venue <venue>`; `deno test` covers
 pagination, the renderer, the write guards, and a whole run against a stubbed API.
 It writes a new `<day>_<venue>[-n].md` rather than rewriting one, so a second run
 the same day adds a capture instead of editing evidence.
+A venue is the channel plus every thread under it, because a thread is a separate
+message stream that the channel's own history never returns. That is also what
+makes a forum capturable: `#propose` is a forum, so its posts are threads and a post's
+body is the first message under its heading. The cursor is keyed by channel id and
+by thread id for the same reason, since a thread message and a channel message
+interleave in time and advancing a channel's cursor to a thread's newest id would
+skip that channel's own older messages. A forum's channel id is never a resume
+point, so it never gets a cursor.
 `tools/discord_invite.py <app-id>` prints the install URL for that bot, scoped to
 `View Channel` and `Read Message History` and locked to the DCWG server. Both
 tools ship with the connector because the invite is the one step that needs a
@@ -119,7 +127,8 @@ privileged intent and no portal approval step. That intent matters only for
 live delivery over the gateway, which this connector does not use.
 
 The daily run is automated: `.github/workflows/discord-ingest.yml` runs the
-connector on a cron, which then canonicalizes and validates its own output
+connector on a cron over the `VENUES` list, which is `#brainstorm` and
+`#propose` only. It then canonicalizes and validates its own output
 (`deno task gates`: fmt, the three checks, the orphan check), and commits and
 pushes to `main`
 when they pass. It pushes rather than opening a pull request because the cursor in
