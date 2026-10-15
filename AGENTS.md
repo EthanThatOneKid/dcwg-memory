@@ -42,6 +42,12 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
   `check --strict`, `lint --strict`, `render --check`, and the orphan check, and
   exits non-zero on any failure. CI runs the same set on every push, plus a
   connector job (`deno check`, `deno test`, and `index_page.ts --check`).
+- An ingest commit is pushed with the repository's `GITHUB_TOKEN`, and GitHub
+  starts no workflow run for an event that token produced, so a plain `push`
+  trigger never fires for it. `ci.yml` and `deploy.yml` therefore also trigger on
+  the ingest workflow finishing: that is what validates an ingest commit, and what
+  carries a new capture to the published site, which otherwise stays one ingest
+  behind.
 - Everything here is Deno. The live engine is `@wazoo/wiki`, pinned in
   `tools/discord/deno.json` and embedded, so the connector shells out to nothing,
   and pinned in `deno.json` for the site build. The `wiki` on `PATH`
