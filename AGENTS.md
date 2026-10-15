@@ -93,7 +93,7 @@ per-channel cursor in `raw/discord/.cursor`, and rewrites the connector-owned
 `raw/discord/SUMMARY.json` counts. `raw/discord/.cursor` is a sibling of
 `SUMMARY.json`, so `memory-check` treats both as mutable while captures stay
 append-only. Run it with
-`deno task ingest -- --channel <id> --venue <venue>`; `deno test` covers
+`deno task ingest --channel <id> --venue <venue>`; `deno test` covers
 pagination, the renderer, the write guards, and a whole run against a stubbed API.
 It writes a new `<day>_<venue>[-n].md` rather than rewriting one, so a second run
 the same day adds a capture instead of editing evidence.
