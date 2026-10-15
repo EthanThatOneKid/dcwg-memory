@@ -78,12 +78,40 @@ export function renderBody(messages: DiscordMessage[]): string {
   return lines.join("\n").trim() + "\n";
 }
 
-export interface CaptureInput {
+/**
+ * One block of a capture: a channel's own top-level history, or one thread.
+ *
+ * A forum has no top-level history at all, so every one of its blocks is titled.
+ * A text channel keeps its untitled block first and follows it with its threads.
+ */
+export interface CaptureSection {
+  /** Heading for the block; omitted for a channel's top-level history. */
+  title?: string;
   messages: DiscordMessage[];
+}
+
+export interface CaptureInput {
+  /**
+   * The flat message list, ascending, across every section. It supplies the
+   * frontmatter and the prose, so it must be the whole capture even when
+   * `sections` is what gets rendered.
+   */
+  messages: DiscordMessage[];
+  /** How to group the body; omitted means one undivided body. */
+  sections?: CaptureSection[];
   channelId: string;
   channelName: string;
   tags?: string[];
   serverLabel?: string;
+}
+
+/** Render one block per section, separated by a rule. */
+export function renderBlocks(sections: CaptureSection[]): string {
+  return sections
+    .map((section) =>
+      section.title ? `## ${section.title}\n\n${renderBody(section.messages)}` : renderBody(section.messages)
+    )
+    .join("\n---\n\n");
 }
 
 export function participantsOf(messages: DiscordMessage[]): string[] {
@@ -102,12 +130,20 @@ export function captureDay(messages: DiscordMessage[]): string {
 
 export function renderCapture(input: CaptureInput): string {
   const { messages, channelId, channelName } = input;
+  const sections = input.sections ?? [];
   const tags = input.tags ?? DEFAULT_TAGS;
   const serverLabel = input.serverLabel ?? DEFAULT_SERVER_LABEL;
   const day = captureDay(messages);
   const participants = participantsOf(messages);
   const spanStart = isoUtc(messages[0].timestamp);
   const spanEnd = isoUtc(messages[messages.length - 1].timestamp);
+
+  const threads = sections.filter((s) => s.title).length;
+  const threadClause = threads ? `, across ${threads} thread${threads === 1 ? "" : "s"}` : "";
+  const groupingNote = threads
+    ? " Threads are grouped under their own headings below, and a forum post's body is the " +
+      "first message under its heading."
+    : "";
 
   const head =
     "---\n" +
@@ -119,7 +155,8 @@ export function renderCapture(input: CaptureInput): string {
     "description: " +
     yamlStr(
       `Append-only capture of #${channelName} from ${spanStart} to ${spanEnd}, pulled ` +
-        `from the Discord REST API. ${messages.length} messages, ${participants.length} participants.`,
+        `from the Discord REST API. ${messages.length} messages, ${participants.length} participants` +
+        `${threadClause}.`,
     ) +
     "\n" +
     "tags:\n" +
@@ -129,10 +166,11 @@ export function renderCapture(input: CaptureInput): string {
     `${spanStart} to ${spanEnd}. Pulled from the Discord REST API, not pasted from a client, ` +
     "so every timestamp below is the server's own UTC timestamp and every message carries its " +
     "snowflake id. Message text is reproduced verbatim, including typos. Bot and webhook " +
-    "messages are omitted. Attachment and embed URLs are recorded as sent; they may expire.\n\n" +
+    "messages are omitted. Attachment and embed URLs are recorded as sent; they may expire." +
+    `${groupingNote}\n\n` +
     "---\n";
 
-  return head + renderBody(messages);
+  return head + (sections.length ? renderBlocks(sections) : renderBody(messages));
 }
 
 /** Never overwrite an existing capture: a re-run gets the next free suffix. */

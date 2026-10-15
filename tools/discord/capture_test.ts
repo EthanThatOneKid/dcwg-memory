@@ -14,6 +14,7 @@ import {
   contentBlock,
   nextCapturePath,
   participantsOf,
+  renderBlocks,
   renderBody,
   renderCapture,
   yamlStr,
@@ -140,3 +141,53 @@ Deno.test("nextCapturePath never reuses a taken capture", () => {
     "raw/discord/2026-08-01_general.md",
   );
 });
+
+Deno.test("renderBlocks titles a thread and leaves a channel's own history untitled", () => {
+  const top = msg({ id: "10", content: "channel message" });
+  const reply = msg({ id: "20", content: "thread reply" });
+  const out = renderBlocks([
+    { messages: [top] },
+    { title: "Rust Academy? (thread 20)", messages: [reply] },
+  ]);
+  assert(!out.startsWith("##"), "a channel's own history carries no heading");
+  assert(out.includes("## Rust Academy? (thread 20)"), "the thread gets one");
+  assert(out.includes("channel message") && out.includes("thread reply"));
+  assert(
+    out.indexOf("channel message") < out.indexOf("thread reply"),
+    "blocks keep the order they are given in",
+  );
+});
+
+Deno.test("a sectioned capture counts every block in its frontmatter and says how it grouped them", () => {
+  const sections = [
+    { messages: [msg({ id: "10", content: "top", author: { id: "1", username: "andy" } })] },
+    {
+      title: "Rust Academy? (thread 20)",
+      messages: [msg({ id: "20", content: "reply", author: { id: "2", username: "ethan" } })],
+    },
+  ];
+  const text = renderCapture({
+    messages: sections.flatMap((s) => s.messages),
+    sections,
+    channelId: "C",
+    channelName: "idea",
+  });
+  assert(
+    text.includes("2 messages, 2 participants, across 1 thread"),
+    "the frontmatter counts the whole capture, not one block",
+  );
+  assert(
+    text.includes("Threads are grouped under their own headings"),
+    "the prose explains the grouping rather than leaving it implicit",
+  );
+  assert(text.includes("## Rust Academy? (thread 20)"));
+});
+
+Deno.test("a capture with no sections renders exactly as it did before sections existed", () => {
+  const messages = [msg({ id: "10", content: "one" }), msg({ id: "11", content: "two" })];
+  const bare = { messages, channelId: "C", channelName: "talk" };
+  assertEquals(renderCapture(bare), renderCapture({ ...bare, sections: [] }));
+  assert(!renderCapture(bare).includes("## "), "no headings without sections");
+  assert(!renderCapture(bare).includes("across "), "no thread clause without sections");
+});
+
