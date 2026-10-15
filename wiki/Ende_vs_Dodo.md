@@ -12,15 +12,16 @@ These are not two forks. They are a project and a preference. [Ende](Ende_Runtim
 
 ## What each one actually is
 
-|                   | Ende                                                                                      | Dodo                                                                                             |
-| ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| What it is        | A fork with a published roadmap                                                           | A name floated in chat, with no project behind it                                                |
-| Origin            | [WM-105, "Beginning of the Ende"](https://blog.webb.page/WM-105), shared into the channel | One message from `daniellacosse` at 10:23 AM on 2026-10-11                                       |
-| Owner             | Paul Anthony Webb (`netop://ウィビ`)                                                      | Nobody                                                                                           |
-| Scope             | Keeps the namespace, drops Node compatibility, Deno Deploy, KV, and Jupyter               | Keeps Deno as it is: LTS, security patches, the permission model, with extensions like KV later  |
-| Namespace claimed | GitHub org `theende` and JSR scope `ende` on 2026-10-10, plus `ende.sh`                   | Nothing. JSR scope `dodo` is free; GitHub `dodo`, npm `dodo`, and crates.io `dodo` are all taken |
-| Public code       | None. Development happens on the author's own infrastructure at `eol.sh`                  | None                                                                                             |
-| Timeline          | Soft launch in December 2026, the author's own schedule                                   | None                                                                                             |
+|                   | Ende                                                                                      | Dodo                                                                                                                                                      |
+| ----------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What it is        | A fork with a published roadmap                                                           | A name floated in chat, with no project behind it, but noted to be tied for the 5th most-starred fork with 9 stars (2026-10-13T22:30:39Z `daniellacosse`) |
+| Origin            | [WM-105, "Beginning of the Ende"](https://blog.webb.page/WM-105), shared into the channel | One message from `daniellacosse` at 10:23 AM on 2026-10-11                                                                                                |
+| Owner             | Paul Anthony Webb (`netop://ウィビ`)                                                      | Nobody                                                                                                                                                    |
+| Scope             | Keeps the namespace, drops Node compatibility, Deno Deploy, KV, and Jupyter               | Keeps Deno as it is: LTS, security patches, the permission model, with extensions like KV later                                                           |
+| Namespace claimed | GitHub org `theende` and JSR scope `ende` on 2026-10-10, plus `ende.sh`                   | Nothing. JSR scope `dodo` is free; GitHub `dodo`, npm `dodo`, and crates.io `dodo` are all taken                                                          |
+| Default branch    | `main` (assumed)                                                                          | Experimented with `trunk` (renamed from `main`), but switched back to `main` (2026-10-14T20:08:57Z `CaptainLach`)                                         |
+| Public code       | None. Development happens on the author's own infrastructure at `eol.sh`                  | None                                                                                                                                                      |
+| Timeline          | Soft launch in December 2026, the author's own schedule                                   | None                                                                                                                                                      |
 
 ## The axis that separates them
 

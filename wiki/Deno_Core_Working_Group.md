@@ -35,7 +35,7 @@ Two captures so far: `raw/discord/2026-10-11_dcwg-talk.md`, the group's `#talk` 
 ## What the group has not settled
 
 - **The name.** Candidates raised on 2026-10-11: `endo` and `noend` (andy), `Pteryx` with the `ptx` command (`netop://ウィビ`), `dodo` (daniellacosse and `w`), and `Ende` (the name `netop://ウィビ` actually shipped). See [Deno fork options and naming](Deno_Fork_Options.md).
-- **One fork or several.** `netop://ウィビ` argued for at least two: a full-compatibility fork and his own stripped-down one. `daniellacosse` proposed instead a single core runtime whose features (KV, Deploy, Node compatibility) are modules you switch on per project.
+- **One fork or several.** `netop://ウィビ` argued for at least two: a full-compatibility fork and his own stripped-down one. `daniellacosse` proposed instead a single core runtime whose features (KV, Deploy, Node compatibility) are modules you switch on per project, and later expressed the expectation that various companies would take on Deno forks to keep their infrastructure running (2026-10-13T20:54:18Z).
 - **Whether to ask for `denoland/deno` itself or to start elsewhere.** Stag Math's reading of the thread: two parties, one stripped-down fork and one that keeps Deno core, with the possibility that "we may be given Deno itself."
 - **Who does release engineering.** Nobody has volunteered for builds, signing, release automation, or a CI matrix.
 - **Decision process.** No stated way to make decisions, no roster, no meeting.
