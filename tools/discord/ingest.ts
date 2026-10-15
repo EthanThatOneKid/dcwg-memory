@@ -218,12 +218,19 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   if (args.since) after = String(snowflakeFromIso(args.since));
   else if (!args.all && typeof cursorStore[args.channel] === "string") after = cursorStore[args.channel] as string;
 
+  // With nothing to resume from, start at the channel's first message and walk
+  // forward. Anchoring on "now" instead, with a cap, keeps the newest N and
+  // advances the cursor past everything older: measured 2026-10-15, that left
+  // the 395 messages between the last capture and the newest 200 unreachable,
+  // because the next run resumed from the newest id and never looked back.
+  if (!after) after = "0";
+
   const fetched = await fetchMessages(args.channel, token, { after, limit: args.limit });
-  if (args.limit && fetched.length >= args.limit) {
+  if (args.limit > 0 && fetched.length >= args.limit) {
     console.error(
-      `warning: hit the ${args.limit}-message cap; the cursor will advance to the newest ` +
-        `message fetched, so anything older than that and newer than the previous cursor ` +
-        `would be skipped. Re-run with --limit 0 to drain the backlog.`,
+      `warning: hit the ${args.limit}-message cap; this run took the oldest ${args.limit} ` +
+        `message(s) after the cursor, and the next run resumes where this one stopped. ` +
+        `Re-run with --limit 0 to drain the backlog in one pass.`,
     );
   }
 
@@ -316,9 +323,14 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     });
 
     if ("problems" in wiki) {
-      lastFailure = `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
+      const byModel = wiki.failure === "model";
+      lastFailure = byModel
+        ? `the model call failed:\n  - ${wiki.problems.join("\n  - ")}`
+        : `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
       feedback = lastFailure;
-      console.log(`attempt ${attempt}/${args.attempts} rejected by the write guard`);
+      console.log(
+        `attempt ${attempt}/${args.attempts} rejected: ${byModel ? "the model call failed" : "the write guard"}`,
+      );
       continue;
     }
 
@@ -394,7 +406,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         output: lastFailure.slice(-1200),
       },
       "NEEDS_ATTENTION",
-      `wrote ${capturePath}, but the page pass failed a gate on all ${args.attempts} attempt(s), so the page edits were reverted:\n${lastFailure.slice(-1200)}`,
+      `wrote ${capturePath}, but the page pass did not complete on any of ${args.attempts} attempt(s), so no page edits were committed:\n${lastFailure.slice(-1200)}`,
     );
   }
 

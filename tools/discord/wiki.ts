@@ -50,6 +50,38 @@ function keyNameFor(provider: Provider): string {
 export const PAGE_CHAR_CAP = 8_000;
 export const CAPTURE_CHAR_CAP = 24_000;
 
+/**
+ * Output budget for one pass, in tokens.
+ *
+ * A reasoning model spends most of its budget before it emits the JSON, so
+ * leaving the cap unset is not a safe default: the 2026-10-15 backlog pass
+ * returned no output at all (`AI_NoOutputGeneratedError`, with the run taking
+ * 36 minutes across the SDK's silent retries). The model's own ceiling is
+ * 235,929, so this is a budget, not a limit.
+ */
+export const MAX_OUTPUT_TOKENS = 32_000;
+
+/**
+ * The model call, narrowed to what the pass reads. Injectable so a test can
+ * exercise the failure paths without a live API key.
+ */
+export interface PassCallArgs {
+  model: unknown;
+  system: string;
+  prompt: string;
+  output: unknown;
+  temperature: number;
+  maxOutputTokens: number;
+  maxRetries: number;
+}
+
+export interface PassCallResult {
+  output?: unknown;
+  usage?: { inputTokens?: number; outputTokens?: number };
+}
+
+export type PassGenerate = (args: PassCallArgs) => Promise<PassCallResult>;
+
 export const PageEditsSchema = z.object({
   edits: z
     .array(
@@ -130,10 +162,18 @@ export interface WikiPassInput {
   lastUpdated?: string;
   /** Why the previous attempt was rejected, so a retry can fix it. */
   feedback?: string;
+  /** Test seam: the model call. Defaults to the AI SDK's `generateText`. */
+  generate?: PassGenerate;
 }
 
 export interface WikiPassRejected {
   problems: string[];
+  /**
+   * Which side refused the pass: the model call itself, or the write guard.
+   * A model failure is worth retrying with feedback; the connector reports the
+   * two differently so a run is not described as a guard rejection it was not.
+   */
+  failure?: "model" | "guard";
 }
 
 export interface WikiPassApplied {
@@ -371,14 +411,29 @@ export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult>
   const provider = providerName === "openrouter"
     ? createOpenRouter({ apiKey })
     : createAnthropic({ apiKey });
-  const result = await generateText({
-    model: provider(modelId),
-    system: SYSTEM_PROMPT,
-    prompt: buildPrompt({ ...input, lastUpdated }, pages, captureText),
-    output: Output.object({ schema: PageEditsSchema }),
-    temperature: 0.2,
-    maxRetries: 2,
-  });
+  // The AI SDK's generateText is heavily overloaded; narrow it once, here, to
+  // the shape the pass actually reads.
+  const generate = (input.generate ?? generateText) as unknown as PassGenerate;
+
+  let result: PassCallResult;
+  try {
+    result = await generate({
+      model: provider(modelId),
+      system: SYSTEM_PROMPT,
+      prompt: buildPrompt({ ...input, lastUpdated }, pages, captureText),
+      output: Output.object({ schema: PageEditsSchema }),
+      temperature: 0.2,
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      // Retrying is the connector's job, and it feeds the reason back to the
+      // model. An SDK retry here would be invisible and would multiply the
+      // wall-clock cost of a call that is failing slowly.
+      maxRetries: 0,
+    });
+  } catch (err) {
+    // A truncated or failed call is a model failure, not a guard rejection.
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    return { problems: [`the model call failed: ${message}`], failure: "model" };
+  }
 
   const proposed = (result.output ?? { edits: [], notes: "" }) as PageEdits;
   const raw = proposed.edits ?? [];
@@ -390,7 +445,7 @@ export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult>
 
   const problems = guardProposal(edits, prior);
   await dumpProposal(proposed, problems, adjustments);
-  if (problems.length) return { problems };
+  if (problems.length) return { problems, failure: "guard" };
 
   const revert = () => restorePages(input.root, prior);
 
