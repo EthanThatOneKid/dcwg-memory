@@ -6,13 +6,7 @@ wazoo:source: dcwg
 wiki:priority: high
 ---
 
-# Prior art for a minimal-core runtime
-
-The architecture thread in [Runtime architecture proposals](Runtime_Architecture_Proposals.md) proposed a minimal core with extensions that can be added, removed, and authored in more than one language. Ethan's read in that thread was that the proposal is not substantially different from work that already exists. Every figure on this page was read from a live GitHub or documentation source on 2026-10-11,[^4] so a stale number here is dated rather than invisible.
-
-## Andromeda already published this architecture
-
-`tryandromeda/andromeda` is a Rust runtime with the proposed structure, crate for crate. `crates/core` is the engine and carries `src/extension.rs` as the plugin boundary; `crates/runtime/src/ext/<name>/` holds one directory per extension, each with a Rust `mod.rs` and a TypeScript file beside it; `crates` is the CLI and tooling. The workspace `Cargo.toml` enables extensions as features (`canvas`, `crypto`, `storage`, `serve`) in exactly the style `andy` described with `--exts=`, and its dependency list includes `libloading`, which is how a Rust host loads code dynamically.[^1]
+th a Rust `mod.rs` and a TypeScript file beside it; `crates` is the CLI and tooling. The workspace `Cargo.toml` enables extensions as features (`canvas`, `crypto`, `storage`, `serve`) in exactly the style `andy` described with `--exts=`, and its dependency list includes `libloading`, which is how a Rust host loads code dynamically.[^1]
 
 Its extension set is `broadcast_channel`, `cache_storage`, `canvas`, `console`, `cron`, `crypto`, `fetch`, `ffi`, `file`, `http`, `local_storage`, `net`, `sqlite`, `streams`, `time`, `url`, `web`, `webidl`, `window`, `workers`. Deno's own `ext/` holds 31 directories including `console`, `webgpu`, `kv`, `canvas`, `cron`, `ffi`, `node`, `node_sqlite`, and `telemetry`. The overlap is not a coincidence: a modular runtime built by people who use Deno converges on Deno's extension list, which is the strongest form of the argument that this architecture is not a new idea but the existing idea, made loadable.[^2]
 
@@ -29,6 +23,8 @@ What Andromeda is not is a Deno replacement, and the reason is its engine. Its `
 | `cloudflare/workerd`     | C++           | V8             | The runtime the Deno acquisition consolidates onto | 8,918 stars, pushed 2026-10-11                                                                   |
 | `oven-sh/bun`            | Rust          | JavaScriptCore | Node-compatible, all-in-one                        | 96,197 stars, pushed 2026-10-11                                                                  |
 | `denoland/deno`          | Rust          | V8             | 31 extensions, compiled in                         | see [Deno](Deno.md)                                                                              |
+
+andy noted concerns about Bun's rewrite: while it may fix crashes, it does not fix logic bugs (especially in the bundler) and has many unsafe blocks, making it not very idiomatic (andy, 2026-10-15).
 
 Three things are worth pulling out of that table.
 

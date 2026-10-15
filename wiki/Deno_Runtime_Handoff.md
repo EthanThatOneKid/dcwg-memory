@@ -50,4 +50,5 @@ The brief's recommended sequence, and the one the Discord discussion converges o
 - Who holds the signing certificates today, and would they issue releases signed on behalf of a community entity?
 - Does JSR publication for `@std` require `denoland` scope rights that cannot be delegated?
 - Is there a maintainer willing to stay on as the bridge, which is the difference between a handover and a cold fork.
+- Whether to transfer the Deno runtime to a foundation (such as the OpenJS Foundation) as a means of community handover. (Ooker, daniellacosse, 2026-10-15)
 - Additionally, JSR has been reported as janky with issues like options rearranging on page refresh and limits on publication (2026-10-15T04:03:54Z `netop://ウィビ`).
