@@ -90,7 +90,17 @@ async function withEnv(fn: () => Promise<void>): Promise<void> {
 
 const BASE = ["--channel", CHANNEL, "--venue", "dcwg-talk", "--skip-wiki", "--all"];
 /** The same run, but with the page pass left on, so the fold is attempted. */
-const FOLDING = ["--channel", CHANNEL, "--venue", "dcwg-talk", "--all", "--attempts", "1"];
+const FOLDING = [
+  "--channel",
+  CHANNEL,
+  "--venue",
+  "dcwg-talk",
+  "--all",
+  "--attempts",
+  "1",
+  "--editor",
+  "api",
+];
 
 /**
  * A run whose page pass cannot succeed must still commit the archive.
@@ -119,6 +129,23 @@ async function withFoldEnv(fn: () => Promise<void>): Promise<void> {
       else Deno.env.set(name, value);
     }
   }
+}
+
+/**
+ * The minimum a fold needs to find.
+ *
+ * The page pass reads `wiki/` before it calls a model, so a temp root with no wiki
+ * would fail on a missing directory instead of on the inference under test. One page
+ * is enough: this test is about what the run does when the model call dies, not about
+ * what it would write if it succeeded.
+ */
+async function seedWiki(root: string): Promise<void> {
+  await Deno.mkdir(`${root}/wiki`, { recursive: true });
+  await Deno.writeTextFile(
+    `${root}/wiki/Talk_History.md`,
+    "---\n'@type': schema:TechArticle\nname: Talk History\n---\n\n# Talk History\n\n" +
+      "What the channel has talked about so far.\n",
+  );
 }
 
 Deno.test("one run writes an append-only capture, a cursor, and a contract-valid summary", async () => {
@@ -208,7 +235,7 @@ Deno.test("a capture the wiki has not folded is queued in the committed cursor f
 
 Deno.test("a failed page pass still commits the capture, the cursor, and a queue entry", async () => {
   await withFoldEnv(async () => {
-    const root = await Deno.makeTempDir();
+    const root = await Deno.makeTempDir();    await seedWiki(root);
     const { code, out } = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
     assertEquals(code, 1, "a stalled fold is a run that needs attention, not a silent success");
 
@@ -252,7 +279,7 @@ Deno.test("a failed page pass still commits the capture, the cursor, and a queue
 
 Deno.test("a queued capture is retried before anything newer, and stays queued", async () => {
   await withFoldEnv(async () => {
-    const root = await Deno.makeTempDir();
+    const root = await Deno.makeTempDir();    await seedWiki(root);
     const first = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
     assertEquals(first.code, 1);
 
