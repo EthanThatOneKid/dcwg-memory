@@ -23,9 +23,6 @@ concurrency:
 
 jobs:
   build:
-    # An ingest that failed pushes nothing, so skip the redeploy rather than
-    # republish identical content.
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       # Enables Pages for the repository if it is not already enabled, and

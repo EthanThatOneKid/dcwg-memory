@@ -29,10 +29,8 @@ function stubPass(
 function passInput(root: string, generate: PassGenerate) {
   return {
     root,
-    messages: [],
     channelName: "talk",
     capturePath: "raw/discord/2026-10-15_talk.md",
-    cursorBefore: null,
     provider: "openrouter" as const,
     apiKey: "test-key",
     pages: [{ path: "wiki/Deno_Runtime.md", text: PAGE }],

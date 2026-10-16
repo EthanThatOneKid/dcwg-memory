@@ -112,6 +112,12 @@ export interface BriefInput {
   capturePath: string;
   channelName: string;
   messageCount: number;
+  /**
+   * True when an earlier run committed this capture and could not fold it in, so this
+   * run is picking the work back up. The task is the same; the brief just stops
+   * describing a capture that may be days old as "new".
+   */
+  queued?: boolean;
   lastUpdated?: string;
   /** True when the venue is a forum, so every post needs its own page. */
   forum: boolean;
@@ -130,8 +136,13 @@ export function renderBrief(input: BriefInput): string {
   const parts: string[] = [];
   parts.push(`# CURRENT TASK`);
   parts.push(
-    `Integrate the new Discord capture at \`${input.capturePath}\` into the wiki. ` +
-      `Read that file in full before you write anything.`,
+    input.queued
+      ? `Fold the staged Discord capture at \`${input.capturePath}\` into the wiki. An ` +
+        `earlier run committed it to \`raw/\` but the wiki does not carry it yet, so ` +
+        `this run is picking that work back up. Read that file in full before you ` +
+        `write anything.`
+      : `Integrate the new Discord capture at \`${input.capturePath}\` into the wiki. ` +
+        `Read that file in full before you write anything.`,
   );
   parts.push(`LAST UPDATED: ${input.lastUpdated ?? "(unknown)"}`);
   parts.push(`CHANNEL: #${input.channelName}`);

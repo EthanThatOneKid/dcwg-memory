@@ -89,6 +89,37 @@ async function withEnv(fn: () => Promise<void>): Promise<void> {
 }
 
 const BASE = ["--channel", CHANNEL, "--venue", "dcwg-talk", "--skip-wiki", "--all"];
+/** The same run, but with the page pass left on, so the fold is attempted. */
+const FOLDING = ["--channel", CHANNEL, "--venue", "dcwg-talk", "--all", "--attempts", "1"];
+
+/**
+ * A run whose page pass cannot succeed must still commit the archive.
+ *
+ * This is the whole point of the queue: `raw/` and `wiki/` fail differently, and a
+ * model call, a gate, or a rate limit must not be able to hold the record hostage.
+ * The stub answers Discord and fails everything else, which is what a dead
+ * provider looks like from the connector's side.
+ */
+async function withFoldEnv(fn: () => Promise<void>): Promise<void> {
+  const restoreFetch = stubFetch();
+  const priorToken = Deno.env.get(TOKEN_ENV);
+  const priorKey = Deno.env.get("OPENROUTER_API_KEY");
+  Deno.env.set(TOKEN_ENV, "test-token-not-real");
+  Deno.env.set("OPENROUTER_API_KEY", "test-key-not-real");
+  try {
+    await fn();
+  } finally {
+    restoreFetch();
+    const prior: Array<[string, string | undefined]> = [
+      [TOKEN_ENV, priorToken],
+      ["OPENROUTER_API_KEY", priorKey],
+    ];
+    for (const [name, value] of prior) {
+      if (value === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, value);
+    }
+  }
+}
 
 Deno.test("one run writes an append-only capture, a cursor, and a contract-valid summary", async () => {
   await withEnv(async () => {
@@ -102,10 +133,13 @@ Deno.test("one run writes an append-only capture, a cursor, and a contract-valid
     const capture = await Deno.readTextFile(`${root}/raw/discord/2026-08-01_dcwg-talk.md`);
     assert(capture.includes('title: "Discord #talk — 2026-08-01"'), "frontmatter title");
     assert(
-      capture.includes("source: \"Discord REST API, channel " + CHANNEL),
+      capture.includes('source: "Discord REST API, channel ' + CHANNEL),
       "frontmatter records the channel id",
     );
-    assert(capture.includes("first message") && capture.includes("second message"), "verbatim text");
+    assert(
+      capture.includes("first message") && capture.includes("second message"),
+      "verbatim text",
+    );
     assert(!capture.includes("bot noise"), "bot messages must be omitted from the record");
     assert(capture.includes("(`1001`)"), "each message carries its snowflake id");
 
@@ -141,7 +175,102 @@ Deno.test("a second run the same day adds a capture instead of rewriting the fir
       [".cursor", "2026-08-01_dcwg-talk-2.md", "2026-08-01_dcwg-talk.md", "SUMMARY.json"],
       "the second capture takes a suffix; the first is left alone",
     );
-    assertEquals(await Deno.readTextFile(firstPath), before, "the earlier capture is byte-identical");
+    assertEquals(
+      await Deno.readTextFile(firstPath),
+      before,
+      "the earlier capture is byte-identical",
+    );
+  });
+});
+
+Deno.test("a capture the wiki has not folded is queued in the committed cursor file", async () => {
+  await withEnv(async () => {
+    const root = await Deno.makeTempDir();
+    await runCli([...BASE, "--root", root]);
+    await runCli([...BASE, "--root", root]);
+
+    // --skip-wiki folds nothing, so both captures are still owed to the wiki. The queue
+    // is the record of that, and it lives in the cursor file the workflow commits, which
+    // is what makes the lag survive the job that created it.
+    const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
+    const queued = cursor._pending;
+    assertEquals(queued.length, 2, "one entry per capture committed");
+    assertEquals(
+      queued.map((fold: { capture: string }) => fold.capture),
+      ["raw/discord/2026-08-01_dcwg-talk.md", "raw/discord/2026-08-01_dcwg-talk-2.md"],
+      "oldest first, in the order the captures were written",
+    );
+    assertEquals(queued[0].venue, "dcwg-talk");
+    assertEquals(queued[0].messages, 2, "the entry carries the capture's message count");
+    assertEquals(queued[0].offset, 0, "nothing of it has been folded in yet");
+  });
+});
+
+Deno.test("a failed page pass still commits the capture, the cursor, and a queue entry", async () => {
+  await withFoldEnv(async () => {
+    const root = await Deno.makeTempDir();
+    const { code, out } = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
+    assertEquals(code, 1, "a stalled fold is a run that needs attention, not a silent success");
+
+    const capture = `${root}/raw/discord/2026-08-01_dcwg-talk.md`;
+    assert(
+      (await Deno.readTextFile(capture)).includes("first message"),
+      "the capture is on disk even though the fold failed",
+    );
+
+    const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
+    assertEquals(
+      cursor[CHANNEL],
+      "1001",
+      "the fetch cursor advances with the capture, never with the wiki",
+    );
+    assertEquals(
+      cursor._pending,
+      [{
+        capture: "raw/discord/2026-08-01_dcwg-talk.md",
+        venue: "dcwg-talk",
+        messages: 2,
+        offset: 0,
+      }],
+      "the fold this run owes is remembered, so the next run retries it instead of skipping material",
+    );
+
+    const summary = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/SUMMARY.json`));
+    assertEquals(validateSummary(summary), [], "the summary is written on this path too");
+    assertEquals(summary.status, "NEEDS_ATTENTION");
+
+    const result = out.find((line) => line.startsWith("RESULT "));
+    assert(result, "the CLI still prints a machine-readable RESULT line");
+    const payload = JSON.parse(result.slice("RESULT ".length));
+    assertEquals(payload.status, "NEEDS_ATTENTION");
+    assertEquals(payload.captured, 2, "the run reports what it archived, not only what it folded");
+    assertEquals(payload.folded, 0);
+    assertEquals(payload.pending, 1);
+    assertEquals(payload.stalled, "raw/discord/2026-08-01_dcwg-talk.md");
+  });
+});
+
+Deno.test("a queued capture is retried before anything newer, and stays queued", async () => {
+  await withFoldEnv(async () => {
+    const root = await Deno.makeTempDir();
+    const first = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
+    assertEquals(first.code, 1);
+
+    // A second run the same day archives another capture, and the fold it attempts
+    // is the older queued one: material this venue still owes the wiki is absorbed
+    // before anything newer, and the run stops rather than folding over it.
+    const second = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
+    assertEquals(second.code, 1);
+
+    const result = second.out.find((line) => line.startsWith("RESULT "))!;
+    const payload = JSON.parse(result.slice("RESULT ".length));
+    assertEquals(payload.stalled, "raw/discord/2026-08-01_dcwg-talk.md");
+    assertEquals(payload.pending, 2, "both captures are still owed");
+
+    const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
+    assertEquals(cursor._pending.length, 2);
+    assertEquals(cursor._pending[0].capture, "raw/discord/2026-08-01_dcwg-talk.md");
+    assertEquals(cursor._pending[1].capture, "raw/discord/2026-08-01_dcwg-talk-2.md");
   });
 });
 

@@ -71,6 +71,25 @@ export function threadAnchors(text: string): string[] {
   return [...block.matchAll(THREAD_ANCHOR)].map((match) => match[1]);
 }
 
+/** The venue kind a capture declares in its frontmatter, or undefined. */
+export function captureKind(text: string): string | undefined {
+  return CHANNEL_TYPE.exec(frontmatterBlock(text))?.[1];
+}
+
+/**
+ * The posts one capture holds, read out of its own headings.
+ *
+ * Derived from the capture rather than from the live channel, so folding a capture
+ * some later run staged describes the venue that capture came from. The alternative —
+ * listing what the current fetch saw — names one venue's posts while the agent reads
+ * another venue's capture.
+ */
+export function postsInCapture(text: string): Array<{ id: string; title: string }> {
+  const kind = captureKind(text);
+  if (!kind || !POST_SHAPED.has(kind)) return [];
+  return threadHeadings(text).map((heading) => ({ id: heading.id, title: heading.name }));
+}
+
 /** Every markdown file directly in a directory, sorted; [] when it is absent. */
 async function markdownFiles(dir: string): Promise<string[]> {
   const names: string[] = [];
@@ -90,10 +109,8 @@ export async function findForumThreads(root: string): Promise<ForumThread[]> {
   for (const name of await markdownFiles(`${root}/${RAW_DIR}`)) {
     const path = `${RAW_DIR}/${name}`;
     const text = await Deno.readTextFile(`${root}/${path}`);
-    const kind = CHANNEL_TYPE.exec(frontmatterBlock(text))?.[1];
-    if (!kind || !POST_SHAPED.has(kind)) continue;
-    for (const heading of threadHeadings(text)) {
-      threads.push({ id: heading.id, name: heading.name, capture: path });
+    for (const post of postsInCapture(text)) {
+      threads.push({ id: post.id, name: post.title, capture: path });
     }
   }
   return threads;

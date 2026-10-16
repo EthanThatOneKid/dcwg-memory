@@ -44,15 +44,24 @@ import {
   snapshotTree,
   writeBrief,
 } from "./opencode.ts";
-import { buildPrompt, readPages, runWikiPass, writePage } from "./wiki.ts";
+import {
+  buildPrompt,
+  CAPTURE_CHAR_CAP,
+  captureSlice,
+  readPages,
+  runWikiPass,
+  writePage,
+} from "./wiki.ts";
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
-import { findThreadProblems } from "./thread_pages.ts";
+import { captureKind, findThreadProblems, POST_SHAPED, postsInCapture } from "./thread_pages.ts";
+import { advance, drop, enqueue, pendingFor, readPending, setPending } from "./pending.ts";
 import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
 import type { PageEdit, Provider } from "./wiki.ts";
 import type { FileTree } from "./opencode.ts";
+import type { PendingFold } from "./pending.ts";
 
 const USAGE = `dcwg-memory Discord connector
 
@@ -89,6 +98,9 @@ Options:
                         (default 900)
   --attempts <n>        how many times the page pass may be retried against the gates
                         (default 2: one retry, because the usual failure is correctable)
+  --drain               fold every capture this venue still owes the wiki, not just the
+                        oldest one (default: one fold per run, so a backlog drains over
+                        several runs instead of overrunning the job's own time limit)
   --no-gates            skip the repo validation commands (local iteration only)
   --dry-run             fetch and render, but write nothing and call no model
   -h, --help            show this help
@@ -118,6 +130,8 @@ interface Args {
   noGates: boolean;
   /** How many times the page pass may be retried against the gates. */
   attempts: number;
+  /** Fold every capture this venue still owes the wiki, not just the oldest. */
+  drain: boolean;
   dryRun: boolean;
 }
 
@@ -135,6 +149,7 @@ function parseArgs(argv: string[]): Args {
     passTimeoutSec: 900,
     noGates: false,
     attempts: 2,
+    drain: false,
     dryRun: false,
   };
   let tagsExplicit = false;
@@ -146,21 +161,39 @@ function parseArgs(argv: string[]): Args {
       return v;
     };
     switch (flag) {
-      case "--channel": args.channel = value(); break;
-      case "--venue": args.venue = value(); break;
-      case "--out": args.out = value(); break;
-      case "--root": args.root = value(); break;
-      case "--server": args.server = value(); break;
+      case "--channel":
+        args.channel = value();
+        break;
+      case "--venue":
+        args.venue = value();
+        break;
+      case "--out":
+        args.out = value();
+        break;
+      case "--root":
+        args.root = value();
+        break;
+      case "--server":
+        args.server = value();
+        break;
       case "--tag": {
         const tag = value();
         args.tags = tagsExplicit ? [...args.tags, tag] : [tag];
         tagsExplicit = true;
         break;
       }
-      case "--limit": args.limit = Number(value()); break;
-      case "--since": args.since = value(); break;
-      case "--token-env": args.tokenEnv = value(); break;
-      case "--model": args.model = value(); break;
+      case "--limit":
+        args.limit = Number(value());
+        break;
+      case "--since":
+        args.since = value();
+        break;
+      case "--token-env":
+        args.tokenEnv = value();
+        break;
+      case "--model":
+        args.model = value();
+        break;
       case "--provider": {
         const name = value();
         if (name !== "anthropic" && name !== "openrouter") {
@@ -169,9 +202,18 @@ function parseArgs(argv: string[]): Args {
         args.provider = name;
         break;
       }
-      case "--all": args.all = true; break;
-      case "--attempts": args.attempts = Number(value()); break;
-      case "--skip-wiki": args.skipWiki = true; break;
+      case "--all":
+        args.all = true;
+        break;
+      case "--attempts":
+        args.attempts = Number(value());
+        break;
+      case "--drain":
+        args.drain = true;
+        break;
+      case "--skip-wiki":
+        args.skipWiki = true;
+        break;
       case "--editor": {
         const name = value();
         if (name !== "opencode" && name !== "api") {
@@ -180,12 +222,21 @@ function parseArgs(argv: string[]): Args {
         args.editor = name;
         break;
       }
-      case "--pass-timeout": args.passTimeoutSec = Number(value()); break;
-      case "--no-gates": args.noGates = true; break;
-      case "--dry-run": args.dryRun = true; break;
+      case "--pass-timeout":
+        args.passTimeoutSec = Number(value());
+        break;
+      case "--no-gates":
+        args.noGates = true;
+        break;
+      case "--dry-run":
+        args.dryRun = true;
+        break;
       case "-h":
-      case "--help": console.log(USAGE); Deno.exit(0);
-      default: throw new Error(`unknown flag: ${flag}`);
+      case "--help":
+        console.log(USAGE);
+        Deno.exit(0);
+      default:
+        throw new Error(`unknown flag: ${flag}`);
     }
   }
   return args;
@@ -228,7 +279,11 @@ async function readExistingCaptures(dir: string): Promise<string[]> {
   return names;
 }
 
-function report(payload: Record<string, unknown>, status: "OK" | "NEEDS_ATTENTION", message: string): number {
+function report(
+  payload: Record<string, unknown>,
+  status: "OK" | "NEEDS_ATTENTION",
+  message: string,
+): number {
   console.log(message);
   console.log(`RESULT ${JSON.stringify({ status, ...payload })}`);
   return status === "OK" ? 0 : 1;
@@ -314,14 +369,10 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
    * are older than that thread message.
    */
   const advances = new Map<string, string>();
-  /** Forum posts this run saw, so the brief can name them and demand a page each. */
-  const forumPosts: Array<{ id: string; title: string }> = [];
 
-  let topLevelResume: string | null = null;
   if (!forum) {
-    topLevelResume = resumeFrom(args.channel);
     const fetched = await fetchMessages(args.channel, token, {
-      after: topLevelResume,
+      after: resumeFrom(args.channel),
       limit: args.limit,
     });
     warnIfCapped(fetched.length, `#${channelName}`);
@@ -346,49 +397,103 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     if (!messages.length) continue;
     sections.push({ title: threadTitle(thread), messages });
     advances.set(thread.id, messages[messages.length - 1].id);
-    if (forum) forumPosts.push({ id: thread.id, title: threadTitle(thread) });
   }
 
   const messages: DiscordMessage[] = sections
     .flatMap((section) => section.messages)
     .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0));
 
-  if (!messages.length) {
-    return report({ venue: args.venue, channel: args.channel, captured: 0 }, "OK", `no new messages in #${channelName}`);
+  /**
+   * What this run folds, in the order it folds it.
+   *
+   * The queue is drained oldest first, so material an earlier run committed and could
+   * not fold in is absorbed before anything newer, and this run's own capture joins the
+   * back of it. One fold per run by default: each one is a whole page pass with its own
+   * attempts, so a backlog drains over several runs instead of overrunning the job's own
+   * time limit. --drain folds the venue's whole queue.
+   */
+  const folds = readPending(cursorStore);
+  const queued = pendingFor(folds, args.venue);
+  const newMessages = messages.length > 0;
+  if (!newMessages && !queued.length) {
+    return report(
+      { venue: args.venue, channel: args.channel, captured: 0 },
+      "OK",
+      `no new messages in #${channelName}`,
+    );
   }
 
-  const text = renderCapture({
-    messages,
-    sections,
-    channelId: args.channel,
-    channelName,
-    channelType: channelKind(channel.type),
-    tags: args.tags,
-    serverLabel: args.server,
-  });
-  const day = captureDay(messages);
+  const text = newMessages
+    ? renderCapture({
+      messages,
+      sections,
+      channelId: args.channel,
+      channelName,
+      channelType: channelKind(channel.type),
+      tags: args.tags,
+      serverLabel: args.server,
+    })
+    : "";
+  const day = newMessages ? captureDay(messages) : isoUtc(new Date().toISOString()).slice(0, 10);
 
   if (args.dryRun) {
-    console.log(text);
+    if (newMessages) console.log(text);
     if (!args.skipWiki) {
       const pages = await readPages(root);
+      // Show the fold this run would perform, which is the oldest thing it owes the
+      // wiki rather than always the capture that was just fetched.
+      const target = queued[0];
       console.error("\n--- wiki pass prompt (dry run; no model call) ---\n");
       console.error(
-        buildPrompt({ root, messages, channelName, forum, capturePath: "(not written)" }, pages, text),
+        buildPrompt(
+          {
+            root,
+            channelName,
+            forum,
+            capturePath: target?.capture ?? "(not written)",
+            offset: target?.offset ?? 0,
+          },
+          pages,
+          target ? await Deno.readTextFile(`${root}/${target.capture}`) : text,
+        ),
       );
     }
     return report(
       { venue: args.venue, channel: args.channel, day, captured: messages.length, dryRun: true },
       "OK",
-      `[dry-run] ${messages.length} messages, ${new Set(messages.map((m) => m.author?.id)).size} authors, ${text.length} bytes`,
+      `[dry-run] ${messages.length} messages, ${
+        new Set(messages.map((m) => m.author?.id)).size
+      } authors, ${text.length} bytes`,
     );
   }
 
-  await Deno.mkdir(outDir, { recursive: true });
-  const capturePath = nextCapturePath(args.out, day, args.venue, await readExistingCaptures(outDir));
-  await Deno.writeTextFile(`${root}/${capturePath}`, text);
+  /**
+   * The capture is written and committed whatever the wiki pass goes on to do.
+   *
+   * It is the evidence, so it cannot be hostage to a model call, a gate, or a rate
+   * limit: the archive being complete through the last message is a fact the moment
+   * this file exists, and it stays true whether or not the fold succeeds.
+   */
+  let capturePath: string | undefined;
+  if (newMessages) {
+    await Deno.mkdir(outDir, { recursive: true });
+    capturePath = nextCapturePath(args.out, day, args.venue, await readExistingCaptures(outDir));
+    await Deno.writeTextFile(`${root}/${capturePath}`, text);
+  }
 
+  /**
+   * The fetch cursor advances with the capture and never with the wiki.
+   *
+   * They fail differently. The archive is complete through the newest message as soon
+   * as the capture is written, so the cursor moves here, before any model call, and a
+   * fold that fails cannot pull it back and make the next run re-fetch what is already
+   * archived. What the wiki still owes is remembered in the queue instead of in the
+   * fetch position, which is what lets the archive run ahead of the fold.
+   */
   const nowIso = isoUtc(new Date().toISOString());
+  let pending: PendingFold[] = capturePath
+    ? enqueue(folds, { capture: capturePath, venue: args.venue, messages: messages.length })
+    : folds;
   {
     const store: Record<string, unknown> = await readJson(cursorPath) as Record<string, unknown>;
     // Only the keys this connector will read again are advanced. For a forum that
@@ -396,6 +501,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     // is not a resume point and a cursor nothing reads is just a stale claim.
     for (const [id, newest] of advances) store[id] = newest;
     store._lastRun = nowIso;
+    setPending(store, pending);
     await Deno.writeTextFile(cursorPath, JSON.stringify(store, null, 2) + "\n");
   }
 
@@ -413,219 +519,296 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     ingested: 0,
     skipped_by_appraisal: 0,
     actionable_candidates: messages.length,
-    cursor: messages[messages.length - 1].id,
     lastRun: nowIso,
   });
+  // A run that only drains its queue fetched nothing, and a cursor there would claim
+  // it read messages it never saw.
+  if (newMessages) summary.cursor = messages[messages.length - 1].id;
 
   if (args.skipWiki) {
-    await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
-    return report(
-      { venue: args.venue, channel: args.channel, day, captured: messages.length, capture: capturePath },
-      "OK",
-      `wrote ${capturePath} (${messages.length} messages); wiki pass skipped`,
-    );
-  }
-
-  // The capture is written once, above; only the page pass iterates. A failed
-  // gate is not fatal on the first attempt: the failures go back to the model as
-  // feedback and the pass runs again, because the usual failure is a correctable
-  // detail (a page left with no inbound link, a frontmatter block flattened into
-  // body text) rather than a bad reading of the capture.
-  let feedback: string | undefined;
-  let written: string[] = [];
-  let notes = "";
-  let usage: { inputTokens?: number; outputTokens?: number } = {};
-  let lastFailure = "";
-  let passed = false;
-
-  /**
-   * What an opencode pass is measured against, and what a failed attempt is
-   * restored to. Taken here, after the connector's own capture and cursor
-   * writes, so those are not mistaken for changes the agent made.
-   */
-  const treeBefore = args.editor === "opencode" ? await snapshotTree(root) : undefined;
-
-  for (let attempt = 1; attempt <= args.attempts; attempt++) {
-    let revert: () => Promise<void>;
-
-    if (args.editor === "opencode") {
-      const briefPath = await writeBrief(
-        root,
-        renderBrief({
-          capturePath,
-          channelName,
-          messageCount: messages.length,
-          lastUpdated: previousRun,
-          forum,
-          threads: forumPosts,
-          feedback,
-        }),
-      );
-      const run = await runOpencode({
-        root,
-        agent: "dcwg",
-        briefPath,
-        model: args.model,
-        timeoutMs: args.passTimeoutSec * 1000,
-      });
-      await cleanBrief(root);
-      const changed = diffTree(treeBefore!, await snapshotTree(root));
-      const stray = outsideWiki(changed);
-      usage = { inputTokens: run.usage.inputTokens, outputTokens: run.usage.outputTokens };
-      revert = () => restoreTree(root, treeBefore!);
-
-      // The tree compare is the write-surface control, not the agent's own
-      // permission rules: a rule that failed open in testing cannot be trusted
-      // to fail closed here. Anything outside wiki/ reverts the whole attempt.
-      if (!run.ok || stray.length) {
-        await revert();
-        lastFailure = !run.ok
-          ? `the opencode pass did not finish: ${
-            run.timedOut ? `killed after ${args.passTimeoutSec}s` : `exit ${run.code}`
-          }${run.stderr ? `\n${run.stderr}` : ""}`
-          : `the pass changed files outside wiki/, so the whole attempt was reverted:\n  - ${
-            stray.join("\n  - ")
-          }`;
-        feedback = lastFailure;
-        console.log(
-          `attempt ${attempt}/${args.attempts} ${
-            !run.ok
-              ? run.timedOut
-                ? `timed out after ${args.passTimeoutSec}s`
-                : `failed (exit ${run.code})`
-              : `wrote outside wiki/ (${stray.length} path(s))`
-          }`,
-        );
-        continue;
-      }
-
-      written = changed;
-      notes = `opencode: ${run.usage.steps} step(s), ${run.usage.inputTokens} in / ` +
-        `${run.usage.outputTokens} out`;
-      console.log(
-        `attempt ${attempt}/${args.attempts}: ${written.length} page file(s) changed: ${
-          written.join(", ") || "none"
-        }`,
-      );
-    } else {
-      const wiki = await runWikiPass({
-        root,
-        messages,
-        channelName,
-        forum,
-        capturePath,
-        cursorBefore: topLevelResume,
-        provider: args.provider,
-        model: args.model,
-        feedback,
-      });
-
-      if ("problems" in wiki) {
-        const byModel = wiki.failure === "model";
-        lastFailure = byModel
-          ? `the model call failed:\n  - ${wiki.problems.join("\n  - ")}`
-          : `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
-        feedback = lastFailure;
-        console.log(
-          `attempt ${attempt}/${args.attempts} rejected: ${
-            byModel ? "the model call failed" : "the write guard"
-          }`,
-        );
-        continue;
-      }
-
-      const unwritable = wiki.edits.find((edit) =>
-        !checkEditablePath(edit.path, new TextEncoder().encode(edit.content).length).ok
-      );
-      if (unwritable) {
-        await wiki.revert();
-        const check = checkEditablePath(
-          unwritable.path,
-          new TextEncoder().encode(unwritable.content).length,
-        );
-        lastFailure = `the model proposed a path it may not write (${unwritable.path}: ${
-          "reason" in check ? check.reason : "no reason given"
-        })`;
-        feedback = lastFailure;
-        console.log(`attempt ${attempt}/${args.attempts} proposed an unwritable path`);
-        continue;
-      }
-
-      written = wiki.edits.map((edit) => edit.path);
-      notes = wiki.notes;
-      usage = wiki.usage;
-      revert = wiki.revert;
-      for (const edit of wiki.edits) await writePage(root, edit as PageEdit);
-      console.log(
-        `attempt ${attempt}/${args.attempts}: ${written.length} page edit(s): ${
-          written.join(", ") || "none"
-        }`,
-      );
-      for (const adjustment of wiki.adjustments) console.log(`  adjusted: ${adjustment}`);
-    }
-
-    await writeCapturesIndex(root);
-
-    if (args.noGates) {
-      summary.ingested = written.length;
-      await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
-      return report(
-        { venue: args.venue, channel: args.channel, capture: capturePath, pages: written, gates: "skipped" },
-        "OK",
-        `wrote ${capturePath} and ${written.length} page edit(s); gates skipped`,
-      );
-    }
-
-    const outcomes = await runWikiGates(`${root}/wiki.yml`);
-    const orphans = await findOrphans(root);
-    if (orphans.length) {
-      outcomes.push({
-        name: "orphans",
-        ok: false,
-        output: `no inbound link from another page:\n  - ${orphans.join("\n  - ")}`,
-      });
-    }
-    const threadProblems = await findThreadProblems(root);
-    if (threadProblems.length) {
-      outcomes.push({
-        name: "threads",
-        ok: false,
-        output: `a forum post is missing its own page:\n  - ${threadProblems.join("\n  - ")}`,
-      });
-    }
-
-    const failed = outcomes.filter((outcome) => !outcome.ok);
-    if (failed.length === 0) {
-      passed = true;
-      break;
-    }
-
-    // Undo this attempt before the next one: the editor must see the pages as
-    // they were, not as its own rejected attempt left them.
-    await revert();
-    await writeCapturesIndex(root);
-    lastFailure = gateFeedback(outcomes);
-    feedback = lastFailure;
-    console.log(
-      `attempt ${attempt}/${args.attempts} failed ${failed.map((outcome) => outcome.name).join(", ")}`,
-    );
-  }
-
-  if (!passed) {
-    summary.status = "NEEDS_ATTENTION";
     await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
     return report(
       {
         venue: args.venue,
         channel: args.channel,
+        day,
+        captured: messages.length,
         capture: capturePath,
-        attempts: args.attempts,
-        output: lastFailure.slice(-1200),
+        pending: pendingFor(pending, args.venue).length,
       },
-      "NEEDS_ATTENTION",
-      `wrote ${capturePath}, but the page pass did not complete on any of ${args.attempts} attempt(s), so no page edits were committed:\n${lastFailure.slice(-1200)}`,
+      "OK",
+      capturePath
+        ? `wrote ${capturePath} (${messages.length} messages); wiki pass skipped`
+        : `no new messages in #${channelName}; wiki pass skipped`,
     );
   }
+
+  /**
+   * The folds this run attempts: what the venue already owed the wiki, oldest first,
+   * and then the capture this run just committed.
+   */
+  const plan: PendingFold[] = capturePath
+    ? [...queued, { capture: capturePath, venue: args.venue, messages: messages.length, offset: 0 }]
+    : [...queued];
+  const folding = args.drain ? plan : plan.slice(0, 1);
+
+  let allWritten: string[] = [];
+  let notes = "";
+  let usage: { inputTokens?: number; outputTokens?: number } = {};
+  let lastFailure = "";
+  let folded = 0;
+  let stalled = false;
+  let stalledCapture = "";
+  let gatesSkipped = false;
+
+  for (const fold of folding) {
+    const foldPath = fold.capture;
+    let captureText: string;
+    try {
+      captureText = await Deno.readTextFile(`${root}/${foldPath}`);
+    } catch {
+      // A queued capture that is no longer on disk cannot be folded, and leaving it
+      // queued would wedge every later run behind it.
+      pending = drop(pending, foldPath);
+      console.log(`fold skipped: ${foldPath} is not on disk; dropped from the queue`);
+      continue;
+    }
+
+    // The venue's shape, read out of the capture rather than off the live channel: a
+    // queued capture may be days old, and describing it with this run's channel would
+    // name one venue while the agent reads another venue's file.
+    const kind = captureKind(captureText);
+    const posts = postsInCapture(captureText);
+    const foldForum = kind ? POST_SHAPED.has(kind) : forum;
+    // opencode reads the capture off disk with its own tools, so one pass folds the
+    // whole file; the API editor is handed one slice, and an entry stays queued behind
+    // its offset while a capture longer than a prompt is still only half read.
+    const absorbed = args.editor === "opencode"
+      ? captureText.length
+      : captureSlice(captureText, fold.offset, CAPTURE_CHAR_CAP).to;
+
+    let changedThisFold: string[] = [];
+    let feedback: string | undefined;
+    let passed = false;
+
+    /**
+     * What an opencode pass is measured against, and what a failed attempt is
+     * restored to. Taken here, after the connector's own capture and cursor
+     * writes, so those are not mistaken for changes the agent made.
+     */
+    const treeBefore = args.editor === "opencode" ? await snapshotTree(root) : undefined;
+
+    /**
+     * Mark this capture folded in: the queue advances past what the pass absorbed and
+     * its pages join the run's report. A partial fold for the API editor advances only
+     * to the end of the slice it was handed, so the entry stays queued and the next run
+     * reads on from there instead of losing the rest of the capture.
+     */
+    const recordFold = () => {
+      pending = advance(pending, foldPath, absorbed, captureText.length);
+      allWritten = [...allWritten, ...changedThisFold];
+      folded++;
+    };
+
+    for (let attempt = 1; attempt <= args.attempts; attempt++) {
+      let revert: () => Promise<void>;
+
+      if (args.editor === "opencode") {
+        const briefPath = await writeBrief(
+          root,
+          renderBrief({
+            capturePath: foldPath,
+            channelName,
+            messageCount: fold.messages,
+            lastUpdated: previousRun,
+            forum: foldForum,
+            threads: posts,
+            // A capture an earlier run committed and could not fold in is being picked
+            // back up here, and the brief should not call days-old material new.
+            queued: foldPath !== capturePath,
+            feedback,
+          }),
+        );
+        const run = await runOpencode({
+          root,
+          agent: "dcwg",
+          briefPath,
+          model: args.model,
+          timeoutMs: args.passTimeoutSec * 1000,
+        });
+        await cleanBrief(root);
+        const changed = diffTree(treeBefore!, await snapshotTree(root));
+        const stray = outsideWiki(changed);
+        usage = { inputTokens: run.usage.inputTokens, outputTokens: run.usage.outputTokens };
+        revert = () => restoreTree(root, treeBefore!);
+
+        // The tree compare is the write-surface control, not the agent's own
+        // permission rules: a rule that failed open in testing cannot be trusted
+        // to fail closed here. Anything outside wiki/ reverts the whole attempt.
+        if (!run.ok || stray.length) {
+          await revert();
+          lastFailure = !run.ok
+            ? `the opencode pass did not finish: ${
+              run.timedOut ? `killed after ${args.passTimeoutSec}s` : `exit ${run.code}`
+            }${run.stderr ? `\n${run.stderr}` : ""}`
+            : `the pass changed files outside wiki/, so the whole attempt was reverted:\n  - ${
+              stray.join("\n  - ")
+            }`;
+          feedback = lastFailure;
+          console.log(
+            `attempt ${attempt}/${args.attempts} ${
+              !run.ok
+                ? run.timedOut
+                  ? `timed out after ${args.passTimeoutSec}s`
+                  : `failed (exit ${run.code})`
+                : `wrote outside wiki/ (${stray.length} path(s))`
+            }`,
+          );
+          continue;
+        }
+
+        changedThisFold = changed;
+        notes = `opencode: ${run.usage.steps} step(s), ${run.usage.inputTokens} in / ` +
+          `${run.usage.outputTokens} out`;
+        console.log(
+          `attempt ${attempt}/${args.attempts}: ${changedThisFold.length} page file(s) changed: ${
+            changedThisFold.join(", ") || "none"
+          }`,
+        );
+      } else {
+        const wiki = await runWikiPass({
+          root,
+          channelName,
+          forum: foldForum,
+          capturePath: foldPath,
+          offset: fold.offset,
+          provider: args.provider,
+          model: args.model,
+          feedback,
+        });
+
+        if ("problems" in wiki) {
+          const byModel = wiki.failure === "model";
+          lastFailure = byModel
+            ? `the model call failed:\n  - ${wiki.problems.join("\n  - ")}`
+            : `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
+          feedback = lastFailure;
+          console.log(
+            `attempt ${attempt}/${args.attempts} rejected: ${
+              byModel ? "the model call failed" : "the write guard"
+            }`,
+          );
+          continue;
+        }
+
+        const unwritable = wiki.edits.find((edit) =>
+          !checkEditablePath(edit.path, new TextEncoder().encode(edit.content).length).ok
+        );
+        if (unwritable) {
+          await wiki.revert();
+          const check = checkEditablePath(
+            unwritable.path,
+            new TextEncoder().encode(unwritable.content).length,
+          );
+          lastFailure = `the model proposed a path it may not write (${unwritable.path}: ${
+            "reason" in check ? check.reason : "no reason given"
+          })`;
+          feedback = lastFailure;
+          console.log(`attempt ${attempt}/${args.attempts} proposed an unwritable path`);
+          continue;
+        }
+
+        changedThisFold = wiki.edits.map((edit) => edit.path);
+        notes = wiki.notes;
+        usage = wiki.usage;
+        revert = wiki.revert;
+        for (const edit of wiki.edits) await writePage(root, edit as PageEdit);
+        console.log(
+          `attempt ${attempt}/${args.attempts}: ${changedThisFold.length} page edit(s): ${
+            changedThisFold.join(", ") || "none"
+          }`,
+        );
+        for (const adjustment of wiki.adjustments) console.log(`  adjusted: ${adjustment}`);
+      }
+
+      await writeCapturesIndex(root);
+
+      if (args.noGates) {
+        // Local iteration only: nothing here checks the pages, so the fold is recorded
+        // as done and the run moves on to the next capture. The report says the gates
+        // were skipped rather than claiming they passed.
+        gatesSkipped = true;
+        recordFold();
+        continue;
+      }
+
+      const outcomes = await runWikiGates(`${root}/wiki.yml`);
+      const orphans = await findOrphans(root);
+      if (orphans.length) {
+        outcomes.push({
+          name: "orphans",
+          ok: false,
+          output: `no inbound link from another page:\n  - ${orphans.join("\n  - ")}`,
+        });
+      }
+      const threadProblems = await findThreadProblems(root);
+      if (threadProblems.length) {
+        outcomes.push({
+          name: "threads",
+          ok: false,
+          output: `a forum post is missing its own page:\n  - ${threadProblems.join("\n  - ")}`,
+        });
+      }
+
+      const failed = outcomes.filter((outcome) => !outcome.ok);
+      if (failed.length === 0) {
+        passed = true;
+        recordFold();
+        break;
+      }
+
+      // Undo this attempt before the next one: the editor must see the pages as
+      // they were, not as its own rejected attempt left them.
+      await revert();
+      await writeCapturesIndex(root);
+      lastFailure = gateFeedback(outcomes);
+      feedback = lastFailure;
+      console.log(
+        `attempt ${attempt}/${args.attempts} failed ${
+          failed.map((outcome) => outcome.name).join(", ")
+        }`,
+      );
+    }
+
+    // Every attempt on this capture failed. It stays committed and stays queued, so
+    // the next run retries it rather than skipping the material this venue still owes
+    // the wiki. The queue is ordered, so the run stops here instead of folding a newer
+    // capture over an older one that was never absorbed.
+    if (!passed) {
+      stalled = true;
+      stalledCapture = foldPath;
+      console.log(`fold stalled: ${foldPath} stays queued for the next run`);
+      break;
+    }
+  }
+
+  /**
+   * The queue is written after the folds, not with the capture.
+   *
+   * The first cursor write records the capture and the entry for it, which is what
+   * makes the archive durable before any model call. This second write records how far
+   * the folds read, and it is the reason a fold that fails cannot lose material: the
+   * entry it did not absorb is still there for the next run.
+   */
+  {
+    const store: Record<string, unknown> = await readJson(cursorPath) as Record<string, unknown>;
+    setPending(store, pending);
+    await Deno.writeTextFile(cursorPath, JSON.stringify(store, null, 2) + "\n");
+  }
+
+  const stillQueued = pendingFor(pending, args.venue).length;
+  summary.ingested = allWritten.length;
+  if (stalled) summary.status = "NEEDS_ATTENTION";
 
   const summaryErrors = validateSummary(summary);
   if (summaryErrors.length) {
@@ -638,8 +821,33 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     );
   }
 
-  summary.ingested = written.length;
   await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
+
+  const archived = capturePath ? `${capturePath} (${messages.length} messages)` : "nothing new";
+  const foldedNote = `${folded} capture(s) folded${gatesSkipped ? ", gates skipped" : ""}`;
+
+  if (stalled) {
+    return report(
+      {
+        venue: args.venue,
+        channel: args.channel,
+        capture: capturePath,
+        // Reported even though the fold failed: the archive is committed, and a
+        // NEEDS_ATTENTION run that hid what it archived would read as a lost run.
+        captured: messages.length,
+        folded,
+        pending: stillQueued,
+        stalled: stalledCapture,
+        attempts: args.attempts,
+        output: lastFailure.slice(-1200),
+      },
+      "NEEDS_ATTENTION",
+      `archived ${archived}; ${foldedNote}, but ${stalledCapture} did not fold in on any of ${args.attempts} attempt(s). It stays queued, so the next run retries it:\n${
+        lastFailure.slice(-1200)
+      }`,
+    );
+  }
+
   return report(
     {
       venue: args.venue,
@@ -647,12 +855,14 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       day,
       capture: capturePath,
       captured: messages.length,
-      pages: written,
+      pages: allWritten,
+      folded,
+      pending: stillQueued,
       usage,
       notes,
     },
     "OK",
-    `wrote ${capturePath} (${messages.length} messages) and updated ${written.length} page(s); all gates pass`,
+    `archived ${archived}; ${foldedNote} and updated ${allWritten.length} page(s)`,
   );
 }
 

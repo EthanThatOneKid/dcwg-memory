@@ -11,6 +11,7 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   buildPrompt,
   CAPTURE_CHAR_CAP,
+  captureSlice,
   guardProposal,
   readPages,
   restorePages,
@@ -23,7 +24,6 @@ import type { PageEdit, WikiPassInput } from "./wiki.ts";
 function input(over: Partial<WikiPassInput> = {}): WikiPassInput {
   return {
     root: ".",
-    messages: [],
     channelName: "talk",
     capturePath: "raw/discord/2026-08-01_talk.md",
     ...over,
@@ -31,7 +31,10 @@ function input(over: Partial<WikiPassInput> = {}): WikiPassInput {
 }
 
 Deno.test("guardProposal accepts a conforming edit", () => {
-  assertEquals(guardProposal([{ path: "wiki/Talk.md", content: "body\n", reason: "new claim" }]), []);
+  assertEquals(
+    guardProposal([{ path: "wiki/Talk.md", content: "body\n", reason: "new claim" }]),
+    [],
+  );
 });
 
 Deno.test("guardProposal refuses the ways a proposal can go wrong", () => {
@@ -60,15 +63,26 @@ Deno.test("guardProposal protects a page's frontmatter", () => {
   // Rewriting the block into body text is what actually happened once: the wiki
   // gates do not require frontmatter, so they all passed on the flattened page.
   const stripped = guardProposal(
-    [{ path: "wiki/Typed.md", content: "'@type': schema:TechArticle\n\n# Typed\n", reason: "edit" }],
+    [{
+      path: "wiki/Typed.md",
+      content: "'@type': schema:TechArticle\n\n# Typed\n",
+      reason: "edit",
+    }],
     prior,
   );
-  assert(stripped.some((p) => p.includes("strips the page's YAML frontmatter")), stripped.join("; "));
+  assert(
+    stripped.some((p) => p.includes("strips the page's YAML frontmatter")),
+    stripped.join("; "),
+  );
 
   // Keeping the block is the normal case and must stay clean.
   assertEquals(
     guardProposal(
-      [{ path: "wiki/Typed.md", content: "---\n'@type': schema:TechArticle\n---\n\n# Typed\n\nMore.\n", reason: "edit" }],
+      [{
+        path: "wiki/Typed.md",
+        content: "---\n'@type': schema:TechArticle\n---\n\n# Typed\n\nMore.\n",
+        reason: "edit",
+      }],
       prior,
     ),
     [],
@@ -76,8 +90,17 @@ Deno.test("guardProposal protects a page's frontmatter", () => {
 
   // A page that never had frontmatter is not suddenly required to have some,
   // and a page this pass creates has nothing to preserve.
-  assertEquals(guardProposal([{ path: "wiki/Plain.md", content: "# Plain\n\nMore.\n", reason: "edit" }], prior), []);
-  assertEquals(guardProposal([{ path: "wiki/New.md", content: "# New\n", reason: "create" }], prior), []);
+  assertEquals(
+    guardProposal(
+      [{ path: "wiki/Plain.md", content: "# Plain\n\nMore.\n", reason: "edit" }],
+      prior,
+    ),
+    [],
+  );
+  assertEquals(
+    guardProposal([{ path: "wiki/New.md", content: "# New\n", reason: "create" }], prior),
+    [],
+  );
 });
 
 Deno.test("snapshot then restore returns the tree to its prior state", async () => {
@@ -128,15 +151,30 @@ Deno.test("buildPrompt carries the captures, the pages, and the last-run stamp",
   assert(prompt.includes("wiki/Talk.md"), prompt);
   assert(prompt.includes("existing claim"), prompt);
 });
-Deno.test("buildPrompt keeps the newest messages when a capture exceeds the cap", () => {
-  const oldest = "OLDEST MESSAGE, already folded into the wiki";
-  const newest = "NEWEST MESSAGE, the reason the run started";
+Deno.test("buildPrompt reads an over-long capture forward and says the slice is partial", () => {
+  const oldest = "OLDEST MESSAGE, not folded in yet";
+  const newest = "NEWEST MESSAGE, arriving in a later run";
   const capture = `${oldest}\n${"x".repeat(CAPTURE_CHAR_CAP)}\n${newest}`;
   assert(capture.length > CAPTURE_CHAR_CAP, "fixture must exceed the cap");
   const prompt = buildPrompt(input(), [], capture);
-  assert(prompt.includes(newest), "the newest message must survive the cap");
-  assert(!prompt.includes(oldest), "the oldest content is the part to drop");
-  assert(prompt.includes("elided by the connector"), "the elision must be announced");
+  assert(prompt.includes(oldest), "the oldest unfolded material is what this run folds");
+  assert(!prompt.includes(newest), "the tail arrives in a later run rather than being dropped");
+  assert(prompt.includes("CAPTURE RANGE"), "a partial capture must say it is partial");
+  assert(prompt.includes("arrives in a later run"), prompt);
+});
+
+Deno.test("buildPrompt resumes a capture from where the last run stopped", () => {
+  const head = "ALREADY FOLDED BY AN EARLIER RUN";
+  const tail = "NOT YET FOLDED";
+  const capture = `${head}\n${tail}`;
+  const prompt = buildPrompt(input({ offset: head.length + 1 }), [], capture);
+  assert(prompt.includes(tail), prompt);
+  assert(!prompt.includes(head), "the folded head is not sent again");
+  assert(prompt.includes("earlier slices were folded in by previous runs"), prompt);
+});
+
+Deno.test("captureSlice clamps an offset past the end instead of slicing backwards", () => {
+  assertEquals(captureSlice("abcdef", 99, 4), { shown: "", from: 6, to: 6, more: false });
 });
 
 Deno.test("runWikiPass refuses to run without a key instead of guessing", async () => {
