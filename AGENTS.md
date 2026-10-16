@@ -111,11 +111,12 @@ by thread id for the same reason, since a thread message and a channel message
 interleave in time and advancing a channel's cursor to a thread's newest id would
 skip that channel's own older messages. A forum's channel id is never a resume
 point, so it never gets a cursor.
-`tools/discord_invite.py <app-id>` prints the install URL for that bot, scoped to
-`View Channel` and `Read Message History` and locked to the DCWG server. Both
-tools ship with the connector because the invite is the one step that needs a
-human: Discord has no API that creates an application or a bot user, so the
-application is made in the portal and only the invite is mechanical.
+`deno task --config tools/discord/deno.json invite <app-id>` prints the install
+URL for that bot, scoped to `View Channel` and `Read Message History` and locked
+to the DCWG server. Both tools ship with the connector because the invite is the
+one step that needs a human: Discord has no API that creates an application or a
+bot user, so the application is made in the portal and only the invite is
+mechanical.
 
 The connector has its own Discord application and its own bot token. In the
 repository it is the secret `DISCORD_BOT_TOKEN`; on this host it is read from
