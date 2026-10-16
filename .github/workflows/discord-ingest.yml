@@ -14,13 +14,21 @@ name: Discord ingest
 # A cursor parked in an unmerged PR would make every daily run re-fetch the same
 # range and add another capture for it. The gates are the review step here.
 #
+# The page pass runs `opencode`, an agentic CLI, which edits the wiki files
+# itself instead of returning one JSON list of rewrites. It is installed below
+# as a pinned CLI: the version decides the agent loop, the tool set, and the
+# event stream the connector parses, so an unpinned install would let the
+# automation change underneath a run. `--editor api` selects the older one-shot
+# path, which needs no CLI.
+#
 # Required repository secrets:
 #   DISCORD_BOT_TOKEN       the capture bot's token (its own application)
 #   OPENROUTER_API_KEY      inference for the wiki pass, on a free model by
 #                           default. ANTHROPIC_API_KEY also works if set, and
-#                           --provider picks between them; a free OpenRouter key
-#                           is capped at 50 requests/day, which one daily run
-#                           stays well inside.
+#                           --provider picks between them.
+# An agentic pass spends one model request per step, so a free OpenRouter key's
+# daily cap meters this path differently than the one-shot one: see the note in
+# AGENTS.md before pointing the schedule at it.
 # Neither is ever echoed: the connector reads them from the environment and
 # never accepts a token as a command-line argument.
 
@@ -39,11 +47,15 @@ on:
         type: boolean
         default: false
       model:
-        description: "Model for the wiki pass (blank = the provider's default)"
+        description: "Model for the wiki pass. Blank = the default. With --editor opencode this must be provider/model, e.g. openrouter/nvidia/nemotron-3-super-120b-a12b:free"
         type: string
         default: ""
       provider:
         description: "anthropic or openrouter (blank = whichever key is set)"
+        type: string
+        default: ""
+      editor:
+        description: "opencode or api (blank = the connector's default)"
         type: string
         default: ""
 
@@ -68,6 +80,7 @@ jobs:
       # every one of these falls back in the shell rather than in an expression.
       MODEL: ${{ github.event.inputs.model }}
       PROVIDER: ${{ github.event.inputs.provider }}
+      EDITOR: ${{ github.event.inputs.editor }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       SKIP_WIKI: ${{ github.event.inputs.skip_wiki }}
     steps:
@@ -76,6 +89,14 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: "2.x"
+
+      # Pinned, because the connector parses this CLI's JSON event stream and
+      # drives its agent loop: a silent major upgrade would change both. The
+      # version is asserted so the pin cannot drift into a lie.
+      - name: Install the page-pass CLI
+        run: |
+          npm install -g opencode-ai@1.19.3
+          test "$(opencode --version)" = "1.19.3"
 
       - name: Unit-test the connector before trusting it
         run: deno test -A
@@ -103,6 +124,7 @@ jobs:
             # that is actually configured.
             if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
             if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
+            if [ -n "${EDITOR:-}" ]; then args+=(--editor "$EDITOR"); fi
             [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
             [ "${SKIP_WIKI:-false}" = "true" ] && args+=(--skip-wiki)
             if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then

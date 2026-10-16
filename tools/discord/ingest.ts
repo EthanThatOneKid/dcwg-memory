@@ -12,7 +12,8 @@
  *
  * Credentials (never passed as arguments, never logged):
  *   DCWG_DISCORD_BOT_TOKEN   the capture bot's token
- *   ANTHROPIC_API_KEY        used by the wiki pass only
+ *   OPENROUTER_API_KEY       the wiki pass, through opencode or the API provider
+ *   ANTHROPIC_API_KEY        the wiki pass, when --provider anthropic
  */
 
 import {
@@ -33,6 +34,16 @@ import {
   renderCapture,
 } from "./capture.ts";
 import { checkEditablePath, validateSummary } from "./guard.ts";
+import {
+  cleanBrief,
+  diffTree,
+  outsideWiki,
+  renderBrief,
+  restoreTree,
+  runOpencode,
+  snapshotTree,
+  writeBrief,
+} from "./opencode.ts";
 import { buildPrompt, readPages, runWikiPass, writePage } from "./wiki.ts";
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
@@ -41,6 +52,7 @@ import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
 import type { PageEdit, Provider } from "./wiki.ts";
+import type { FileTree } from "./opencode.ts";
 
 const USAGE = `dcwg-memory Discord connector
 
@@ -69,6 +81,12 @@ Options:
   --provider <name>     anthropic or openrouter (default: whichever key is set)
   --model <id>          model id for the wiki pass (default: provider-specific)
   --skip-wiki           capture only; do not touch wiki pages
+  --editor <name>       how the page pass edits pages. opencode (default) runs an
+                        agentic CLI that reads the capture and edits wiki/ files
+                        itself; api asks the model for a JSON list of complete
+                        page rewrites, one request per attempt
+  --pass-timeout <sec>  kill an opencode pass that runs longer than this
+                        (default 900)
   --attempts <n>        how many times the page pass may be retried against the gates
                         (default 2: one retry, because the usual failure is correctable)
   --no-gates            skip the repo validation commands (local iteration only)
@@ -93,6 +111,10 @@ interface Args {
   /** Unset means the provider's own default, so the two defaults cannot collide. */
   model?: string;
   skipWiki: boolean;
+  /** Which editor produces the page changes. */
+  editor: "opencode" | "api";
+  /** Wall-clock cap on one opencode pass, in seconds. */
+  passTimeoutSec: number;
   noGates: boolean;
   /** How many times the page pass may be retried against the gates. */
   attempts: number;
@@ -109,6 +131,8 @@ function parseArgs(argv: string[]): Args {
     all: false,
     tokenEnv: "DCWG_DISCORD_BOT_TOKEN",
     skipWiki: false,
+    editor: "opencode",
+    passTimeoutSec: 900,
     noGates: false,
     attempts: 2,
     dryRun: false,
@@ -148,6 +172,15 @@ function parseArgs(argv: string[]): Args {
       case "--all": args.all = true; break;
       case "--attempts": args.attempts = Number(value()); break;
       case "--skip-wiki": args.skipWiki = true; break;
+      case "--editor": {
+        const name = value();
+        if (name !== "opencode" && name !== "api") {
+          throw new Error(`--editor must be opencode or api, not '${name}'`);
+        }
+        args.editor = name;
+        break;
+      }
+      case "--pass-timeout": args.passTimeoutSec = Number(value()); break;
       case "--no-gates": args.noGates = true; break;
       case "--dry-run": args.dryRun = true; break;
       case "-h":
@@ -218,6 +251,10 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     console.error("error: --limit must be a non-negative integer");
     return 2;
   }
+  if (!Number.isInteger(args.passTimeoutSec) || args.passTimeoutSec <= 0) {
+    console.error("error: --pass-timeout must be a positive integer");
+    return 2;
+  }
 
   let token: string;
   try {
@@ -277,6 +314,8 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
    * are older than that thread message.
    */
   const advances = new Map<string, string>();
+  /** Forum posts this run saw, so the brief can name them and demand a page each. */
+  const forumPosts: Array<{ id: string; title: string }> = [];
 
   let topLevelResume: string | null = null;
   if (!forum) {
@@ -307,6 +346,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     if (!messages.length) continue;
     sections.push({ title: threadTitle(thread), messages });
     advances.set(thread.id, messages[messages.length - 1].id);
+    if (forum) forumPosts.push({ id: thread.id, title: threadTitle(thread) });
   }
 
   const messages: DiscordMessage[] = sections
@@ -361,6 +401,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
 
   const summaryPath = `${outDir}/SUMMARY.json`;
   const summary: Record<string, unknown> = await readJson(summaryPath);
+  // Read before this run overwrites it: the brief shows the model when the wiki
+  // was last touched, which is how a page judges how stale its claims are.
+  const previousRun = typeof summary.lastRun === "string" ? summary.lastRun : undefined;
   const captureCount = (await readExistingCaptures(outDir)).length;
   Object.assign(summary, {
     status: "OK" as const,
@@ -395,51 +438,131 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   let lastFailure = "";
   let passed = false;
 
+  /**
+   * What an opencode pass is measured against, and what a failed attempt is
+   * restored to. Taken here, after the connector's own capture and cursor
+   * writes, so those are not mistaken for changes the agent made.
+   */
+  const treeBefore = args.editor === "opencode" ? await snapshotTree(root) : undefined;
+
   for (let attempt = 1; attempt <= args.attempts; attempt++) {
-    const wiki = await runWikiPass({
-      root,
-      messages,
-      channelName,
-      forum,
-      capturePath,
-      cursorBefore: topLevelResume,
-      provider: args.provider,
-      model: args.model,
-      feedback,
-    });
+    let revert: () => Promise<void>;
 
-    if ("problems" in wiki) {
-      const byModel = wiki.failure === "model";
-      lastFailure = byModel
-        ? `the model call failed:\n  - ${wiki.problems.join("\n  - ")}`
-        : `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
-      feedback = lastFailure;
-      console.log(
-        `attempt ${attempt}/${args.attempts} rejected: ${byModel ? "the model call failed" : "the write guard"}`,
+    if (args.editor === "opencode") {
+      const briefPath = await writeBrief(
+        root,
+        renderBrief({
+          capturePath,
+          channelName,
+          messageCount: messages.length,
+          lastUpdated: previousRun,
+          forum,
+          threads: forumPosts,
+          feedback,
+        }),
       );
-      continue;
-    }
+      const run = await runOpencode({
+        root,
+        agent: "dcwg",
+        briefPath,
+        model: args.model,
+        timeoutMs: args.passTimeoutSec * 1000,
+      });
+      await cleanBrief(root);
+      const changed = diffTree(treeBefore!, await snapshotTree(root));
+      const stray = outsideWiki(changed);
+      usage = { inputTokens: run.usage.inputTokens, outputTokens: run.usage.outputTokens };
+      revert = () => restoreTree(root, treeBefore!);
 
-    const unwritable = wiki.edits.find((edit) =>
-      !checkEditablePath(edit.path, new TextEncoder().encode(edit.content).length).ok
-    );
-    if (unwritable) {
-      await wiki.revert();
-      const check = checkEditablePath(unwritable.path, new TextEncoder().encode(unwritable.content).length);
-      lastFailure = `the model proposed a path it may not write (${unwritable.path}: ${"reason" in check ? check.reason : "no reason given"})`;
-      feedback = lastFailure;
-      console.log(`attempt ${attempt}/${args.attempts} proposed an unwritable path`);
-      continue;
-    }
+      // The tree compare is the write-surface control, not the agent's own
+      // permission rules: a rule that failed open in testing cannot be trusted
+      // to fail closed here. Anything outside wiki/ reverts the whole attempt.
+      if (!run.ok || stray.length) {
+        await revert();
+        lastFailure = !run.ok
+          ? `the opencode pass did not finish: ${
+            run.timedOut ? `killed after ${args.passTimeoutSec}s` : `exit ${run.code}`
+          }${run.stderr ? `\n${run.stderr}` : ""}`
+          : `the pass changed files outside wiki/, so the whole attempt was reverted:\n  - ${
+            stray.join("\n  - ")
+          }`;
+        feedback = lastFailure;
+        console.log(
+          `attempt ${attempt}/${args.attempts} ${
+            !run.ok
+              ? run.timedOut
+                ? `timed out after ${args.passTimeoutSec}s`
+                : `failed (exit ${run.code})`
+              : `wrote outside wiki/ (${stray.length} path(s))`
+          }`,
+        );
+        continue;
+      }
 
-    written = wiki.edits.map((edit) => edit.path);
-    notes = wiki.notes;
-    usage = wiki.usage;
-    for (const edit of wiki.edits) await writePage(root, edit as PageEdit);
-    console.log(
-      `attempt ${attempt}/${args.attempts}: ${written.length} page edit(s): ${written.join(", ") || "none"}`,
-    );
-    for (const adjustment of wiki.adjustments) console.log(`  adjusted: ${adjustment}`);
+      written = changed;
+      notes = `opencode: ${run.usage.steps} step(s), ${run.usage.inputTokens} in / ` +
+        `${run.usage.outputTokens} out`;
+      console.log(
+        `attempt ${attempt}/${args.attempts}: ${written.length} page file(s) changed: ${
+          written.join(", ") || "none"
+        }`,
+      );
+    } else {
+      const wiki = await runWikiPass({
+        root,
+        messages,
+        channelName,
+        forum,
+        capturePath,
+        cursorBefore: topLevelResume,
+        provider: args.provider,
+        model: args.model,
+        feedback,
+      });
+
+      if ("problems" in wiki) {
+        const byModel = wiki.failure === "model";
+        lastFailure = byModel
+          ? `the model call failed:\n  - ${wiki.problems.join("\n  - ")}`
+          : `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
+        feedback = lastFailure;
+        console.log(
+          `attempt ${attempt}/${args.attempts} rejected: ${
+            byModel ? "the model call failed" : "the write guard"
+          }`,
+        );
+        continue;
+      }
+
+      const unwritable = wiki.edits.find((edit) =>
+        !checkEditablePath(edit.path, new TextEncoder().encode(edit.content).length).ok
+      );
+      if (unwritable) {
+        await wiki.revert();
+        const check = checkEditablePath(
+          unwritable.path,
+          new TextEncoder().encode(unwritable.content).length,
+        );
+        lastFailure = `the model proposed a path it may not write (${unwritable.path}: ${
+          "reason" in check ? check.reason : "no reason given"
+        })`;
+        feedback = lastFailure;
+        console.log(`attempt ${attempt}/${args.attempts} proposed an unwritable path`);
+        continue;
+      }
+
+      written = wiki.edits.map((edit) => edit.path);
+      notes = wiki.notes;
+      usage = wiki.usage;
+      revert = wiki.revert;
+      for (const edit of wiki.edits) await writePage(root, edit as PageEdit);
+      console.log(
+        `attempt ${attempt}/${args.attempts}: ${written.length} page edit(s): ${
+          written.join(", ") || "none"
+        }`,
+      );
+      for (const adjustment of wiki.adjustments) console.log(`  adjusted: ${adjustment}`);
+    }
 
     await writeCapturesIndex(root);
 
@@ -477,9 +600,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       break;
     }
 
-    // Undo this attempt before the next one: the model must see the pages as
-    // they were, not as its own rejected edit left them.
-    await wiki.revert();
+    // Undo this attempt before the next one: the editor must see the pages as
+    // they were, not as its own rejected attempt left them.
+    await revert();
     await writeCapturesIndex(root);
     lastFailure = gateFeedback(outcomes);
     feedback = lastFailure;
