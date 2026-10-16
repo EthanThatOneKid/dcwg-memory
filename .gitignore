@@ -9,3 +9,7 @@ _site/
 # Local secrets and tooling
 secrets/
 .ruff_cache/
+
+# The wiki pass: opencode keeps its own workspace and the connector its brief
+.opencode/
+.dcwg/

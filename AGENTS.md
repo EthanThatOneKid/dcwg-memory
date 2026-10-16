@@ -146,10 +146,10 @@ edits while leaving the capture in place. It needs two repository secrets,
 `DISCORD_BOT_TOKEN` and `OPENROUTER_API_KEY`. Inference runs on OpenRouter
 by default on a free model (`nvidia/nemotron-3-super-120b-a12b:free`), which was
 verified to honour the strict `json_schema` the page edits need; `ANTHROPIC_API_KEY`
-also works and `--provider` picks between them. A free OpenRouter key allows 50
-requests a day, and one daily run over one venue stays well inside that. A
-reasoning model is the trade: the first real run, a 593-message backfill, cost
-~25k input and ~24k output tokens and took about three minutes, at no charge.
+also works and `--provider` picks between them. A reasoning model is the trade:
+the first real run, a 593-message backfill, cost ~25k input and ~24k output
+tokens and took about three minutes, at no charge. That run used the `api`
+editor; the default is now `opencode`, described next.
 
 If the pass or a gate fails, the capture stays and the page edits are reverted, so
 a bad inference never commits prose that does not pass the repo's own checks. The
@@ -176,6 +176,52 @@ The connector is verified end to end: `Dodo [DCWG]` (app `1559632041484484709`) 
 installed in the server, and a full backfill of `#talk` read 593 messages in about
 four seconds. The manual steps above remain the fallback for a venue the bot cannot
 see.
+
+## The page pass runs opencode
+
+`ingest.ts` folds a capture into the wiki in one of two ways, chosen with
+`--editor` (default `opencode`):
+
+- **`opencode`** runs `opencode`, an agentic coding CLI, as the `dcwg` agent
+  defined in the repo's `opencode.json`, whose standing instructions are
+  `tools/discord/prompt/dcwg.md`. The connector writes a per-run brief to
+  `.dcwg/brief.md` (gitignored, removed after the run) and tells the agent to
+  read it; the agent then reads the capture and whichever pages it wants to
+  change with its own tools, and edits `wiki/` itself. The workflow installs the
+  CLI pinned to `1.19.3` and asserts the version, because the connector parses
+  that version's JSON event stream and drives its agent loop.
+- **`api`** asks the model for one JSON list of complete page rewrites, one
+  request per attempt. This is the original path, and `--provider`/`--model`
+  still select it; `ANTHROPIC_API_KEY` works here.
+
+The agentic path exists because the one-shot one truncates: the capture goes in
+through `clip(text, CAPTURE_CHAR_CAP)`, which keeps 24,000 characters, so
+measured 2026-10-16 the pending `#brainstorm` backfill at 115,516 bytes would
+have lost more than three quarters of itself with only a note in the prompt. An
+agent that reads the capture off disk reads all of it, and it can grep for how a
+concept is already named rather than reasoning only from the pages it was handed.
+
+The write surface is enforced by the connector, not by the agent's own
+permission rules. `snapshotTree`, `diffTree`, and `restoreTree` in
+`tools/discord/opencode.ts` compare the whole tree either side of a run and
+revert the attempt when anything outside `wiki/` changed. That is deliberate:
+measured 2026-10-16 on opencode 1.19.3, the same `{"wiki/**": "allow", "**":
+"deny"}` rule allowed `wiki/Alpha.md` in one checkout and refused `wiki/New.md`
+in another, so a rule that fails open is not a control. `opencode.json` still
+denies bash, webfetch, websearch, task, and question, so a run cannot exfiltrate
+the OpenRouter key it is handed or run a command nobody reviewed.
+
+`--model` means different things to the two editors: opencode wants
+`provider/model` (e.g. `openrouter/nvidia/nemotron-3-super-120b-a12b:free`),
+while the `api` path wants the bare provider id. `--pass-timeout` (default 900
+seconds) kills an opencode pass that overruns.
+
+Metering is the open question on this path, and the reason to watch the first
+runs: an agentic pass spends one model request per step, so a free OpenRouter
+key's daily cap meters it per step rather than per run. One daily run over one
+venue was comfortably inside that cap for the one-shot path, and that arithmetic
+does not transfer. A pass that hits the cap reports `NEEDS_ATTENTION` and commits
+nothing, so the failure is visible rather than silent.
 
 ## Maintaining the wiki: the self-healing pass
 
