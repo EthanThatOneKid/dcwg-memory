@@ -6,7 +6,7 @@
  * helpers, same separators) to keep the record uniform across both writers.
  */
 
-import type { DiscordMessage } from "./discord.ts";
+import type { CaptureChannelKind, DiscordMessage } from "./discord.ts";
 import { isoUtc } from "./discord.ts";
 
 /** Message types whose text belongs in the record; anything else is annotated. */
@@ -101,6 +101,12 @@ export interface CaptureInput {
   sections?: CaptureSection[];
   channelId: string;
   channelName: string;
+  /**
+   * Discord's own kind for the venue. Required rather than optional so a capture
+   * can never be written without saying whether its blocks are a channel plus its
+   * threads or a forum's posts, which is what the thread check keys on.
+   */
+  channelType: CaptureChannelKind;
   tags?: string[];
   serverLabel?: string;
 }
@@ -129,7 +135,7 @@ export function captureDay(messages: DiscordMessage[]): string {
 }
 
 export function renderCapture(input: CaptureInput): string {
-  const { messages, channelId, channelName } = input;
+  const { messages, channelId, channelName, channelType } = input;
   const sections = input.sections ?? [];
   const tags = input.tags ?? DEFAULT_TAGS;
   const serverLabel = input.serverLabel ?? DEFAULT_SERVER_LABEL;
@@ -149,6 +155,7 @@ export function renderCapture(input: CaptureInput): string {
     "---\n" +
     `title: ${yamlStr(`Discord #${channelName} — ${day}`)}\n` +
     `source: ${yamlStr(`Discord REST API, channel ${channelId}, UTC timestamps`)}\n` +
+    `channel_type: ${channelType}\n` +
     "author:\n" +
     participants.map((p) => `  - ${yamlStr(p)}\n`).join("") +
     `created: ${day}\n` +

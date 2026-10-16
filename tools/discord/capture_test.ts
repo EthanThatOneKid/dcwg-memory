@@ -19,6 +19,12 @@ import {
   renderCapture,
   yamlStr,
 } from "./capture.ts";
+import {
+  CHANNEL_FORUM,
+  CHANNEL_MEDIA,
+  CHANNEL_TEXT,
+  channelKind,
+} from "./discord.ts";
 import type { DiscordMessage } from "./discord.ts";
 
 function msg(over: Partial<DiscordMessage> & { id: string }): DiscordMessage {
@@ -101,11 +107,17 @@ Deno.test("renderCapture frontmatter names the venue, span, and participants", (
     msg({ id: "2", content: "b", timestamp: "2026-08-01T02:00:00Z", author: { id: "2", username: "jef" } }),
     msg({ id: "3", content: "c", timestamp: "2026-08-01T03:00:00Z", author: { id: "1", username: "andy" } }),
   ];
-  const text = renderCapture({ messages, channelId: "1558888938842624093", channelName: "talk" });
+  const text = renderCapture({
+    messages,
+    channelId: "1558888938842624093",
+    channelName: "talk",
+    channelType: "text",
+  });
 
   assert(text.startsWith("---\n"), text);
   assert(text.includes(`title: "Discord #talk — 2026-08-01"`), text);
   assert(text.includes(`source: "Discord REST API, channel 1558888938842624093, UTC timestamps"`), text);
+  assert(text.includes("channel_type: text"), text);
   assert(text.includes("created: 2026-08-01"), text);
   assert(text.includes("  - \"andy\"\n  - \"jef\"\n"), text);
   assert(text.includes("3 messages, 2 participants"), text);
@@ -171,6 +183,7 @@ Deno.test("a sectioned capture counts every block in its frontmatter and says ho
     sections,
     channelId: "C",
     channelName: "idea",
+    channelType: "text",
   });
   assert(
     text.includes("2 messages, 2 participants, across 1 thread"),
@@ -182,10 +195,26 @@ Deno.test("a sectioned capture counts every block in its frontmatter and says ho
   );
   assert(text.includes("## Rust Academy? (thread 20)"));
 });
+Deno.test("a post-shaped venue says so in the frontmatter, and a forum is not called a text channel", () => {
+  const messages = [msg({ id: "10", content: "a proposal", author: { id: "1", username: "andy" } })];
+  const text = renderCapture({
+    messages,
+    sections: [{ title: "Rust Academy? (thread 20)", messages }],
+    channelId: "F",
+    channelName: "propose",
+    channelType: "forum",
+  });
+  assert(text.includes("channel_type: forum"), text);
+  // A forum's own channel id is never a resume point, and its blocks are all posts.
+  assertEquals(channelKind(CHANNEL_FORUM), "forum");
+  assertEquals(channelKind(CHANNEL_MEDIA), "media");
+  assertEquals(channelKind(CHANNEL_TEXT), "text");
+  assertEquals(channelKind(undefined), "text");
+});
 
 Deno.test("a capture with no sections renders exactly as it did before sections existed", () => {
   const messages = [msg({ id: "10", content: "one" }), msg({ id: "11", content: "two" })];
-  const bare = { messages, channelId: "C", channelName: "talk" };
+  const bare = { messages, channelId: "C", channelName: "talk", channelType: "text" as const };
   assertEquals(renderCapture(bare), renderCapture({ ...bare, sections: [] }));
   assert(!renderCapture(bare).includes("## "), "no headings without sections");
   assert(!renderCapture(bare).includes("across "), "no thread clause without sections");

@@ -95,7 +95,7 @@ deno task --config tools/discord/deno.json gates  # fmt, check, lint, render, or
 deno task build                                  # the site build the deploy workflow runs
 ```
 
-The first runs the five gates, which is what CI runs on every push. `deno task
+The first runs the six gates, which is what CI runs on every push. `deno task
 build` writes `_site/<base_url>/`, and `deploy.yml` uploads `_site/dcwg-memory`.
 Nothing in either path needs Python.
 

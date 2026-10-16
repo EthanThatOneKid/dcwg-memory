@@ -148,6 +148,8 @@ export interface WikiPassInput {
   root: string;
   messages: DiscordMessage[];
   channelName: string;
+  /** True when the venue is post-shaped: a forum or a media channel. */
+  forum?: boolean;
   capturePath: string;
   cursorBefore?: string | null;
   model?: string;
@@ -224,6 +226,17 @@ export function buildPrompt(input: WikiPassInput, pages: Array<{ path: string; t
   const parts: string[] = [];
   parts.push(`LAST UPDATED: ${input.lastUpdated ?? "(unknown)"}`);
   parts.push(`CHANNEL: #${input.channelName}`);
+  if (input.forum) {
+    parts.push(
+      "VENUE KIND: forum. Every heading in the capture below is one post, and a post is the whole " +
+        "reason the venue exists, so each one is its own concept: give every thread its own page " +
+        "under wiki/, named for what the post proposes rather than for its title, and anchor that " +
+        "page to its thread with `wazoo:thread: \"<thread id>\"` in the frontmatter. Quote the id, " +
+        "because a snowflake is larger than a YAML number can hold exactly. One page anchors one " +
+        "thread: a page carrying two thread ids has aggregated two posts into one page, and the " +
+        "connector's thread gate refuses the pass for that rather than for a missing page.",
+    );
+  }
   if (input.feedback) {
     parts.push(
       "YOUR PREVIOUS ATTEMPT WAS REJECTED. Nothing from it was kept. Fix exactly this and "

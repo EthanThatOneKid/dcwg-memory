@@ -3,8 +3,9 @@ name: Discord ingest
 # One run = pull new channel activity over the Discord REST API, write it as an
 # append-only capture, let the model fold it into the wiki pages, then validate
 # and push. The connector refuses to write anything the repo's own gates reject:
-# if `fmt`, `check --strict`, `lint --strict`, `render --check`, or the orphan
-# check fails, the page edits are reverted and the run reports NEEDS_ATTENTION
+# if `fmt`, `check --strict`, `lint --strict`, `render --check`, the orphan
+# check, or the forum thread check fails, the page edits are reverted and the run
+# reports NEEDS_ATTENTION
 # instead of committing prose that does not pass. The gates are the embedded
 # Deno engine (`deno task gates`), so this job installs no Python.
 #
