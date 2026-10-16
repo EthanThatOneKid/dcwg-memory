@@ -163,10 +163,14 @@ queue oldest first and stops after one capture unless `--drain`, because each fo
 a whole page pass with its own attempts and a backlog should drain over several runs
 rather than overrun the job's own time limit. A fold that cannot pass its gates after
 `--attempts` reports NEEDS_ATTENTION, commits nothing to `wiki/`, and leaves its entry
-queued, so the next run retries that material instead of skipping it. The workflow
-commits `raw/discord` on every run and `wiki` only when the connector reported
-success, and `deploy.yml` no longer skips the redeploy when an ingest run's
-conclusion is not success, because a failed ingest run now commits a new capture.
+queued, so the next run retries that material instead of skipping it. Each venue
+commits and pushes its own capture, cursor, and pages inside the workflow's venue
+loop, as soon as its own fold finishes, so one venue's failure cannot discard
+another venue's work; the job still fails at the end when any venue reported
+NEEDS_ATTENTION, after the venues that succeeded have pushed. A failed pass has
+already reverted its own page edits in-process, so `wiki/` in that commit holds only
+edits that passed the gates. `deploy.yml` no longer skips the redeploy when an ingest
+run's conclusion is not success, because a failed ingest run now commits a capture.
 
 The two failures the model reliably produced are handled in code
 before the guard sees the proposal (`adjustProposal` in `tools/discord/wiki.ts`):
