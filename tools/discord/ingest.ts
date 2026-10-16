@@ -16,6 +16,7 @@
  */
 
 import {
+  channelKind,
   fetchChannelMeta,
   fetchMessages,
   fetchVenueThreads,
@@ -35,6 +36,7 @@ import { checkEditablePath, validateSummary } from "./guard.ts";
 import { buildPrompt, readPages, runWikiPass, writePage } from "./wiki.ts";
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
+import { findThreadProblems } from "./thread_pages.ts";
 import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
@@ -320,6 +322,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     sections,
     channelId: args.channel,
     channelName,
+    channelType: channelKind(channel.type),
     tags: args.tags,
     serverLabel: args.server,
   });
@@ -330,7 +333,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     if (!args.skipWiki) {
       const pages = await readPages(root);
       console.error("\n--- wiki pass prompt (dry run; no model call) ---\n");
-      console.error(buildPrompt({ root, messages, channelName, capturePath: "(not written)" }, pages, text));
+      console.error(
+        buildPrompt({ root, messages, channelName, forum, capturePath: "(not written)" }, pages, text),
+      );
     }
     return report(
       { venue: args.venue, channel: args.channel, day, captured: messages.length, dryRun: true },
@@ -395,6 +400,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       root,
       messages,
       channelName,
+      forum,
       capturePath,
       cursorBefore: topLevelResume,
       provider: args.provider,
@@ -454,6 +460,14 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         name: "orphans",
         ok: false,
         output: `no inbound link from another page:\n  - ${orphans.join("\n  - ")}`,
+      });
+    }
+    const threadProblems = await findThreadProblems(root);
+    if (threadProblems.length) {
+      outcomes.push({
+        name: "threads",
+        ok: false,
+        output: `a forum post is missing its own page:\n  - ${threadProblems.join("\n  - ")}`,
       });
     }
 

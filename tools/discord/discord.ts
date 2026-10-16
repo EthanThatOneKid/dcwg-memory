@@ -121,6 +121,24 @@ export function isForum(type: number | undefined): boolean {
   return type === CHANNEL_FORUM || type === CHANNEL_MEDIA;
 }
 
+/**
+ * The venue kind a capture records in its frontmatter.
+ *
+ * A forum and a media channel are post-shaped: their top-level history holds only
+ * the post starters, so every block of their capture is a titled thread, while a
+ * text channel carries its own untitled block first. `isForum` collapses the two
+ * post-shaped types because the fetcher treats them the same way, but the record
+ * keeps them apart, since calling a media channel a forum would be wrong. What
+ * this buys is that a reader, and the thread check, can tell a forum's posts from
+ * a text channel's side discussions without inferring it from the block shapes.
+ */
+export type CaptureChannelKind = "text" | "forum" | "media";
+
+export function channelKind(type: number | undefined): CaptureChannelKind {
+  if (type === CHANNEL_MEDIA) return "media";
+  return isForum(type) ? "forum" : "text";
+}
+
 export interface ChannelMeta {
   id: string;
   name?: string | null;

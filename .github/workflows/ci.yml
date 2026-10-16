@@ -21,9 +21,10 @@ jobs:
         with:
           deno-version: v2.x
       # fmt (which writes), check --strict, lint --strict, render --check, and
-      # the orphan check. The engine is embedded, so this job needs no Python and
+      # the orphan check, and the forum thread check. The engine is embedded, so this
+      # job needs no Python and
       # no `pip install`; it exits non-zero on any failure.
-      - name: Run the five gates
+      - name: Run the six gates
         run: deno task --config tools/discord/deno.json gates
 
   connector:
