@@ -112,6 +112,12 @@ export interface BriefInput {
   capturePath: string;
   channelName: string;
   messageCount: number;
+  /**
+   * True when an earlier run committed this capture and could not fold it in, so this
+   * run is picking the work back up. The task is the same; the brief just stops
+   * describing a capture that may be days old as "new".
+   */
+  queued?: boolean;
   lastUpdated?: string;
   /** True when the venue is a forum, so every post needs its own page. */
   forum: boolean;
@@ -130,8 +136,13 @@ export function renderBrief(input: BriefInput): string {
   const parts: string[] = [];
   parts.push(`# CURRENT TASK`);
   parts.push(
-    `Integrate the new Discord capture at \`${input.capturePath}\` into the wiki. ` +
-      `Read that file in full before you write anything.`,
+    input.queued
+      ? `Fold the staged Discord capture at \`${input.capturePath}\` into the wiki. An ` +
+        `earlier run committed it to \`raw/\` but the wiki does not carry it yet, so ` +
+        `this run is picking that work back up. Read that file in full before you ` +
+        `write anything.`
+      : `Integrate the new Discord capture at \`${input.capturePath}\` into the wiki. ` +
+        `Read that file in full before you write anything.`,
   );
   parts.push(`LAST UPDATED: ${input.lastUpdated ?? "(unknown)"}`);
   parts.push(`CHANNEL: #${input.channelName}`);
@@ -313,4 +324,33 @@ export async function cleanBrief(root: string): Promise<void> {
   } catch {
     // nothing to clean
   }
+}
+/**
+ * The marker that tells the workflow `wiki/` is safe to commit.
+ *
+ * It lives under `.dcwg/` precisely because that path is gitignored and never staged,
+ * and the workflow deletes the directory before each venue runs, so one venue's marker
+ * cannot authorise the next venue's crash.
+ */
+export const PAGES_OK_PATH = ".dcwg/pages-ok";
+
+/**
+ * Record whether every page edit currently on disk passed the gates.
+ *
+ * `ok: false` is not the same as leaving no marker: it says the tree is in a known state
+ * (the baseline, because a failed fold reverts) while the marker that authorises a
+ * commit is absent. Removing any earlier marker is the point, so it is unconditional.
+ */
+export async function writePagesOk(root: string, ok: boolean): Promise<void> {
+  const path = `${root}/${PAGES_OK_PATH}`;
+  if (!ok) {
+    try {
+      await Deno.remove(path);
+    } catch {
+      // no marker to remove
+    }
+    return;
+  }
+  await Deno.mkdir(`${root}/.dcwg`, { recursive: true });
+  await Deno.writeTextFile(path, `${new Date().toISOString()}\n`);
 }

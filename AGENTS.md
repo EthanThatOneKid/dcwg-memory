@@ -142,7 +142,7 @@ when they pass. It pushes rather than opening a pull request because the cursor 
 `raw/discord/.cursor` has to advance for the next run to know where to resume; a
 cursor parked in an unmerged pull request would make every run re-fetch the same
 range. The gates are the review step, and a failing gate reverts the pass's page
-edits while leaving the capture in place. It needs two repository secrets,
+edits while leaving the capture committed. It needs two repository secrets,
 `DISCORD_BOT_TOKEN` and `OPENROUTER_API_KEY`. Inference runs on OpenRouter
 by default on a free model (`nvidia/nemotron-3-super-120b-a12b:free`), which was
 verified to honour the strict `json_schema` the page edits need; `ANTHROPIC_API_KEY`
@@ -151,13 +151,29 @@ the first real run, a 593-message backfill, cost ~25k input and ~24k output
 tokens and took about three minutes, at no charge. That run used the `api`
 editor; the default is now `opencode`, described next.
 
-If the pass or a gate fails, the capture stays and the page edits are reverted, so
-a bad inference never commits prose that does not pass the repo's own checks. The
-reverted pass leaves the cursor where it was, which is deliberate: the next run
-re-fetches the same range and retries rather than skipping material the wiki never
-absorbed. The cost is that a pass which fails for a reason the model cannot fix
-repeats every day, so the two failures the model reliably produced are handled in
-code before the guard sees the proposal (`adjustProposal` in `tools/discord/wiki.ts`):
+If the pass or a gate fails, the page edits are reverted, so a bad inference never
+commits prose that does not pass the repo's own checks. The capture is committed
+either way, because `raw/` and `wiki/` fail differently: the archive is complete
+through the newest message the moment the file exists, while the wiki is derived and
+a model call, a gate, or a rate limit can stop it folding that capture in. The
+connector therefore writes the capture, advances the cursor with it, and records
+what the wiki still owes in a queue (under `_pending` in `raw/discord/.cursor`, a
+file the hub already treats as mutable connector state). A run folds its venue's
+queue oldest first and stops after one capture unless `--drain`, because each fold is
+a whole page pass with its own attempts and a backlog should drain over several runs
+rather than overrun the job's own time limit. A fold that cannot pass its gates after
+`--attempts` reports NEEDS_ATTENTION, commits nothing to `wiki/`, and leaves its entry
+queued, so the next run retries that material instead of skipping it. Each venue
+commits and pushes its own capture, cursor, and pages inside the workflow's venue
+loop, as soon as its own fold finishes, so one venue's failure cannot discard
+another venue's work; the job still fails at the end when any venue reported
+NEEDS_ATTENTION, after the venues that succeeded have pushed. A failed pass has
+already reverted its own page edits in-process, so `wiki/` in that commit holds only
+edits that passed the gates. `deploy.yml` no longer skips the redeploy when an ingest
+run's conclusion is not success, because a failed ingest run now commits a capture.
+
+The two failures the model reliably produced are handled in code
+before the guard sees the proposal (`adjustProposal` in `tools/discord/wiki.ts`):
 an edit to `wiki/Captures.md` is dropped, because the connector rebuilds that index
 from the tree right after applying a pass, and a page that had frontmatter keeps it,
 because carrying the block forward is what the prompt already asked for. Both are
@@ -194,12 +210,13 @@ see.
   request per attempt. This is the original path, and `--provider`/`--model`
   still select it; `ANTHROPIC_API_KEY` works here.
 
-The agentic path exists because the one-shot one truncates: the capture goes in
-through `clip(text, CAPTURE_CHAR_CAP)`, which keeps 24,000 characters, so
-measured 2026-10-16 the pending `#brainstorm` backfill at 115,516 bytes would
-have lost more than three quarters of itself with only a note in the prompt. An
-agent that reads the capture off disk reads all of it, and it can grep for how a
-concept is already named rather than reasoning only from the pages it was handed.
+The agentic path exists because the one-shot one reads a long capture in pieces.
+The `api` editor gets `captureSlice`, at most `CAPTURE_CHAR_CAP` (24,000)
+characters of capture per attempt, and where it resumes is the queue entry's
+`offset`: measured 2026-10-16, the pending `#brainstorm` backfill at 115,516 bytes
+takes five slices, so the wiki is whole only after the last one. An agent that reads
+the capture off disk reads all of it in one pass, and it can grep for how a concept
+is already named rather than reasoning only from the pages it was handed.
 
 The write surface is enforced by the connector, not by the agent's own
 permission rules. `snapshotTree`, `diffTree`, and `restoreTree` in

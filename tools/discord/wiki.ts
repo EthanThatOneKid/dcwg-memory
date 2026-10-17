@@ -19,11 +19,10 @@ import {
   carryFrontmatterForward,
   checkEditablePath,
   CODE_OWNED,
+  hasFrontmatter,
   MAX_PAGE_BYTES,
   WIKI_PREFIX,
-  hasFrontmatter,
 } from "./guard.ts";
-import type { DiscordMessage } from "./discord.ts";
 
 /** Sonnet-class by default: the pass writes prose into a public record, so a
  *  small model is the wrong floor. Override with --model. */
@@ -98,7 +97,8 @@ export const PageEditsSchema = z.object({
 export type PageEdits = z.infer<typeof PageEditsSchema>;
 export type PageEdit = PageEdits["edits"][number];
 
-export const SYSTEM_PROMPT = `You are the connector for dcwg-memory, a proactive memory agent managing a public knowledge base.
+export const SYSTEM_PROMPT =
+  `You are the connector for dcwg-memory, a proactive memory agent managing a public knowledge base.
 
 Your primary directive is to process new information and integrate it cleanly.
 
@@ -146,12 +146,18 @@ Hard rules, all enforced by the connector and by CI:
 
 export interface WikiPassInput {
   root: string;
-  messages: DiscordMessage[];
   channelName: string;
   /** True when the venue is post-shaped: a forum or a media channel. */
   forum?: boolean;
   capturePath: string;
-  cursorBefore?: string | null;
+  /**
+   * How far into the capture the wiki already carries.
+   *
+   * A capture longer than one prompt is read forward, oldest slice first, so this
+   * is where the next run resumes rather than a claim about what the cursor is.
+   * Zero for the ordinary case, where the whole capture fits in one prompt.
+   */
+  offset?: number;
   model?: string;
   /** Which provider to run on; defaults to whichever API key is present. */
   provider?: Provider;
@@ -193,20 +199,40 @@ export interface WikiPassApplied {
 export type WikiPassResult = WikiPassApplied | WikiPassRejected;
 
 /**
- * Trim an over-long input from the old end, not the new one.
+ * Trim an over-long page from the old end, not the new one.
  *
- * A capture is chronological and ascending, so its newest messages are its last
- * characters. This pass exists to fold in the latest activity, and a channel that
- * grows past the cap is exactly when that matters: keeping the head would feed the
- * model material the wiki already reflects while silently discarding the messages
- * the run was started for. The elision is announced so the model knows the input
- * is partial rather than assuming it is the whole capture.
+ * A page's newest material is what a pass is most likely to have just changed, and
+ * a page over the cap is a page the model cannot rewrite whole anyway. The elision is
+ * announced so the model knows the input is partial rather than assuming it is the
+ * whole page.
  */
 function clip(text: string, cap: number, label: string): string {
   if (text.length <= cap) return text;
   const elided = text.length - cap;
   return `[${label}: first ${elided} characters elided by the connector, newest ${cap} kept]\n\n` +
     text.slice(-cap);
+}
+
+/**
+ * The slice of a capture one prompt may carry, and where it starts and ends.
+ *
+ * A capture is chronological and ascending, so folding one in means reading it
+ * forward: the model gets the oldest part it has not seen yet, and the next run gets
+ * the next slice. `offset` is that position, and it is what makes a capture too long
+ * for one prompt absorbable at all.
+ *
+ * The previous behaviour kept the newest `cap` characters and advanced the archive
+ * cursor past the whole capture anyway, so the elided head reached `raw/`, never
+ * reached the wiki, and no later run was ever offered it.
+ */
+export function captureSlice(
+  text: string,
+  offset: number,
+  cap: number,
+): { shown: string; from: number; to: number; more: boolean } {
+  const from = Math.max(0, Math.min(offset, text.length));
+  const to = Math.min(from + cap, text.length);
+  return { shown: text.slice(from, to), from, to, more: to < text.length };
 }
 
 /** List the wiki pages the pass may edit. */
@@ -222,7 +248,11 @@ export async function readPages(root: string): Promise<Array<{ path: string; tex
   return out;
 }
 
-export function buildPrompt(input: WikiPassInput, pages: Array<{ path: string; text: string }>, captureText: string): string {
+export function buildPrompt(
+  input: WikiPassInput,
+  pages: Array<{ path: string; text: string }>,
+  captureText: string,
+): string {
   const parts: string[] = [];
   parts.push(`LAST UPDATED: ${input.lastUpdated ?? "(unknown)"}`);
   parts.push(`CHANNEL: #${input.channelName}`);
@@ -231,7 +261,7 @@ export function buildPrompt(input: WikiPassInput, pages: Array<{ path: string; t
       "VENUE KIND: forum. Every heading in the capture below is one post, and a post is the whole " +
         "reason the venue exists, so each one is its own concept: give every thread its own page " +
         "under wiki/, named for what the post proposes rather than for its title, and anchor that " +
-        "page to its thread with `wazoo:thread: \"<thread id>\"` in the frontmatter. Quote the id, " +
+        'page to its thread with `wazoo:thread: "<thread id>"` in the frontmatter. Quote the id, ' +
         "because a snowflake is larger than a YAML number can hold exactly. One page anchors one " +
         "thread: a page carrying two thread ids has aggregated two posts into one page, and the " +
         "connector's thread gate refuses the pass for that rather than for a missing page.",
@@ -239,21 +269,35 @@ export function buildPrompt(input: WikiPassInput, pages: Array<{ path: string; t
   }
   if (input.feedback) {
     parts.push(
-      "YOUR PREVIOUS ATTEMPT WAS REJECTED. Nothing from it was kept. Fix exactly this and "
-        + "return a corrected set of edits:\n\n" + input.feedback,
+      "YOUR PREVIOUS ATTEMPT WAS REJECTED. Nothing from it was kept. Fix exactly this and " +
+        "return a corrected set of edits:\n\n" + input.feedback,
     );
   }
+  const slice = captureSlice(captureText, input.offset ?? 0, CAPTURE_CHAR_CAP);
   parts.push(`NEW CAPTURE (verbatim messages; the only new information in this task):`);
+  if (slice.from > 0 || slice.more) {
+    // A partial capture has to say so: the model would otherwise write a summary of
+    // a conversation it saw half of, and the missing half arrives in a later run.
+    parts.push(
+      `CAPTURE RANGE: characters ${slice.from}-${slice.to} of ${captureText.length}. ` +
+        (slice.more
+          ? "The rest of this capture arrives in a later run. Fold in what is here and do " +
+            "not summarise, speculate about, or draw conclusions from what is not."
+          : "This slice completes the capture; the earlier slices were folded in by previous runs."),
+    );
+  }
   parts.push(
-    `--- BEGIN capture ${input.capturePath} ---\n${
-      clip(captureText, CAPTURE_CHAR_CAP, input.capturePath)
-    }\n--- END capture ${input.capturePath} ---`,
+    `--- BEGIN capture ${input.capturePath} ---\n${slice.shown}\n--- END capture ${input.capturePath} ---`,
   );
   parts.push(
     `CURRENT WIKI (${pages.length} pages; return the complete new content of any page you edit):`,
   );
   for (const p of pages) {
-    parts.push(`--- BEGIN page ${p.path} ---\n${clip(p.text, PAGE_CHAR_CAP, p.path)}\n--- END page ${p.path} ---`);
+    parts.push(
+      `--- BEGIN page ${p.path} ---\n${
+        clip(p.text, PAGE_CHAR_CAP, p.path)
+      }\n--- END page ${p.path} ---`,
+    );
   }
   parts.push(
     "Return only the pages you are changing, in `edits`. Keep each page's existing voice, headings, " +
@@ -277,8 +321,9 @@ async function readLastUpdated(root: string): Promise<string | undefined> {
  * guard sees the proposal.
  *
  * Both are things the prompt asks the model to get right and the model sometimes
- * gets wrong, and both would otherwise refuse the entire pass. A refused pass
- * never advances the cursor, so one bad edit would repeat every day forever:
+ * gets wrong, and both would otherwise refuse the entire pass. A refused pass keeps
+ * its capture queued, so one edit the model always gets wrong would be re-proposed
+ * every day and the queue behind it would never drain:
  *
  * - An edit to a connector-generated page is dropped. The connector rewrites the
  *   capture index from the tree right after applying a pass, so the edit could not
@@ -331,7 +376,9 @@ export function guardProposal(
     if (!check.ok) problems.push(`${edit.path}: ${check.reason}`);
     if (seen.has(edit.path)) problems.push(`${edit.path}: proposed twice in one pass`);
     seen.add(edit.path);
-    if (!(edit.content ?? "").trim()) problems.push(`${edit.path}: refusing to write an empty page`);
+    if (!(edit.content ?? "").trim()) {
+      problems.push(`${edit.path}: refusing to write an empty page`);
+    }
     if (bytes > MAX_PAGE_BYTES) problems.push(`${edit.path}: page exceeds ${MAX_PAGE_BYTES} bytes`);
 
     // A page that had frontmatter must still have it. Rewriting the block into
@@ -416,7 +463,8 @@ export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult>
   }
 
   const pages = input.pages ?? await readPages(input.root);
-  const captureText = input.captureText ?? await Deno.readTextFile(`${input.root}/${input.capturePath}`);
+  const captureText = input.captureText ??
+    await Deno.readTextFile(`${input.root}/${input.capturePath}`);
   const lastUpdated = input.lastUpdated ?? await readLastUpdated(input.root);
 
   const defaultModel = providerName === "openrouter" ? DEFAULT_OPENROUTER_MODEL : DEFAULT_MODEL;

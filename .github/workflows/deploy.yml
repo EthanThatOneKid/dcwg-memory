@@ -23,9 +23,12 @@ concurrency:
 
 jobs:
   build:
-    # An ingest that failed pushes nothing, so skip the redeploy rather than
-    # republish identical content.
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    # No conclusion guard here, on purpose. A failed ingest run now commits the capture
+    # it fetched (the archive is never hostage to the fold), so skipping the deploy on a
+    # non-success conclusion would leave the published site missing a capture that is
+    # already on `main`. The build reads `main` and nothing else, and `main`'s `wiki/`
+    # only ever holds gate-passed pages, so deploying after a failed or cancelled ingest
+    # run publishes exactly the tree the next `push` would.
     runs-on: ubuntu-latest
     steps:
       # Enables Pages for the repository if it is not already enabled, and

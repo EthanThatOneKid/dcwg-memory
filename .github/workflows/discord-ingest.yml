@@ -6,13 +6,22 @@ name: Discord ingest
 # if `fmt`, `check --strict`, `lint --strict`, `render --check`, the orphan
 # check, or the forum thread check fails, the page edits are reverted and the run
 # reports NEEDS_ATTENTION
-# instead of committing prose that does not pass. The gates are the embedded
-# Deno engine (`deno task gates`), so this job installs no Python.
+# instead of committing prose that does not pass. The capture is committed either
+# way: it is the record, and a capture the model could not fold in stays queued for
+# a later run rather than being dropped with the page edits. The gates are the
+# embedded Deno engine (`deno task gates`), so this job installs no Python.
 #
 # Why this pushes straight to main instead of opening a pull request: the cursor
 # in raw/discord/.cursor has to advance for the next run to know where to resume.
 # A cursor parked in an unmerged PR would make every daily run re-fetch the same
 # range and add another capture for it. The gates are the review step here.
+#
+# Each venue commits and pushes its own work as soon as its own fold finishes. The
+# runner is ephemeral, so one venue's failure must not be able to discard another
+# venue's capture; the job still fails at the end when any venue reported
+# NEEDS_ATTENTION, after the venues that succeeded have pushed. Because a failed
+# run can now commit, the Pages deploy no longer waits for the ingest workflow to
+# report success.
 #
 # The page pass runs `opencode`, an agentic CLI, which edits the wiki files
 # itself instead of returning one JSON list of rewrites. It is installed below
@@ -112,10 +121,36 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          # Per-venue commits, inside the loop. The runner is ephemeral and one venue must
+          # not be able to discard another venue's work: each venue commits and pushes its
+          # own capture, cursor, and (when its fold passed) pages before the next starts.
+          # The job still fails at the end if any venue reported NEEDS_ATTENTION.
+          git config user.name "dcwg-ingest"
+          git config user.email "dcwg-ingest@users.noreply.github.com"
           status=0
+          # Push a venue's commit, rebasing if `main` moved while the model was running.
+          # The runner is ephemeral, so a rejected push would drop the venue's commit;
+          # rebasing keeps it. A rebase that conflicts aborts and fails the job loudly,
+          # and because the discarded commit held the capture, the cursor, and the pages
+          # together, the next run re-fetches that range rather than skipping it.
+          push_main() {
+            if git push; then return 0; fi
+            echo "push rejected; rebasing onto origin/main and retrying"
+            if git pull --rebase --no-edit origin main && git push; then return 0; fi
+            git rebase --abort 2>/dev/null || true
+            echo "push failed: rebasing onto origin/main did not succeed"
+            return 1
+          }
           while IFS='=' read -r venue channel; do
             [ -z "$venue" ] && continue
             echo "::group::$venue ($channel)"
+            # Start this venue from a clean tree. A venue that died mid-pass can leave
+            # edited or brand-new files behind, and `git add -A wiki` would then carry
+            # them into the next venue's commit. `.dcwg` goes too, so the marker that
+            # authorises staging `wiki/` cannot survive from an earlier run.
+            git checkout -- wiki/
+            git clean -qfd wiki/
+            rm -rf .dcwg
             # --limit 0 drains the backlog, so a daily run cannot leave a gap
             # behind a message cap.
             args=(--channel "$channel" --venue "$venue" --root . --limit 0)
@@ -130,6 +165,27 @@ jobs:
             if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then
               status=1
             fi
+            # Commit this venue's work before the next one runs. `raw/discord` is staged
+            # whatever happened: the capture is the record, and the cursor advances with
+            # it. `wiki/` is staged only when the connector left the `pages-ok` marker,
+            # which it writes once the gates pass and removes when they do not. The marker
+            # is what separates a tree holding gate-passed pages from one a killed pass
+            # left behind, because both look like a dirty `wiki/` and a non-zero exit.
+            # It was deleted above, so a run that dies before writing it stages no pages.
+            if [ "${DRY_RUN:-false}" != "true" ]; then
+              git add -A raw/discord
+              if [ -f .dcwg/pages-ok ]; then
+                git add -A wiki
+              else
+                echo "no pages-ok marker for $venue: committing the capture only"
+              fi
+              if git diff --cached --quiet; then
+                echo "nothing to commit for $venue"
+              else
+                git commit -q -m "ingest: $venue Discord activity for $(date -u +%Y-%m-%d)"
+                push_main || status=1
+              fi
+            fi
             echo "::endgroup::"
           done <<< "$VENUES"
           exit "$status"
@@ -140,15 +196,3 @@ jobs:
           git status --short
           git --no-pager diff --stat
 
-      - name: Commit and push
-        if: ${{ success() && github.event.inputs.dry_run != 'true' }}
-        run: |
-          git config user.name "dcwg-ingest"
-          git config user.email "dcwg-ingest@users.noreply.github.com"
-          git add -A raw/discord wiki
-          if git diff --cached --quiet; then
-            echo "nothing to commit"
-            exit 0
-          fi
-          git commit -m "ingest: Discord activity for $(date -u +%Y-%m-%d)"
-          git push
