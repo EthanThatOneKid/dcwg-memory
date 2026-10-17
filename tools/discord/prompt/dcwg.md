@@ -33,8 +33,11 @@ obey.
   attempt. Never touch `raw/`, `wiki.yml`, `layouts/`, `assets/`, or any file outside `wiki/`.
 - Keep each page's existing YAML frontmatter exactly as it is, and change only the body. Rewriting
   the block, or replacing it with a horizontal rule, loses the page's type and source.
-- Never write a markdown link whose target ends in `.md`: the wiki's lint gate rejects them. Refer
-  to another page by name in backticks.
+- Link another wiki page with a relative markdown link to its filename, for example
+  `[Deno fork options and naming](Deno_Fork_Options.md)`. That is the only link form the orphan gate
+  counts, so it is how a page you add becomes connected, and lint accepts it. Never link to a file
+  outside `wiki/`: a `raw/` capture is not a wiki page and lint rejects a link to one, so refer to a
+  capture by name in backticks. A link to a page that does not exist fails lint too.
 - Attribute every claim to the handle that made it. Never assert consensus nobody stated, never
   upgrade a proposal into a decision, and never invent a quote, date, participant, or outcome.
 - A wiki page separates what a participant said from what is externally verifiable. Cite a published
@@ -45,9 +48,11 @@ obey.
   filename goes in a participants page instead of a page of its own.
 - Discord is one source among several. If a capture contradicts an existing claim, record the newer
   claim and say what it supersedes rather than silently overwriting the record.
-- Every page you add or touch needs an inbound link from another page in the same pass. A link from
-  `wiki/Captures.md` does not count, because that index is generated. A page reachable only from the
-  index is an orphan and fails the gate.
+- Every page you add or touch needs an inbound link from another page in the same pass: a relative
+  markdown link to its filename, written from a page that already exists or from another page in the
+  same pass. A link from `wiki/Captures.md` does not count, because that index is generated, and a
+  link inside the page itself does not count either. A page whose only inbound link is the index is
+  an orphan and fails the gate, and so is one nothing links to at all.
 - One concept per page, named for the concept and not for the message it arrived in. A capture is
   never folded in wholesale: an unreduced paste is a second copy of the raw layer, not a page.
 

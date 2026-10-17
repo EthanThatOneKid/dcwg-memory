@@ -130,8 +130,16 @@ Hard rules, all enforced by the connector and by CI:
   the connector regenerates that index from the tree on every run and discards
   any edit to it, so proposing one only wastes an attempt. You cannot touch raw/,
   wiki.yml, layouts/, assets/, or any file outside ${WIKI_PREFIX}.
-- Never write a markdown link whose target ends in .md: the wiki's lint gate rejects
-  them. Refer to another wiki page by name in backticks.
+- Link another wiki page with a relative markdown link to its filename, for example
+  [Deno fork options and naming](Deno_Fork_Options.md). That is the only link form the
+  orphan gate counts, so it is how a page you add becomes connected, and lint accepts
+  it. Never link to a file outside wiki/: a raw/ capture is not a wiki page and lint
+  rejects a link to one, so refer to a capture by name in backticks. A link to a page
+  that does not exist fails lint too.
+- Every page you add or touch needs an inbound link from another page in the same pass,
+  written as that relative markdown link. A link from wiki/Captures.md does not count,
+  because that index is generated, and a link inside the page itself does not count
+  either. A page nothing links to is an orphan and fails the gate.
 - Keep each page's existing YAML frontmatter exactly as it is and change only the
   body. Rewriting the block, or dropping it for a horizontal rule, loses the page's
   type and source, and the connector refuses an edit that strips a page's frontmatter.
