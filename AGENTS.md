@@ -233,12 +233,38 @@ the OpenRouter key it is handed or run a command nobody reviewed.
 while the `api` path wants the bare provider id. `--pass-timeout` (default 900
 seconds) kills an opencode pass that overruns.
 
-Metering is the open question on this path, and the reason to watch the first
-runs: an agentic pass spends one model request per step, so a free OpenRouter
-key's daily cap meters it per step rather than per run. One daily run over one
-venue was comfortably inside that cap for the one-shot path, and that arithmetic
-does not transfer. A pass that hits the cap reports `NEEDS_ATTENTION` and commits
-nothing, so the failure is visible rather than silent.
+## The request budget
+
+Metering is settled, and it is counted in requests rather than tokens. The
+OpenRouter free tier allows 50 free-model requests per day, rising permanently to
+1,000 once $10 of credits have been bought at any point; the per-minute limit is 20
+either way. Measured 2026-10-17 against the connector's own key,
+`GET /api/v1/auth/key` answers `"is_free_tier": true`, `"usage": 0`, and
+`"free_model_daily_requests": {"used": 51, "limit": 50, "remaining": 0}`. Capping
+tokens would bound nothing on this path: an agentic step is one request whatever it
+carries, so a 594-message backfill and a three-message day cost the same until the
+agent runs out of steps.
+
+What a run has to fit is therefore requests, and the ceiling is easy to exceed.
+`opencode.json` caps the agent at 24 steps, `--attempts` defaults to 2, and the cron
+runs two venues, so the worst case is 96 requests against a budget of 50. One
+venue's two attempts over the 594-message backfill spent a whole day on 2026-10-17
+and left the next run answering 429 to its first request, which is what made a
+healthy venue look like a venue with bad content.
+
+`tools/discord/budget.ts` is how a run learns what it can afford. Before each fold
+the connector asks the provider what is left of the day, logs it, and does not start
+a pass it cannot pay for. A fold that never reached the model is reported as a
+budget condition rather than a stall, because `stalls` counts runs that failed to
+fold material and a pass the provider refused judged nothing; the status stays
+`NEEDS_ATTENTION` either way, since `VALID_STATUSES` mirrors the hub's contract.
+
+To go past 50 requests a day without spending money, point `--model` at a provider
+with more headroom. `google/gemini-2.5-flash` is a built-in opencode provider on
+roughly 1,500 free requests a day, and opencode's own `opencode/*-free` models
+answer with no credential at all, verified 2026-10-17 driving the agent loop through
+a `read` and a `write` at a total cost of 0. Either one is billed by that provider,
+so the connector skips the OpenRouter probe when `--model` names a different one.
 
 ## Maintaining the wiki: the self-healing pass
 

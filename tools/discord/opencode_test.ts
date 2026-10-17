@@ -2,6 +2,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
   diffTree,
   outsideWiki,
+  parseRateLimit,
   parseUsage,
   renderBrief,
   restoreTree,
@@ -157,4 +158,64 @@ Deno.test("parseUsage on a stream with no steps is a clean zero", () => {
     reasoningTokens: 0,
     cost: 0,
   });
+});
+
+Deno.test("parseRateLimit lifts the provider's own message out of an error event", () => {
+  // The real event, measured 2026-10-17 (run 39052618604), on a day whose free-model
+  // cap was already spent. This message is the whole difference between "the material
+  // could not be folded" and "nothing was ever asked of the material".
+  const stream = [
+    JSON.stringify({ type: "step_start", part: { id: "prt_1" } }),
+    JSON.stringify({
+      type: "error",
+      error: {
+        name: "APIError",
+        data: {
+          message: "Rate limit exceeded: free-models-per-day. " +
+            "Add 10 credits to unlock 1000 free model requests per day",
+          statusCode: 429,
+          responseHeaders: { "x-ratelimit-limit": "50", "x-ratelimit-remaining": "0" },
+        },
+      },
+    }),
+  ].join("\n");
+  assertEquals(
+    parseRateLimit(stream),
+    "Rate limit exceeded: free-models-per-day. " +
+      "Add 10 credits to unlock 1000 free model requests per day",
+  );
+});
+
+Deno.test("parseRateLimit keeps the last one, which is the failure the run ended on", () => {
+  const stream = [
+    JSON.stringify({
+      type: "error",
+      error: { data: { message: "Rate limit exceeded: first", statusCode: 429 } },
+    }),
+    JSON.stringify({
+      type: "error",
+      error: { data: { message: "Rate limit exceeded: second", statusCode: 429 } },
+    }),
+  ].join("\n");
+  assertEquals(parseRateLimit(stream), "Rate limit exceeded: second");
+});
+
+Deno.test("parseRateLimit recognises a 429 that does not spell it out", () => {
+  const stream = JSON.stringify({ type: "error", error: { data: { statusCode: 429 } } });
+  assertEquals(parseRateLimit(stream), "HTTP 429 from the model provider");
+});
+
+Deno.test("parseRateLimit is undefined for a pass that failed on its own work", () => {
+  // A gate rejection, a crash, a timeout: none of them is a provider cap, and every
+  // one of them must keep counting as a stall.
+  const stream = [
+    "not json at all",
+    JSON.stringify({ type: "text", part: { text: "orphans FAILED" } }),
+    JSON.stringify({
+      type: "error",
+      error: { name: "APIError", data: { message: "Invalid tool call", statusCode: 400 } },
+    }),
+  ].join("\n");
+  assertEquals(parseRateLimit(stream), undefined);
+  assertEquals(parseRateLimit(""), undefined);
 });

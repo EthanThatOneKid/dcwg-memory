@@ -34,6 +34,7 @@ import {
   nextCapturePath,
   renderCapture,
 } from "./capture.ts";
+import { describeModelBudget, probeModelBudget } from "./budget.ts";
 import { checkEditablePath, validateSummary } from "./guard.ts";
 import {
   cleanBrief,
@@ -62,6 +63,7 @@ import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
 import type { PageEdit, Provider } from "./wiki.ts";
+import type { ModelBudget } from "./budget.ts";
 import type { PendingFold } from "./pending.ts";
 
 const USAGE = `dcwg-memory Discord connector
@@ -289,6 +291,25 @@ async function readExistingCaptures(dir: string): Promise<string[]> {
     // directory does not exist yet
   }
   return names;
+}
+
+/**
+ * The free-model budget this run will spend from, if any.
+ *
+ * Only OpenRouter publishes per-key free-model counters, and only a pass OpenRouter
+ * actually serves spends them. A `--model` naming another provider
+ * (`google/gemini-2.5-flash`, `opencode/nemotron-3.5-lightning-free`) is billed by
+ * that provider, so asking OpenRouter about it would report a cap this run cannot
+ * reach. The API editor is skipped for a different reason: it has no step loop, so
+ * its spend is the number of slices rather than anything a budget probe could bound.
+ */
+async function passBudget(args: Args): Promise<ModelBudget | undefined> {
+  if (args.editor !== "opencode") return undefined;
+  const pinned = args.model?.split("/")[0];
+  if (pinned !== undefined && pinned !== "openrouter") return undefined;
+  const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+  if (!apiKey) return undefined;
+  return await probeModelBudget({ apiKey });
 }
 
 function report(
@@ -597,6 +618,15 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   let stalled = false;
   let stalledCapture = "";
   let gatesSkipped = false;
+  /**
+   * Set when the fold was never judged because there was no budget to judge it with.
+   *
+   * Kept apart from `stalled` on purpose: a stall is a verdict on the material, and a
+   * pass that never reached the model reached no verdict at all.
+   */
+  let budgetBlocked = false;
+  let budgetBlockedCapture = "";
+  let budgetBlockedReason = "";
 
   for (let foldCount = 0; foldCount < foldCeiling; foldCount++) {
     const fold = pendingFor(pending, args.venue)[0];
@@ -629,9 +659,30 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       ? captureText.length
       : captureSlice(captureText, fold.offset, CAPTURE_CHAR_CAP).to;
 
+    /**
+     * Ask what the day has left before spending any of it.
+     *
+     * The alternative is what happened on 2026-10-17: two attempts that each answered
+     * 429 in about a minute, reported as a fold the material could not survive. A pass
+     * that cannot be paid for is not attempted, because attempting it teaches nothing
+     * and spends the run's own time budget.
+     */
+    const budget = await passBudget(args);
+    if (budget) console.log(describeModelBudget(budget));
+    if (budget && budget.remaining <= 0) {
+      budgetBlocked = true;
+      budgetBlockedCapture = foldPath;
+      budgetBlockedReason = `${describeModelBudget(budget)}; no requests left for this pass`;
+      console.log(`fold deferred: ${budgetBlockedReason}`);
+      break;
+    }
+
     let changedThisFold: string[] = [];
     let feedback: string | undefined;
     let passed = false;
+    /** Attempts this fold lost to the provider's own cap rather than to its own work. */
+    let rateLimitedAttempts = 0;
+    let rateLimitNote = "";
 
     /**
      * What an opencode pass is measured against, and what a failed attempt is
@@ -716,6 +767,14 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
                 : `wrote outside wiki/ (${stray.length} path(s))`
             }`,
           );
+          // A provider cap is not a verdict on the material. Noted per attempt so a
+          // fold whose attempts were *all* rate-limited can be told apart from one
+          // that reached the model and wrote something the gates rejected.
+          if (run.rateLimited) {
+            rateLimitedAttempts += 1;
+            rateLimitNote = run.rateLimited;
+            console.log(`attempt ${attempt}/${args.attempts} was rate-limited: ${run.rateLimited}`);
+          }
           continue;
         }
 
@@ -843,6 +902,23 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     // the wiki. The queue is ordered, so the run stops here instead of folding a newer
     // capture over an older one that was never absorbed.
     if (!passed) {
+      /**
+       * A spent budget is not a stall.
+       *
+       * `stalls` counts runs that failed to fold a capture, a diagnostic for material
+       * the model could not integrate. A pass the provider refused judged nothing, so
+       * counting it would make a spent budget look like a venue with bad content and
+       * send the next run looking at the wrong problem. The status stays
+       * NEEDS_ATTENTION either way: `VALID_STATUSES` mirrors the hub's contract, so a
+       * new status value would be a cross-repo change.
+       */
+      if (rateLimitedAttempts > 0 && rateLimitedAttempts === args.attempts) {
+        budgetBlocked = true;
+        budgetBlockedCapture = foldPath;
+        budgetBlockedReason = `every attempt was rate-limited by the provider: ${rateLimitNote}`;
+        console.log(`fold deferred: ${budgetBlockedReason}`);
+        break;
+      }
       stalled = true;
       stalledCapture = foldPath;
       pending = stall(pending, foldPath);
@@ -880,7 +956,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
 
   const stillQueued = pendingFor(pending, args.venue).length;
   summary.ingested = allWritten.length;
-  if (stalled) summary.status = "NEEDS_ATTENTION";
+  if (stalled || budgetBlocked) summary.status = "NEEDS_ATTENTION";
 
   const summaryErrors = validateSummary(summary);
   if (summaryErrors.length) {
@@ -897,6 +973,24 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
 
   const archived = capturePath ? `${capturePath} (${messages.length} messages)` : "nothing new";
   const foldedNote = `${folded} capture(s) folded${gatesSkipped ? ", gates skipped" : ""}`;
+
+  if (budgetBlocked) {
+    return report(
+      {
+        venue: args.venue,
+        channel: args.channel,
+        capture: capturePath,
+        captured: messages.length,
+        folded,
+        pending: stillQueued,
+        budget: budgetBlockedReason,
+        attempts: args.attempts,
+        output: lastFailure.slice(-1200),
+      },
+      "NEEDS_ATTENTION",
+      `archived ${archived}; ${foldedNote}, but ${budgetBlockedCapture} was not folded for want of model budget: ${budgetBlockedReason}. It stays queued, so the next run retries it.`,
+    );
+  }
 
   if (stalled) {
     return report(
