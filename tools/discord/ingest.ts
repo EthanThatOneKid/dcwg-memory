@@ -16,6 +16,7 @@
  *   ANTHROPIC_API_KEY        the wiki pass, when --provider anthropic
  */
 
+import { parseArgs } from "@std/cli/parse-args";
 import {
   channelKind,
   fetchChannelMeta,
@@ -61,7 +62,6 @@ import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
 import type { PageEdit, Provider } from "./wiki.ts";
-import type { FileTree } from "./opencode.ts";
 import type { PendingFold } from "./pending.ts";
 
 const USAGE = `dcwg-memory Discord connector
@@ -141,118 +141,117 @@ interface Args {
   dryRun: boolean;
 }
 
-function parseArgs(argv: string[]): Args {
-  const args: Args = {
-    out: "raw/discord",
-    root: ".",
-    server: DEFAULT_SERVER_LABEL,
-    tags: [...DEFAULT_TAGS],
-    limit: 200,
-    all: false,
-    tokenEnv: "DCWG_DISCORD_BOT_TOKEN",
-    skipWiki: false,
-    editor: "opencode",
-    passTimeoutSec: 900,
-    noGates: false,
-    attempts: 2,
-    drain: false,
-    drainMax: 6,
-    dryRun: false,
-  };
-  let tagsExplicit = false;
-  for (let i = 0; i < argv.length; i++) {
-    const flag = argv[i];
-    const value = () => {
-      const v = argv[++i];
-      if (v === undefined) throw new Error(`${flag} needs a value`);
-      return v;
-    };
-    switch (flag) {
-      case "--channel":
-        args.channel = value();
-        break;
-      case "--venue":
-        args.venue = value();
-        break;
-      case "--out":
-        args.out = value();
-        break;
-      case "--root":
-        args.root = value();
-        break;
-      case "--server":
-        args.server = value();
-        break;
-      case "--tag": {
-        const tag = value();
-        args.tags = tagsExplicit ? [...args.tags, tag] : [tag];
-        tagsExplicit = true;
-        break;
-      }
-      case "--limit":
-        args.limit = Number(value());
-        break;
-      case "--since":
-        args.since = value();
-        break;
-      case "--token-env":
-        args.tokenEnv = value();
-        break;
-      case "--model":
-        args.model = value();
-        break;
-      case "--provider": {
-        const name = value();
-        if (name !== "anthropic" && name !== "openrouter") {
-          throw new Error(`--provider must be anthropic or openrouter, not '${name}'`);
-        }
-        args.provider = name;
-        break;
-      }
-      case "--all":
-        args.all = true;
-        break;
-      case "--attempts":
-        args.attempts = Number(value());
-        break;
-      case "--drain":
-        args.drain = true;
-        break;
-      case "--drain-max": {
-        const n = Number(value());
-        if (!Number.isInteger(n) || n < 1) throw new Error("--drain-max must be a positive integer");
-        args.drainMax = n;
-        break;
-      }
-      case "--skip-wiki":
-        args.skipWiki = true;
-        break;
-      case "--editor": {
-        const name = value();
-        if (name !== "opencode" && name !== "api") {
-          throw new Error(`--editor must be opencode or api, not '${name}'`);
-        }
-        args.editor = name;
-        break;
-      }
-      case "--pass-timeout":
-        args.passTimeoutSec = Number(value());
-        break;
-      case "--no-gates":
-        args.noGates = true;
-        break;
-      case "--dry-run":
-        args.dryRun = true;
-        break;
-      case "-h":
-      case "--help":
-        console.log(USAGE);
-        Deno.exit(0);
-      default:
-        throw new Error(`unknown flag: ${flag}`);
-    }
+/** Parse the CLI's flags, then validate them into `Args`.
+ *
+ *  Every flag is declared, which is what lets `unknown` refuse a typo instead of
+ *  dropping it: a workflow that misspelled `--drain-max` would otherwise run on
+ *  the default and report success. A string flag passed last with nothing after
+ *  it arrives as `""`, which `str` reports as the missing value it is. */
+function parseCliArgs(argv: string[]): Args {
+  const parsed = parseArgs(
+    argv,
+    {
+      string: [
+        "channel",
+        "venue",
+        "out",
+        "root",
+        "server",
+        "tag",
+        "limit",
+        "since",
+        "token-env",
+        "model",
+        "provider",
+        "editor",
+        "pass-timeout",
+        "attempts",
+        "drain-max",
+      ],
+      boolean: ["all", "drain", "skip-wiki", "no-gates", "dry-run", "help"],
+      collect: ["tag"],
+      alias: { h: "help" },
+      unknown: (arg: string) => {
+        throw new Error(`unknown flag: ${arg}`);
+      },
+    } as const,
+  );
+
+  // A token after `--` is a positional, and the parser does not route those
+  // through `unknown`, so refuse it here rather than dropping it in silence.
+  if (parsed._.length > 0) throw new Error(`unknown flag: ${parsed._[0]}`);
+
+  if (parsed.help === true) {
+    console.log(USAGE);
+    Deno.exit(0);
   }
-  return args;
+
+  /** A string flag's value, or undefined when the flag was not passed. */
+  const str = (name: string): string | undefined => {
+    const value = parsed[name];
+    if (typeof value !== "string") return undefined;
+    if (value === "") throw new Error(`--${name} needs a value`);
+    return value;
+  };
+  const num = (name: string, fallback: number): number => {
+    const raw = str(name);
+    return raw === undefined ? fallback : Number(raw);
+  };
+
+  /** The `--tag` values, or the defaults when no `--tag` was passed. `collect`
+   *  gives the key an empty array when the flag is absent, so an empty list means
+   *  "not passed", and the first explicit --tag replaces the defaults rather than
+   *  adding to them. */
+  const tagList = (): string[] => {
+    const collected = parsed.tag;
+    if (collected === undefined || collected.length === 0) return [...DEFAULT_TAGS];
+    if (collected.some((tag) => tag === "")) throw new Error("--tag needs a value");
+    return collected;
+  };
+
+  const provider = str("provider");
+  if (provider !== undefined && provider !== "anthropic" && provider !== "openrouter") {
+    throw new Error(`--provider must be anthropic or openrouter, not '${provider}'`);
+  }
+  const editor = str("editor");
+  if (editor !== undefined && editor !== "opencode" && editor !== "api") {
+    throw new Error(`--editor must be opencode or api, not '${editor}'`);
+  }
+  const drainMaxRaw = str("drain-max");
+  let drainMax = 6;
+  if (drainMaxRaw !== undefined) {
+    const n = Number(drainMaxRaw);
+    if (!Number.isInteger(n) || n < 1) throw new Error("--drain-max must be a positive integer");
+    drainMax = n;
+  }
+
+  const channel = str("channel");
+  const venue = str("venue");
+  const since = str("since");
+  const model = str("model");
+  const tags = tagList();
+  return {
+    ...(channel === undefined ? {} : { channel }),
+    ...(venue === undefined ? {} : { venue }),
+    out: str("out") ?? "raw/discord",
+    root: str("root") ?? ".",
+    server: str("server") ?? DEFAULT_SERVER_LABEL,
+    tags,
+    limit: num("limit", 200),
+    all: parsed.all === true,
+    ...(since === undefined ? {} : { since }),
+    tokenEnv: str("token-env") ?? "DCWG_DISCORD_BOT_TOKEN",
+    ...(provider === undefined ? {} : { provider }),
+    ...(model === undefined ? {} : { model }),
+    skipWiki: parsed["skip-wiki"] === true,
+    editor: editor ?? "opencode",
+    passTimeoutSec: num("pass-timeout", 900),
+    noGates: parsed["no-gates"] === true,
+    attempts: num("attempts", 2),
+    drain: parsed.drain === true,
+    drainMax,
+    dryRun: parsed["dry-run"] === true,
+  };
 }
 
 /** A config error the CLI reports as exit 2. Thrown, never exited, so `main` owns
@@ -306,7 +305,7 @@ function report(
 export async function main(argv: string[] = Deno.args): Promise<number> {
   let args: Args;
   try {
-    args = parseArgs(argv);
+    args = parseCliArgs(argv);
   } catch (error) {
     console.error(`error: ${(error as Error).message}\n\n${USAGE}`);
     return 2;

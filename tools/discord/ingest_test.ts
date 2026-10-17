@@ -340,3 +340,72 @@ Deno.test("a missing token fails loudly instead of half-running", async () => {
     if (prior !== undefined) Deno.env.set(TOKEN_ENV, prior);
   }
 });
+
+/**
+ * The parser refuses what it does not recognise. `@std/cli/parse-args` ignores an
+ * unknown flag by default and reports a value-less string flag as `""`, so both
+ * refusals are the connector's own: without them a misspelled `--drain-max` would
+ * run on the default and a typo would pass review as a green run.
+ */
+Deno.test("the CLI refuses a flag it cannot honour instead of ignoring it", async () => {
+  const cases: Array<[string[], string]> = [
+    [["--bogus"], "unknown flag: --bogus"],
+    [["--channel"], "--channel needs a value"],
+    [["--channel", CHANNEL, "--venue", "dcwg-talk", "--tag"], "--tag needs a value"],
+  ];
+  for (const [argv, expected] of cases) {
+    const errors: string[] = [];
+    const originalError = console.error;
+    console.error = (...parts: unknown[]) => errors.push(parts.join(" "));
+    let code: number;
+    try {
+      code = await main(argv);
+    } finally {
+      console.error = originalError;
+    }
+    assertEquals(code, 2, `exit 2 for ${JSON.stringify(argv)}`);
+    assert(
+      errors.join("\n").includes(expected),
+      `${JSON.stringify(argv)} should report '${expected}', got '${errors.join(" ")}'`,
+    );
+  }
+});
+
+Deno.test("an unrecognized token fails the run instead of being ignored", async () => {
+  // The parser's own default is to ignore an unknown flag, which would let a
+  // workflow run on a default nobody asked for and report success.
+  const unknownFlag = await runCliErrors([...BASE, "--drain-mx", "3"]);
+  assertEquals(unknownFlag.code, 2);
+  assert(
+    unknownFlag.errors.join("\n").includes("unknown flag: --drain-mx"),
+    "the message names the flag",
+  );
+
+  const afterSeparator = await runCliErrors([...BASE, "--", "stray"]);
+  assertEquals(afterSeparator.code, 2);
+  assert(
+    afterSeparator.errors.join("\n").includes("unknown flag: stray"),
+    "a token after -- is refused too",
+  );
+});
+
+Deno.test("a flag passed with no value fails the run", async () => {
+  const { code, errors } = await runCliErrors([...BASE, "--model"]);
+  assertEquals(code, 2);
+  assert(errors.join("\n").includes("--model needs a value"), "the message names the flag");
+});
+
+Deno.test("--tag replaces the default tags instead of adding to them", async () => {
+  await withEnv(async () => {
+    const root = await Deno.makeTempDir();
+    const { code } = await runCli([...BASE, "--root", root, "--tag", "fork"]);
+    assertEquals(code, 0);
+
+    const capture = await Deno.readTextFile(`${root}/raw/discord/2026-08-01_dcwg-talk.md`);
+    assert(capture.includes('- "fork"'), "the explicit tag is recorded");
+    assert(
+      !capture.includes('- "dcwg"'),
+      "the first explicit --tag replaces the defaults rather than adding to them",
+    );
+  });
+});
