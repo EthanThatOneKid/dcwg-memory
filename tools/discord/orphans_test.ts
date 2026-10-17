@@ -94,3 +94,29 @@ Deno.test("findOrphans reads a real directory and reports the unlinked page", as
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("the link form the prompt instructs is the form this check counts", () => {
+  // The prompt tells the model to connect a new page with a relative markdown link to
+  // its filename, and that is exactly what inboundCounts reads. If the two ever
+  // disagree again, every pass that adds a page becomes unsatisfiable: the model
+  // writes what the prompt asked for and this check reports an orphan anyway.
+  const pages = pagesOf({
+    "wiki/Deno_Fork_Options.md": "See [Deno](Deno.md).",
+    "wiki/Deno.md":
+      "See [Deno Desktop](Deno_Desktop.md) and [the fork options](Deno_Fork_Options.md).",
+    "wiki/Deno_Desktop.md": "leaf",
+  });
+  assertEquals(orphansIn(pages), []);
+});
+
+Deno.test("a page named in backticks instead of linked is still an orphan", () => {
+  // The trap that stalled the 2026-10-17 fold: the prompt then asked for a backticked
+  // page name, which reads as a connection to a human and is invisible to this check.
+  const pages = pagesOf({
+    "wiki/Deno_Fork_Options.md": "See [Deno](Deno.md).",
+    "wiki/Deno.md":
+      "See `Deno_Desktop.md` for the desktop proposal, and [the fork options](Deno_Fork_Options.md).",
+    "wiki/Deno_Desktop.md": "leaf",
+  });
+  assertEquals(orphansIn(pages), ["wiki/Deno_Desktop.md"]);
+});

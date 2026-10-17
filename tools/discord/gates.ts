@@ -20,12 +20,22 @@ import { findForumThreads, findThreadProblems } from "./thread_pages.ts";
 export async function runGates(root: string): Promise<string[]> {
   const outcomes = await runWikiGates(`${root}/wiki.yml`);
   const orphans = await findOrphans(root);
+  /**
+   * The orphan message names the link form the prompt names, because this text is what
+   * the model is handed when the pass is retried: a gate that says only what is wrong
+   * leaves the model to guess the link form, and the form it guessed was a backticked
+   * page name, which this check cannot see.
+   */
   outcomes.push({
     name: "orphans",
     ok: orphans.length === 0,
     output: orphans.length === 0
       ? "every page has an inbound link"
-      : `no inbound link from another page:\n  - ${orphans.join("\n  - ")}`,
+      : `no inbound link from another page:\n  - ${orphans.join("\n  - ")}\n` +
+        `Link each of these from a page that already exists, with a relative markdown ` +
+        `link to its filename, for example [Deno fork options and naming](Deno_Fork_Options.md). ` +
+        `A link from wiki/Captures.md does not count, and a link inside the orphan page ` +
+        `itself does not count.`,
   });
   /**
    * Every forum post gets its own page. The output names the count it covered,
