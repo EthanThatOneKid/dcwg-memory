@@ -573,6 +573,22 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
    */
   const foldCeiling = args.drain ? args.drainMax : 1;
 
+  /**
+   * Persist the queue to the cursor file.
+   *
+   * Called after every fold that lands and again once the loop is over, so the queue on
+   * disk tracks the queue in memory. Writing per fold rather than only at the end is what
+   * makes a throw mid-drain harmless: a fold that advanced an entry and then hit an I/O
+   * error would otherwise leave the file holding the offset from before the run, and the
+   * next run would fold that slice a second time. Re-folding is the conservative failure
+   * and never a lost slice, but it spends a model call redoing work the wiki already has.
+   */
+  const persistQueue = async (): Promise<void> => {
+    const store: Record<string, unknown> = await readJson(cursorPath) as Record<string, unknown>;
+    setPending(store, pending);
+    await Deno.writeTextFile(cursorPath, JSON.stringify(store, null, 2) + "\n");
+  };
+
   let allWritten: string[] = [];
   let notes = "";
   let usage: { inputTokens?: number; outputTokens?: number } = {};
@@ -630,10 +646,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
      * to the end of the slice it was handed, so the entry stays queued and the next run
      * reads on from there instead of losing the rest of the capture.
      */
-    const recordFold = () => {
+    const recordFold = async () => {
       pending = advance(pending, foldPath, absorbed, captureText.length);
       allWritten = [...allWritten, ...changedThisFold];
       folded++;
+      await persistQueue();
     };
 
     for (let attempt = 1; attempt <= args.attempts; attempt++) {
@@ -779,7 +796,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         // NEEDS_ATTENTION because `passed` is never set.
         gatesSkipped = true;
         passed = true;
-        recordFold();
+        await recordFold();
         break;
       }
 
@@ -804,7 +821,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       const failed = outcomes.filter((outcome) => !outcome.ok);
       if (failed.length === 0) {
         passed = true;
-        recordFold();
+        await recordFold();
         break;
       }
 
@@ -838,18 +855,16 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   }
 
   /**
-   * The queue is written after the folds, not with the capture.
+   * The queue's final write, after the folds rather than with the capture.
    *
-   * The first cursor write records the capture and the entry for it, which is what
-   * makes the archive durable before any model call. This second write records how far
-   * the folds read, and it is the reason a fold that fails cannot lose material: the
-   * entry it did not absorb is still there for the next run.
+   * The first cursor write records the capture and the entry for it, which is what makes
+   * the archive durable before any model call. This one carries the entries this run
+   * stalled or dropped as well as any fold that landed, and it is the reason a fold that
+   * fails cannot lose material: the entry it did not absorb is still there for the next
+   * run. A fold that landed already wrote itself, so a throw between here and there
+   * costs a repeated slice, never a forgotten one.
    */
-  {
-    const store: Record<string, unknown> = await readJson(cursorPath) as Record<string, unknown>;
-    setPending(store, pending);
-    await Deno.writeTextFile(cursorPath, JSON.stringify(store, null, 2) + "\n");
-  }
+  await persistQueue();
 
   /**
    * Authorise the workflow to commit `wiki/`.
