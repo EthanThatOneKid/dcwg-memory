@@ -75,6 +75,18 @@ async function runCli(argv: string[]): Promise<{ code: number; out: string[] }> 
   }
 }
 
+/** Run one invocation that is expected to fail, capturing stderr instead. */
+async function runCliErrors(argv: string[]): Promise<{ code: number; errors: string[] }> {
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (...parts: unknown[]) => errors.push(parts.join(" "));
+  try {
+    return { code: await main(argv), errors };
+  } finally {
+    console.error = originalError;
+  }
+}
+
 async function withEnv(fn: () => Promise<void>): Promise<void> {
   const restoreFetch = stubFetch();
   const prior = Deno.env.get(TOKEN_ENV);
@@ -235,7 +247,8 @@ Deno.test("a capture the wiki has not folded is queued in the committed cursor f
 
 Deno.test("a failed page pass still commits the capture, the cursor, and a queue entry", async () => {
   await withFoldEnv(async () => {
-    const root = await Deno.makeTempDir();    await seedWiki(root);
+    const root = await Deno.makeTempDir();
+    await seedWiki(root);
     const { code, out } = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
     assertEquals(code, 1, "a stalled fold is a run that needs attention, not a silent success");
 
@@ -258,6 +271,7 @@ Deno.test("a failed page pass still commits the capture, the cursor, and a queue
         venue: "dcwg-talk",
         messages: 2,
         offset: 0,
+        stalls: 1,
       }],
       "the fold this run owes is remembered, so the next run retries it instead of skipping material",
     );
@@ -279,7 +293,8 @@ Deno.test("a failed page pass still commits the capture, the cursor, and a queue
 
 Deno.test("a queued capture is retried before anything newer, and stays queued", async () => {
   await withFoldEnv(async () => {
-    const root = await Deno.makeTempDir();    await seedWiki(root);
+    const root = await Deno.makeTempDir();
+    await seedWiki(root);
     const first = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
     assertEquals(first.code, 1);
 

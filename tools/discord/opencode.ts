@@ -325,3 +325,32 @@ export async function cleanBrief(root: string): Promise<void> {
     // nothing to clean
   }
 }
+/**
+ * The marker that tells the workflow `wiki/` is safe to commit.
+ *
+ * It lives under `.dcwg/` precisely because that path is gitignored and never staged,
+ * and the workflow deletes the directory before each venue runs, so one venue's marker
+ * cannot authorise the next venue's crash.
+ */
+export const PAGES_OK_PATH = ".dcwg/pages-ok";
+
+/**
+ * Record whether every page edit currently on disk passed the gates.
+ *
+ * `ok: false` is not the same as leaving no marker: it says the tree is in a known state
+ * (the baseline, because a failed fold reverts) while the marker that authorises a
+ * commit is absent. Removing any earlier marker is the point, so it is unconditional.
+ */
+export async function writePagesOk(root: string, ok: boolean): Promise<void> {
+  const path = `${root}/${PAGES_OK_PATH}`;
+  if (!ok) {
+    try {
+      await Deno.remove(path);
+    } catch {
+      // no marker to remove
+    }
+    return;
+  }
+  await Deno.mkdir(`${root}/.dcwg`, { recursive: true });
+  await Deno.writeTextFile(path, `${new Date().toISOString()}\n`);
+}

@@ -36,6 +36,15 @@ export interface PendingFold {
   messages: number;
   /** Characters of it already folded in; the next fold resumes here. */
   offset: number;
+  /**
+   * How many consecutive runs have failed to fold it.
+   *
+   * Not a retry cap: the queue is deliberately ordered and never skips, so that material
+   * the wiki never absorbed is never silently passed over in favour of newer material.
+   * This is the number that makes a stuck venue diagnosable at a glance instead of
+   * making someone diff `.cursor` against the previous day to count the failures.
+   */
+  stalls: number;
 }
 
 /** What a run knows about a capture at the moment it queues it. */
@@ -55,7 +64,7 @@ export function readPending(store: Record<string, unknown>): PendingFold[] {
   const folds: PendingFold[] = [];
   for (const entry of raw) {
     if (typeof entry !== "object" || entry === null) continue;
-    const { capture, venue, messages, offset } = entry as Record<string, unknown>;
+    const { capture, venue, messages, offset, stalls } = entry as Record<string, unknown>;
     if (typeof capture !== "string" || !capture) continue;
     if (typeof venue !== "string" || !venue) continue;
     folds.push({
@@ -65,6 +74,7 @@ export function readPending(store: Record<string, unknown>): PendingFold[] {
         ? messages
         : 0,
       offset: typeof offset === "number" && Number.isInteger(offset) && offset >= 0 ? offset : 0,
+      stalls: typeof stalls === "number" && Number.isInteger(stalls) && stalls >= 0 ? stalls : 0,
     });
   }
   return folds;
@@ -79,7 +89,7 @@ export function setPending(store: Record<string, unknown>, folds: PendingFold[])
 /** Append a capture, unless the queue already holds it. */
 export function enqueue(folds: PendingFold[], request: FoldRequest): PendingFold[] {
   if (folds.some((fold) => fold.capture === request.capture)) return folds;
-  return [...folds, { ...request, offset: 0 }];
+  return [...folds, { ...request, offset: 0, stalls: 0 }];
 }
 
 /** The entries one venue's run may fold, oldest first. */
@@ -103,8 +113,21 @@ export function advance(
   return folds.flatMap((fold) => {
     if (fold.capture !== capture) return [fold];
     const offset = Math.max(fold.offset, Math.min(absorbed, total));
-    return offset >= total ? [] : [{ ...fold, offset }];
+    // A fold that reached the gates made progress, so a run that absorbed part of a
+    // long capture is not the same as one that could not touch it: the stall count
+    // measures consecutive runs that moved nothing, not runs that have not finished.
+    return offset >= total ? [] : [{ ...fold, offset, stalls: 0 }];
   });
+}
+
+/**
+ * Count a run that could not fold this capture at all.
+ *
+ * Nothing else changes: the entry keeps its offset and its place in the queue, because
+ * the next run has to retry this material rather than skip it.
+ */
+export function stall(folds: PendingFold[], capture: string): PendingFold[] {
+  return folds.map((fold) => fold.capture === capture ? { ...fold, stalls: fold.stalls + 1 } : fold);
 }
 
 /** Forget an entry, for a capture that is no longer on disk. */

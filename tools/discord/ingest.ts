@@ -43,6 +43,7 @@ import {
   runOpencode,
   snapshotTree,
   writeBrief,
+  writePagesOk,
 } from "./opencode.ts";
 import {
   buildPrompt,
@@ -55,7 +56,7 @@ import {
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
 import { captureKind, findThreadProblems, POST_SHAPED, postsInCapture } from "./thread_pages.ts";
-import { advance, drop, enqueue, pendingFor, readPending, setPending } from "./pending.ts";
+import { advance, drop, enqueue, pendingFor, readPending, setPending, stall } from "./pending.ts";
 import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
@@ -101,6 +102,9 @@ Options:
   --drain               fold every capture this venue still owes the wiki, not just the
                         oldest one (default: one fold per run, so a backlog drains over
                         several runs instead of overrunning the job's own time limit)
+  --drain-max <n>       how many folds one --drain run may attempt (default 6). Each
+                        fold is a whole page pass, and a capture too long for one
+                        prompt takes several, so this is the cap on one job's work
   --no-gates            skip the repo validation commands (local iteration only)
   --dry-run             fetch and render, but write nothing and call no model
   -h, --help            show this help
@@ -132,6 +136,8 @@ interface Args {
   attempts: number;
   /** Fold every capture this venue still owes the wiki, not just the oldest. */
   drain: boolean;
+  /** How many folds one --drain run may attempt, so a backlog cannot overrun the job. */
+  drainMax: number;
   dryRun: boolean;
 }
 
@@ -150,6 +156,7 @@ function parseArgs(argv: string[]): Args {
     noGates: false,
     attempts: 2,
     drain: false,
+    drainMax: 6,
     dryRun: false,
   };
   let tagsExplicit = false;
@@ -211,6 +218,12 @@ function parseArgs(argv: string[]): Args {
       case "--drain":
         args.drain = true;
         break;
+      case "--drain-max": {
+        const n = Number(value());
+        if (!Number.isInteger(n) || n < 1) throw new Error("--drain-max must be a positive integer");
+        args.drainMax = n;
+        break;
+      }
       case "--skip-wiki":
         args.skipWiki = true;
         break;
@@ -522,8 +535,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     lastRun: nowIso,
   });
   // A run that only drains its queue fetched nothing, and a cursor there would claim
-  // it read messages it never saw.
+  // it read messages it never saw. An existing cursor is left as it was; a first run
+  // that finds nothing new has to satisfy the contract too, which allows an explicit
+  // null, rather than failing validation because it had nothing to write.
   if (newMessages) summary.cursor = messages[messages.length - 1].id;
+  else if (!("cursor" in summary)) summary.cursor = null;
 
   if (args.skipWiki) {
     await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + "\n");
@@ -544,13 +560,19 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   }
 
   /**
-   * The folds this run attempts: what the venue already owed the wiki, oldest first,
-   * and then the capture this run just committed.
+   * What this run may fold: the oldest capture this venue still owes the wiki.
+   *
+   * Read live from the queue on every pass rather than snapshotted, because a fold moves
+   * an entry's own offset. A capture too long for one prompt is folded a slice at a time,
+   * so it stays queued behind its offset and a drain has to pick that same entry back up
+   * instead of calling the capture finished because it appeared in a list built before
+   * the run started.
+   *
+   * One fold per run by default: each fold is a whole page pass with its own gate
+   * attempts, so draining a backlog inside one job risks the job's own time limit.
+   * `--drain` opts in and `--drain-max` caps how far it will go.
    */
-  const plan: PendingFold[] = capturePath
-    ? [...queued, { capture: capturePath, venue: args.venue, messages: messages.length, offset: 0 }]
-    : [...queued];
-  const folding = args.drain ? plan : plan.slice(0, 1);
+  const foldCeiling = args.drain ? args.drainMax : 1;
 
   let allWritten: string[] = [];
   let notes = "";
@@ -561,14 +583,19 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   let stalledCapture = "";
   let gatesSkipped = false;
 
-  for (const fold of folding) {
+  for (let foldCount = 0; foldCount < foldCeiling; foldCount++) {
+    const fold = pendingFor(pending, args.venue)[0];
+    if (!fold) break;
     const foldPath = fold.capture;
     let captureText: string;
     try {
       captureText = await Deno.readTextFile(`${root}/${foldPath}`);
-    } catch {
-      // A queued capture that is no longer on disk cannot be folded, and leaving it
-      // queued would wedge every later run behind it.
+    } catch (error) {
+      // Only a capture that is genuinely gone leaves the queue. A read that failed for
+      // any other reason (permissions, a truncated file, an I/O error) is not evidence
+      // that the material is absent, and dropping the entry would forget it in silence:
+      // the run stops instead, and the queue is still on disk for the next one.
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
       pending = drop(pending, foldPath);
       console.log(`fold skipped: ${foldPath} is not on disk; dropped from the queue`);
       continue;
@@ -614,6 +641,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       let revert: () => Promise<void>;
 
       if (args.editor === "opencode") {
+        // Bound before the pass runs rather than after it: a spawn failure throws instead
+        // of returning `!ok` ("Failed to spawn 'opencode': entity not found" is how that
+        // surfaces), and by then the agent may already have edited pages. Bound here, that
+        // throw can undo them instead of leaving pages behind that no gate has seen.
+        revert = () => restoreTree(root, treeBefore!);
         const briefPath = await writeBrief(
           root,
           renderBrief({
@@ -635,6 +667,10 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
           briefPath,
           model: args.model,
           timeoutMs: args.passTimeoutSec * 1000,
+        }).catch(async (error: unknown) => {
+          await revert();
+          await cleanBrief(root);
+          throw error;
         });
         await cleanBrief(root);
         const changed = diffTree(treeBefore!, await snapshotTree(root));
@@ -734,12 +770,18 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       await writeCapturesIndex(root);
 
       if (args.noGates) {
-        // Local iteration only: nothing here checks the pages, so the fold is recorded
-        // as done and the run moves on to the next capture. The report says the gates
-        // were skipped rather than claiming they passed.
+        // Local iteration only: nothing here checks the pages, so the fold is recorded as
+        // done and the run moves on. The report says the gates were skipped rather than
+        // claiming they passed, and no `pages-ok` marker is written, so an unattended
+        // workflow will not commit pages that no gate has seen.
+        //
+        // `break`, not `continue`: continuing runs the next attempt over the pages this
+        // one already wrote, which double-counts the fold and ends every run as
+        // NEEDS_ATTENTION because `passed` is never set.
         gatesSkipped = true;
+        passed = true;
         recordFold();
-        continue;
+        break;
       }
 
       const outcomes = await runWikiGates(`${root}/wiki.yml`);
@@ -787,7 +829,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     if (!passed) {
       stalled = true;
       stalledCapture = foldPath;
-      console.log(`fold stalled: ${foldPath} stays queued for the next run`);
+      pending = stall(pending, foldPath);
+      const attemptsSoFar = pending.find((entry) => entry.capture === foldPath)?.stalls ?? 1;
+      console.log(
+        `fold stalled: ${foldPath} stays queued for the next run (${attemptsSoFar} consecutive stall(s))`,
+      );
       break;
     }
   }
@@ -805,6 +851,18 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     setPending(store, pending);
     await Deno.writeTextFile(cursorPath, JSON.stringify(store, null, 2) + "\n");
   }
+
+  /**
+   * Authorise the workflow to commit `wiki/`.
+   *
+   * The commit step cannot tell a tree holding gate-passed pages from one a crashed
+   * agent left behind: both are a non-zero exit with a dirty `wiki/`. So the process
+   * that ran the gates is the one that says so, and it says it only here, after every
+   * fold has either passed or been reverted. The marker is deleted before each venue
+   * runs and `.dcwg/` is never committed, so a run that dies before this line, and a
+   * run under `--no-gates`, authorise nothing.
+   */
+  await writePagesOk(root, !gatesSkipped);
 
   const stillQueued = pendingFor(pending, args.venue).length;
   summary.ingested = allWritten.length;

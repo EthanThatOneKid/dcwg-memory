@@ -16,13 +16,14 @@ import {
   pendingFor,
   readPending,
   setPending,
+  stall,
 } from "./pending.ts";
 import type { PendingFold } from "./pending.ts";
 
 const CAPTURE = "raw/discord/2026-10-11_dcwg-brainstorm.md";
 
 function fold(over: Partial<PendingFold> = {}): PendingFold {
-  return { capture: CAPTURE, venue: "dcwg-brainstorm", messages: 3, offset: 0, ...over };
+  return { capture: CAPTURE, venue: "dcwg-brainstorm", messages: 3, offset: 0, stalls: 0, ...over };
 }
 
 Deno.test("readPending survives whatever the cursor file holds", () => {
@@ -41,15 +42,17 @@ Deno.test("readPending keeps a well-formed entry and defaults its numbers", () =
       venue: "dcwg-propose",
       messages: -4,
       offset: 1.5,
+      stalls: -2,
     }],
   });
   assertEquals(folds, [
-    { capture: CAPTURE, venue: "dcwg-brainstorm", messages: 0, offset: 0 },
+    { capture: CAPTURE, venue: "dcwg-brainstorm", messages: 0, offset: 0, stalls: 0 },
     {
       capture: "raw/discord/2026-10-12_dcwg-propose.md",
       venue: "dcwg-propose",
       messages: 0,
       offset: 0,
+      stalls: 0,
     },
   ], "a negative count and a fractional offset are both malformed, and both fall back to zero");
 });
@@ -105,6 +108,30 @@ Deno.test("advance retires an entry once the capture is fully absorbed", () => {
     advance([fold()], "raw/discord/2026-10-12_dcwg-propose.md", 5_000, 5_000).length,
     1,
     "advancing one capture leaves the others alone",
+  );
+});
+
+Deno.test("stall counts a run that could not fold a capture, and moves nothing else", () => {
+  const started = [fold({ offset: 900 }), fold({ capture: "raw/discord/2026-10-12_dcwg-propose.md" })];
+  const stalled = stall(started, CAPTURE);
+  assertEquals(stalled, [
+    fold({ offset: 900, stalls: 1 }),
+    fold({ capture: "raw/discord/2026-10-12_dcwg-propose.md" }),
+  ], "the entry keeps its offset and its place; only the count moves");
+  assertEquals(stall(stalled, CAPTURE)[0].stalls, 2, "consecutive runs accumulate");
+  assertEquals(
+    stall(stalled, "raw/discord/2026-10-13_dcwg-brainstorm.md"),
+    stalled,
+    "a capture the queue does not hold is not invented by counting it",
+  );
+});
+
+Deno.test("a fold that reached the gates clears the stall count", () => {
+  const stalled = [fold({ offset: 900, stalls: 3 })];
+  assertEquals(
+    advance(stalled, CAPTURE, 1_200, 5_000),
+    [fold({ offset: 1_200 })],
+    "the count measures consecutive runs that moved nothing, not runs that have not finished",
   );
 });
 

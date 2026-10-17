@@ -128,9 +128,29 @@ jobs:
           git config user.name "dcwg-ingest"
           git config user.email "dcwg-ingest@users.noreply.github.com"
           status=0
+          # Push a venue's commit, rebasing if `main` moved while the model was running.
+          # The runner is ephemeral, so a rejected push would drop the venue's commit;
+          # rebasing keeps it. A rebase that conflicts aborts and fails the job loudly,
+          # and because the discarded commit held the capture, the cursor, and the pages
+          # together, the next run re-fetches that range rather than skipping it.
+          push_main() {
+            if git push; then return 0; fi
+            echo "push rejected; rebasing onto origin/main and retrying"
+            if git pull --rebase --no-edit origin main && git push; then return 0; fi
+            git rebase --abort 2>/dev/null || true
+            echo "push failed: rebasing onto origin/main did not succeed"
+            return 1
+          }
           while IFS='=' read -r venue channel; do
             [ -z "$venue" ] && continue
             echo "::group::$venue ($channel)"
+            # Start this venue from a clean tree. A venue that died mid-pass can leave
+            # edited or brand-new files behind, and `git add -A wiki` would then carry
+            # them into the next venue's commit. `.dcwg` goes too, so the marker that
+            # authorises staging `wiki/` cannot survive from an earlier run.
+            git checkout -- wiki/
+            git clean -qfd wiki/
+            rm -rf .dcwg
             # --limit 0 drains the backlog, so a daily run cannot leave a gap
             # behind a message cap.
             args=(--channel "$channel" --venue "$venue" --root . --limit 0)
@@ -145,17 +165,25 @@ jobs:
             if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then
               status=1
             fi
-            # Commit this venue's work before the next one runs. A failed pass has already
-            # reverted its own page edits in-process, so `wiki/` here holds only edits that
-            # passed the gates, and `raw/discord` holds the capture and the cursor that
-            # advanced with it.
+            # Commit this venue's work before the next one runs. `raw/discord` is staged
+            # whatever happened: the capture is the record, and the cursor advances with
+            # it. `wiki/` is staged only when the connector left the `pages-ok` marker,
+            # which it writes once the gates pass and removes when they do not. The marker
+            # is what separates a tree holding gate-passed pages from one a killed pass
+            # left behind, because both look like a dirty `wiki/` and a non-zero exit.
+            # It was deleted above, so a run that dies before writing it stages no pages.
             if [ "${DRY_RUN:-false}" != "true" ]; then
-              git add -A raw/discord wiki
+              git add -A raw/discord
+              if [ -f .dcwg/pages-ok ]; then
+                git add -A wiki
+              else
+                echo "no pages-ok marker for $venue: committing the capture only"
+              fi
               if git diff --cached --quiet; then
                 echo "nothing to commit for $venue"
               else
                 git commit -q -m "ingest: $venue Discord activity for $(date -u +%Y-%m-%d)"
-                git push || { echo "push failed for $venue"; status=1; }
+                push_main || status=1
               fi
             fi
             echo "::endgroup::"
