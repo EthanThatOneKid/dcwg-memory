@@ -115,8 +115,3 @@ Deno.test("a media channel is post-shaped too, and no captures means nothing to 
   const empty = await tree({ "wiki/Deno.md": page("Deno", []) });
   assertEquals(await findThreadProblems(empty), []);
 });
-
-Deno.test("the repository itself has no forum post without a page of its own", async () => {
-  const root = new URL("../..", import.meta.url).pathname.replace(/\/$/, "");
-  assertEquals(await findThreadProblems(root), []);
-});

@@ -210,10 +210,16 @@ jobs:
             # It was deleted above, so a run that dies before writing it stages no pages.
             if [ "${DRY_RUN:-false}" != "true" ]; then
               git add -A raw/discord
+              # The captures and the index that indexes them are one unit: the index is
+              # generated from the tree, so it is staged whenever a capture is. On
+              # 2026-10-18 a run committed two captures and no pages, which left main
+              # holding an index that contradicted its own captures and failed
+              # `index_page.ts --check` on every run afterwards.
+              git add -A -- wiki/Captures.md
               if [ -f .dcwg/pages-ok ]; then
                 git add -A wiki
               else
-                echo "no pages-ok marker for $venue: committing the capture only"
+                echo "no pages-ok marker for $venue: committing the capture and its index only"
               fi
               if git diff --cached --quiet; then
                 echo "nothing to commit for $venue"

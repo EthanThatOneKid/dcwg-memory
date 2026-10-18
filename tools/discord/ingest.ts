@@ -538,6 +538,19 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     await Deno.mkdir(outDir, { recursive: true });
     capturePath = nextCapturePath(args.out, day, args.venue, await readExistingCaptures(outDir));
     await Deno.writeTextFile(`${root}/${capturePath}`, text);
+    /**
+     * The index is a view of the captures, so it moves in the same commit as the
+     * capture that changed it.
+     *
+     * It is written here, before the pass rather than only after one, because a
+     * capture that is committed without a fold still changes the tree the index
+     * describes: a pass that fails its gates reverts its pages but leaves the
+     * capture, and a pass that is killed cannot revert anything at all. Writing it
+     * twice is cheap and idempotent, and the alternative is a repository whose
+     * index contradicts its own captures, which is what `index_page.ts --check`
+     * fails on and what left `main` with a stale index on 2026-10-18.
+     */
+    await writeCapturesIndex(root);
   }
 
   /**
