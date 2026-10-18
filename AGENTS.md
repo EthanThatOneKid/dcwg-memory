@@ -163,7 +163,13 @@ queue oldest first and stops after one capture unless `--drain`, because each fo
 a whole page pass with its own attempts and a backlog should drain over several runs
 rather than overrun the job's own time limit. A fold that cannot pass its gates after
 `--attempts` reports NEEDS_ATTENTION, commits nothing to `wiki/`, and leaves its entry
-queued, so the next run retries that material instead of skipping it. Each venue
+queued, so the next run retries that material instead of skipping it. A pass that runs
+to completion and changes no page is the same kind of failure, settled before the gates
+rather than left to them, because an untouched tree passes all six: the pages revert,
+the entry stays queued and its stall count rises, and the run reports NEEDS_ATTENTION
+naming the capture. Measured 2026-10-18, that silent success is not hypothetical: the
+`#brainstorm` pass over a 288-message capture spent all 24 of its steps and 174,449
+input tokens, wrote nothing, and reported `OK` with `pages: []`. Each venue
 commits and pushes its own capture, cursor, and pages inside the workflow's venue
 loop, as soon as its own fold finishes, so one venue's failure cannot discard
 another venue's work; the job still fails at the end when any venue reported
@@ -233,12 +239,50 @@ the OpenRouter key it is handed or run a command nobody reviewed.
 while the `api` path wants the bare provider id. `--pass-timeout` (default 900
 seconds) kills an opencode pass that overruns.
 
-Metering is the open question on this path, and the reason to watch the first
-runs: an agentic pass spends one model request per step, so a free OpenRouter
-key's daily cap meters it per step rather than per run. One daily run over one
-venue was comfortably inside that cap for the one-shot path, and that arithmetic
-does not transfer. A pass that hits the cap reports `NEEDS_ATTENTION` and commits
-nothing, so the failure is visible rather than silent.
+## The request budget
+
+Metering is settled, and it is counted in requests rather than tokens. The
+OpenRouter free tier allows 50 free-model requests per day, rising permanently to
+1,000 once $10 of credits have been bought at any point; the per-minute limit is 20
+either way. Measured 2026-10-17 against the connector's own key,
+`GET /api/v1/auth/key` answers `"is_free_tier": true`, `"usage": 0`, and
+`"free_model_daily_requests": {"used": 51, "limit": 50, "remaining": 0}`. Capping
+tokens would bound nothing on this path: an agentic step is one request whatever it
+carries, so a 594-message backfill and a three-message day cost the same until the
+agent runs out of steps.
+
+The automation stays on `nvidia/nemotron-3-super-120b-a12b:free`, by Ethan's call on
+2026-10-18: the free tier is the budget, and the schedule fits it rather than the
+other way round. So what a run has to fit is requests, and the ceiling is easy to
+exceed. `opencode.json` caps the agent at 24 steps, `--attempts` defaults to 2, and
+the cron runs two venues, so the worst case is 96 requests against a budget of 50.
+One venue's two attempts over the 594-message backfill spent a whole day on
+2026-10-17 and left the next run answering 429 to its first request, which is what
+made a healthy venue look like a venue with bad content.
+
+`tools/discord/budget.ts` is how a run learns what it can afford. Before each fold
+the connector asks the provider what is left of the day, logs it, and does not start
+a pass it cannot pay for. The day is shared rather than first come: the workflow runs
+each venue with `--budget-share <i>/<n>`, and a venue's share is what the provider
+reports left divided by the runs still to come, so a venue holding a backlog cannot
+spend a later venue's allowance. A share buys attempts at the agent's own step
+ceiling, which the connector reads from `opencode.json` rather than restating: at 50
+requests over two venues each venue gets 25, which is one 24-step pass, so a free day
+is one pass per venue and a fold that needs a second attempt waits for tomorrow's
+budget. A share that cannot pay for a single pass defers the fold without calling the
+model at all. A fold that never reached the model is reported as a budget condition
+rather than a stall, because `stalls` counts runs that failed to fold material and a
+pass the provider refused judged nothing; the status stays `NEEDS_ATTENTION` either
+way, since `VALID_STATUSES` mirrors the hub's contract.
+
+If the free tier proves too tight for the material, three verified ways out are on
+record, and none of them changes the connector: $10 of OpenRouter credits raises the
+same key to 1,000 requests a day permanently; `google/gemini-2.5-flash` is a built-in
+opencode provider on roughly 1,500 free requests a day; and opencode's own
+`opencode/*-free` models answer with no credential at all, verified 2026-10-17
+driving the agent loop through a `read` and a `write` at a total cost of 0. Each of
+the last two is billed by that provider, so the connector skips the OpenRouter probe
+when `--model` names a different one.
 
 ## Maintaining the wiki: the self-healing pass
 

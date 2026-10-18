@@ -226,6 +226,47 @@ export function parseUsage(jsonl: string): OpencodeUsage {
   return usage;
 }
 
+/**
+ * The provider's own rate-limit message, when a pass died on one.
+ *
+ * A spent budget arrives in the same JSON event stream `parseUsage` already walks,
+ * and it is the only thing that separates a pass that never reached the model from
+ * one the model ran and got wrong. Measured 2026-10-17 (run 39052618604), the event
+ * was:
+ *
+ *   {"type":"error","error":{"name":"APIError","data":{"message":"Rate limit
+ *    exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model
+ *    requests per day","statusCode":429,"responseHeaders":{...}}}}
+ *
+ * Returns the last such message, because that is the failure the run ended on. A
+ * pass that failed some other way returns `undefined` and is judged on the material.
+ */
+export function parseRateLimit(jsonl: string): string | undefined {
+  let found: string | undefined;
+  for (const line of jsonl.split("\n")) {
+    const text = line.trim();
+    if (!text.startsWith("{")) continue;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (event.type !== "error") continue;
+    const error = event.error;
+    const details = errorRecord(errorRecord(error)?.data) ?? errorRecord(error);
+    const status = details?.statusCode ?? details?.status;
+    const message = details?.message ?? (typeof error === "string" ? error : undefined);
+    if (status !== 429 && !(typeof message === "string" && /rate limit/i.test(message))) continue;
+    found = typeof message === "string" ? message : "HTTP 429 from the model provider";
+  }
+  return found;
+}
+
+function errorRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : undefined;
+}
+
 export interface OpencodeRunResult {
   /** The process exited on its own, with code 0. */
   ok: boolean;
@@ -235,6 +276,12 @@ export interface OpencodeRunResult {
   /** Last lines of stderr, for the run report. Never contains the API key. */
   stderr: string;
   stdout: string;
+  /**
+   * The provider's rate-limit message when the pass died on one, so a spent budget
+   * is reported as a budget condition rather than as material the model could not
+   * fold. `undefined` for every other failure.
+   */
+  rateLimited: string | undefined;
 }
 
 export interface OpencodeRunInput {
@@ -301,6 +348,7 @@ export async function runOpencode(input: OpencodeRunInput): Promise<OpencodeRunR
       usage: parseUsage(stdout),
       stderr: stderr.trim().split("\n").slice(-20).join("\n"),
       stdout,
+      rateLimited: parseRateLimit(stdout),
     };
   } finally {
     clearTimeout(timer);
@@ -353,4 +401,45 @@ export async function writePagesOk(root: string, ok: boolean): Promise<void> {
   }
   await Deno.mkdir(`${root}/.dcwg`, { recursive: true });
   await Deno.writeTextFile(path, `${new Date().toISOString()}\n`);
+}
+/**
+ * The step ceiling a pass falls back to when `opencode.json` does not name one.
+ *
+ * Matches the `dcwg` agent's own `steps`, so a config the connector cannot read
+ * budgets the pass the same way the config it can read does.
+ */
+export const DEFAULT_AGENT_STEPS = 24;
+
+/**
+ * Read an agent's step ceiling out of a parsed `opencode.json`.
+ *
+ * `steps` is what bounds a pass, and it is what a pass costs: opencode emits one
+ * `step_finish` per model request, so the ceiling is the worst-case spend in requests.
+ * The connector needs that number to decide whether the day can pay for an attempt at
+ * all, and it reads it from the config rather than restating it, because the ceiling
+ * that bounds the pass is the one opencode actually applies.
+ */
+export function agentSteps(config: unknown, agent: string): number {
+  const agents = (config as { agent?: Record<string, unknown> } | null)?.agent;
+  const entry = agents?.[agent] as { steps?: unknown } | undefined;
+  const steps = entry?.steps;
+  return typeof steps === "number" && Number.isInteger(steps) && steps > 0
+    ? steps
+    : DEFAULT_AGENT_STEPS;
+}
+
+/**
+ * `agentSteps` for the repo on disk.
+ *
+ * Answers the fallback rather than throwing when the file is missing or unreadable: a
+ * budget decision must not be the thing that fails a run, and an unreadable config is
+ * not evidence that the pass is free.
+ */
+export async function readAgentSteps(root: string, agent: string): Promise<number> {
+  try {
+    const config = JSON.parse(await Deno.readTextFile(`${root}/opencode.json`));
+    return agentSteps(config, agent);
+  } catch {
+    return DEFAULT_AGENT_STEPS;
+  }
 }

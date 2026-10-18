@@ -1,8 +1,12 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
+  agentSteps,
+  DEFAULT_AGENT_STEPS,
   diffTree,
   outsideWiki,
+  parseRateLimit,
   parseUsage,
+  readAgentSteps,
   renderBrief,
   restoreTree,
   snapshotTree,
@@ -156,5 +160,97 @@ Deno.test("parseUsage on a stream with no steps is a clean zero", () => {
     outputTokens: 0,
     reasoningTokens: 0,
     cost: 0,
+  });
+});
+
+Deno.test("parseRateLimit lifts the provider's own message out of an error event", () => {
+  // The real event, measured 2026-10-17 (run 39052618604), on a day whose free-model
+  // cap was already spent. This message is the whole difference between "the material
+  // could not be folded" and "nothing was ever asked of the material".
+  const stream = [
+    JSON.stringify({ type: "step_start", part: { id: "prt_1" } }),
+    JSON.stringify({
+      type: "error",
+      error: {
+        name: "APIError",
+        data: {
+          message: "Rate limit exceeded: free-models-per-day. " +
+            "Add 10 credits to unlock 1000 free model requests per day",
+          statusCode: 429,
+          responseHeaders: { "x-ratelimit-limit": "50", "x-ratelimit-remaining": "0" },
+        },
+      },
+    }),
+  ].join("\n");
+  assertEquals(
+    parseRateLimit(stream),
+    "Rate limit exceeded: free-models-per-day. " +
+      "Add 10 credits to unlock 1000 free model requests per day",
+  );
+});
+
+Deno.test("parseRateLimit keeps the last one, which is the failure the run ended on", () => {
+  const stream = [
+    JSON.stringify({
+      type: "error",
+      error: { data: { message: "Rate limit exceeded: first", statusCode: 429 } },
+    }),
+    JSON.stringify({
+      type: "error",
+      error: { data: { message: "Rate limit exceeded: second", statusCode: 429 } },
+    }),
+  ].join("\n");
+  assertEquals(parseRateLimit(stream), "Rate limit exceeded: second");
+});
+
+Deno.test("parseRateLimit recognises a 429 that does not spell it out", () => {
+  const stream = JSON.stringify({ type: "error", error: { data: { statusCode: 429 } } });
+  assertEquals(parseRateLimit(stream), "HTTP 429 from the model provider");
+});
+
+Deno.test("parseRateLimit is undefined for a pass that failed on its own work", () => {
+  // A gate rejection, a crash, a timeout: none of them is a provider cap, and every
+  // one of them must keep counting as a stall.
+  const stream = [
+    "not json at all",
+    JSON.stringify({ type: "text", part: { text: "orphans FAILED" } }),
+    JSON.stringify({
+      type: "error",
+      error: { name: "APIError", data: { message: "Invalid tool call", statusCode: 400 } },
+    }),
+  ].join("\n");
+  assertEquals(parseRateLimit(stream), undefined);
+  assertEquals(parseRateLimit(""), undefined);
+});
+
+Deno.test("agentSteps reads the agent's own ceiling, and falls back when it cannot", () => {
+  assertEquals(agentSteps({ agent: { dcwg: { steps: 24 } } }, "dcwg"), 24);
+  assertEquals(agentSteps({ agent: { dcwg: { steps: 8 } } }, "dcwg"), 8);
+  // A config that names another agent, or names no ceiling, does not bound this one.
+  assertEquals(agentSteps({ agent: { other: { steps: 5 } } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps({ agent: { dcwg: {} } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  // A ceiling that is not a usable count is not a ceiling: zero would defer every fold,
+  // and a non-integer is not a number of requests.
+  assertEquals(agentSteps({ agent: { dcwg: { steps: 0 } } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps({ agent: { dcwg: { steps: 2.5 } } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps({ agent: { dcwg: { steps: "24" } } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps(undefined, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps("not a config", "dcwg"), DEFAULT_AGENT_STEPS);
+});
+
+Deno.test("readAgentSteps reads the repo's own opencode.json", async () => {
+  await withTempTree(
+    { "opencode.json": JSON.stringify({ agent: { dcwg: { steps: 12 } } }) },
+    async (root) => {
+      assertEquals(await readAgentSteps(root, "dcwg"), 12);
+    },
+  );
+  // A missing or unparsable config answers the fallback rather than failing the run:
+  // a budget decision must not be the thing that stops a capture.
+  await withTempTree({ "opencode.json": "{ not json" }, async (root) => {
+    assertEquals(await readAgentSteps(root, "dcwg"), DEFAULT_AGENT_STEPS);
+  });
+  await withTempTree({}, async (root) => {
+    assertEquals(await readAgentSteps(root, "dcwg"), DEFAULT_AGENT_STEPS);
   });
 });

@@ -35,9 +35,13 @@ name: Discord ingest
 #   OPENROUTER_API_KEY      inference for the wiki pass, on a free model by
 #                           default. ANTHROPIC_API_KEY also works if set, and
 #                           --provider picks between them.
-# An agentic pass spends one model request per step, so a free OpenRouter key's
-# daily cap meters this path differently than the one-shot one: see the note in
-# AGENTS.md before pointing the schedule at it.
+# An agentic pass spends one model request per step, and a free OpenRouter key
+# allows 50 of them per day, so the connector asks the provider what is left
+# before each fold and refuses to start a pass it cannot pay for. Each venue runs
+# with --budget-share <i>/<n>, so the day is divided between the venues that
+# share it rather than spent by whichever runs first. See "The request budget" in
+# AGENTS.md for the arithmetic and for the providers that raise the ceiling
+# without spending money.
 # Neither is ever echoed: the connector reads them from the environment and
 # never accepts a token as a command-line argument.
 
@@ -87,7 +91,12 @@ jobs:
         dcwg-propose=1559218298128695386
       # github.event.inputs is a string map that is empty on a scheduled run, so
       # every one of these falls back in the shell rather than in an expression.
-      MODEL: ${{ github.event.inputs.model }}
+      # MODEL is the one exception, and it falls back in the expression on
+      # purpose: a scheduled run cannot take an input, so the repository variable
+      # DCWG_MODEL is how the schedule is repointed at another provider (e.g.
+      # google/gemini-2.5-flash or opencode/nemotron-3.5-lightning-free) without
+      # editing this file. Unset, the connector uses opencode.json's own default.
+      MODEL: ${{ github.event.inputs.model || vars.DCWG_MODEL }}
       PROVIDER: ${{ github.event.inputs.provider }}
       EDITOR: ${{ github.event.inputs.editor }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
@@ -120,6 +129,10 @@ jobs:
           DCWG_DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Only needed when DCWG_MODEL names a google/* model. Set it and the
+          # Google free tier's ~1,500 requests a day replace OpenRouter's 50; leave
+          # it unset and this expands to an empty string, which no editor reads.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           # Per-venue commits, inside the loop. The runner is ephemeral and one venue must
           # not be able to discard another venue's work: each venue commits and pushes its
@@ -128,6 +141,12 @@ jobs:
           git config user.name "dcwg-ingest"
           git config user.email "dcwg-ingest@users.noreply.github.com"
           status=0
+          # How many venues share today's free-model budget. The connector divides what
+          # the provider reports left by the runs still to come, so a venue with a
+          # backlog cannot spend a later venue's allowance. It is counted from the same
+          # VENUES block the loop reads, so a line added there is counted too.
+          venue_total=$(grep -c . <<< "$VENUES")
+          venue_index=0
           # Push a venue's commit, rebasing if `main` moved while the model was running.
           # The runner is ephemeral, so a rejected push would drop the venue's commit;
           # rebasing keeps it. A rebase that conflicts aborts and fails the job loudly,
@@ -143,7 +162,8 @@ jobs:
           }
           while IFS='=' read -r venue channel; do
             [ -z "$venue" ] && continue
-            echo "::group::$venue ($channel)"
+            venue_index=$((venue_index + 1))
+            echo "::group::$venue ($channel) [$venue_index/$venue_total]"
             # Start this venue from a clean tree. A venue that died mid-pass can leave
             # edited or brand-new files behind, and `git add -A wiki` would then carry
             # them into the next venue's commit. `.dcwg` goes too, so the marker that
@@ -153,7 +173,8 @@ jobs:
             rm -rf .dcwg
             # --limit 0 drains the backlog, so a daily run cannot leave a gap
             # behind a message cap.
-            args=(--channel "$channel" --venue "$venue" --root . --limit 0)
+            args=(--channel "$channel" --venue "$venue" --root . --limit 0 \
+              --budget-share "$venue_index/$venue_total")
             # Only pin a model or provider when one was asked for: passing the
             # other provider's default id would send an unknown model to the one
             # that is actually configured.
