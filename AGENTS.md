@@ -188,6 +188,17 @@ what the model actually returned when a pass is refused, set `DCWG_DUMP_PROPOSAL
 a path; the guard's message names the page and never the content, and the content is
 the part a prompt fix depends on.
 
+A second gate-blind failure is the prompt's own framing coming back as page text. The api
+prompt hands the model the capture and every page wrapped in `--- BEGIN page <path> ---`
+... `--- END page <path> ---` fences, and the 2026-10-18 pass returned the page it had been
+handed with the fence still around it, plus the page's frontmatter echoed as a body line.
+`wiki check` and `wiki lint` pass on that, and the frontmatter carry-forward restores the
+real block above the copy, so nothing caught it. `guardProposal` now refuses content
+carrying a `--- BEGIN|END page|capture` fence, and both prompt surfaces say the fences are
+not page text. The match is deliberately that narrow: a horizontal rule, a table's `| --- |`
+separator, and a page's own frontmatter block are legitimate page text, and a guard that
+refused a bare `---` would refuse every page.
+
 The connector is verified end to end: `Dodo [DCWG]` (app `1559632041484484709`) is
 installed in the server, and a full backfill of `#talk` read 593 messages in about
 four seconds. The manual steps above remain the fallback for a venue the bot cannot

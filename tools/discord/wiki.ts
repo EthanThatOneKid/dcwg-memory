@@ -48,6 +48,24 @@ function keyNameFor(provider: Provider): string {
 /** Per-page and per-capture caps so a long history cannot blow the budget. */
 export const PAGE_CHAR_CAP = 8_000;
 export const CAPTURE_CHAR_CAP = 24_000;
+/**
+ * The fences this prompt wraps its own input in.
+ *
+ * `buildPrompt` delimits the capture and every page it hands the model with
+ * `--- BEGIN page wiki/X.md ---` ... `--- END page wiki/X.md ---`, and a model asked for
+ * complete page rewrites has echoed that framing into the content it returned. Measured
+ * 2026-10-18 on the free tier: one pass wrote `## --- BEGIN page wiki/Deno_Fork_Options.md
+ * ---` into the body, echoed the page's frontmatter as a body line under it, and closed
+ * with `--- END page wiki/Deno_Fork_Options.md ---`, and all six gates passed, because a
+ * page is not required to be free of the prompt's own framing. The echo also survives the
+ * frontmatter carry-forward, which restores the real block above it and leaves the copy in
+ * the body.
+ *
+ * Only the fence is matched, and only in this exact form: a horizontal rule, a markdown
+ * table's `| --- |` separator, and a page's own YAML frontmatter block are all legitimate
+ * page text, and a guard that refused a bare `---` would refuse every page.
+ */
+export const PROMPT_FENCE = /^---[ \t]+(?:BEGIN|END)[ \t]+(?:page|capture)\b/m;
 
 /**
  * Output budget for one pass, in tokens.
@@ -143,6 +161,10 @@ Hard rules, all enforced by the connector and by CI:
 - Keep each page's existing YAML frontmatter exactly as it is and change only the
   body. Rewriting the block, or dropping it for a horizontal rule, loses the page's
   type and source, and the connector refuses an edit that strips a page's frontmatter.
+- The --- BEGIN page ... --- and --- BEGIN capture ... --- lines in the task below fence
+  the blocks of this prompt: they are not page text. Never copy one into a page's content
+  and never wrap your content in one, because the connector refuses an edit whose content
+  carries that framing, and no gate can tell it from real prose.
 - Attribute every claim to the handle that made it. Never assert consensus nobody
   stated, never upgrade a proposal into a decision, and never invent a quote, date,
   participant, or outcome.
@@ -309,7 +331,9 @@ export function buildPrompt(
   }
   parts.push(
     "Return only the pages you are changing, in `edits`. Keep each page's existing voice, headings, " +
-      "and cross-references. Cite the handle and the date for every new claim.",
+      "and cross-references. Cite the handle and the date for every new claim. The `--- BEGIN ... ---` " +
+      "and `--- END ... ---` lines above fence this prompt's blocks: they are not page content, so the " +
+      "`content` field carries the page alone, starting at its frontmatter block.",
   );
   return parts.join("\n\n");
 }
@@ -394,6 +418,17 @@ export function guardProposal(
     const was = prior?.get(edit.path);
     if (was && hasFrontmatter(was) && !hasFrontmatter(edit.content ?? "")) {
       problems.push(`${edit.path}: the edit strips the page's YAML frontmatter`);
+    }
+
+    // The prompt's own framing is not page text, and the gates cannot see the
+    // difference: a body that begins with the fence is still valid markdown with a
+    // frontmatter block above it, so an echo of the prompt commits as a corrupted page.
+    const fence = (edit.content ?? "").match(PROMPT_FENCE);
+    if (fence) {
+      problems.push(
+        `${edit.path}: the content carries the prompt's own framing ` +
+          `(\`${fence[0].trim()}\`), which is not part of a page`,
+      );
     }
   }
   return problems;

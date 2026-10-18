@@ -152,7 +152,9 @@ export function main(argv: string[] = Deno.args): number {
   }
 
   const url = inviteUrl(clientId, guildId, !anyGuild);
-  const granted = Object.entries(READ_ONLY_BITS).map(([name, bit]) => `${name} (${bit})`).join(" | ");
+  const granted = Object.entries(READ_ONLY_BITS).map(([name, bit]) => `${name} (${bit})`).join(
+    " | ",
+  );
   console.log(url);
   console.log();
   console.log(`permissions  ${PERMISSIONS} = ${granted}`);

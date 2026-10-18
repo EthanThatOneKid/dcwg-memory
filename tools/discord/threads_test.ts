@@ -77,7 +77,10 @@ function stubFetch(api: Api): () => void {
     const archived = path.match(/^\/api\/v10\/channels\/([^/]+)\/threads\/archived\/public$/);
     if (archived) {
       const threads = archived[1] === FORUM
-        ? [{ ...thread(FORUM_POST_2, "Sustainability", FORUM), thread_metadata: { archived: true } }]
+        ? [{
+          ...thread(FORUM_POST_2, "Sustainability", FORUM),
+          thread_metadata: { archived: true },
+        }]
         : [];
       return json({ threads, has_more: false });
     }
@@ -153,7 +156,10 @@ Deno.test("a forum run captures every post under its own heading", async () => {
     const capture = await Deno.readTextFile(`${root}/raw/discord/2026-08-01_dcwg-propose.md`);
     assert(capture.includes(`## Rust Academy? (thread ${FORUM_POST_1})`), "post heading");
     assert(capture.includes(`## Sustainability (thread ${FORUM_POST_2})`), "archived post heading");
-    assert(capture.includes("post body") && capture.includes("first reply"), "post and its replies");
+    assert(
+      capture.includes("post body") && capture.includes("first reply"),
+      "post and its replies",
+    );
     assert(capture.includes("across 2 threads"), "the frontmatter counts the posts");
     assert(!capture.includes("top level one"), "another venue's messages must not leak in");
 
@@ -190,7 +196,11 @@ Deno.test("a text channel's thread is captured without dragging its own cursor p
     );
 
     const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
-    assertEquals(cursor[TEXT], "1001", "the channel cursor is its own newest, not the thread's 4000");
+    assertEquals(
+      cursor[TEXT],
+      "1001",
+      "the channel cursor is its own newest, not the thread's 4000",
+    );
     assertEquals(cursor[TEXT_THREAD], "4000");
   });
 });
@@ -219,7 +229,10 @@ Deno.test("a resumed run reads each thread from its own cursor and re-reads noth
     assert(second.includes("another reply"), "the new reply is captured");
     assert(!second.includes("top level one"), "the channel's history is not re-captured");
     assert(!second.includes("thread starter"), "the thread's older messages are not re-captured");
-    assert(second.includes(`## LLM Notetaking (thread ${TEXT_THREAD})`), "the reply keeps its thread heading");
+    assert(
+      second.includes(`## LLM Notetaking (thread ${TEXT_THREAD})`),
+      "the reply keeps its thread heading",
+    );
 
     const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
     assertEquals(cursor[TEXT_THREAD], "5000");

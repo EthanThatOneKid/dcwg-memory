@@ -45,9 +45,16 @@ Deno.test("carryFrontmatterForward leaves a page that never had frontmatter alon
 });
 
 Deno.test("adjustProposal drops an edit to the connector-generated index", () => {
-  const prior = new Map<string, string | null>([["wiki/Captures.md", "---\nx: y\n---\n\n# Captures\n"]]);
+  const prior = new Map<string, string | null>([[
+    "wiki/Captures.md",
+    "---\nx: y\n---\n\n# Captures\n",
+  ]]);
   const { edits, adjustments } = adjustProposal(
-    [{ path: "wiki/Captures.md", content: "---\nx: y\n---\n\n# Captures\n\nmore\n", reason: "bump count" }],
+    [{
+      path: "wiki/Captures.md",
+      content: "---\nx: y\n---\n\n# Captures\n\nmore\n",
+      reason: "bump count",
+    }],
     prior,
   );
   assertEquals(edits, []);
@@ -58,7 +65,11 @@ Deno.test("adjustProposal drops an edit to the connector-generated index", () =>
 Deno.test("adjustProposal keeps a normal edit untouched", () => {
   const prior = new Map<string, string | null>([["wiki/Ende_vs_Dodo.md", PAGE]]);
   const { edits, adjustments } = adjustProposal(
-    [{ path: "wiki/Ende_vs_Dodo.md", content: PAGE + "\nA new claim.\n", reason: "fold in capture" }],
+    [{
+      path: "wiki/Ende_vs_Dodo.md",
+      content: PAGE + "\nA new claim.\n",
+      reason: "fold in capture",
+    }],
     prior,
   );
   assertEquals(adjustments, []);
@@ -69,7 +80,11 @@ Deno.test("adjustProposal keeps a normal edit untouched", () => {
 Deno.test("adjustProposal repairs a frontmatter-stripping edit instead of refusing the pass", () => {
   const prior = new Map<string, string | null>([["wiki/Ende_vs_Dodo.md", PAGE]]);
   const { edits, adjustments } = adjustProposal(
-    [{ path: "wiki/Ende_vs_Dodo.md", content: "# Ende vs Dodo\n\nBody only.\n", reason: "rewrite" }],
+    [{
+      path: "wiki/Ende_vs_Dodo.md",
+      content: "# Ende vs Dodo\n\nBody only.\n",
+      reason: "rewrite",
+    }],
     prior,
   );
   assertEquals(edits.length, 1);

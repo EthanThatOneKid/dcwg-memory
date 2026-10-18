@@ -102,6 +102,67 @@ Deno.test("guardProposal protects a page's frontmatter", () => {
     [],
   );
 });
+/**
+ * The prompt's own framing must never commit as page text.
+ *
+ * Measured 2026-10-18 on the free tier: `buildPrompt` fences the capture and every page it
+ * hands the model, and the pass echoed the page fence into the body it returned, along with
+ * a copy of the page's frontmatter as a body line. Every gate passed on the result, because
+ * a page is not required to be free of the prompt's framing and the frontmatter block was
+ * still there (the connector's carry-forward restored the real one above the copy).
+ */
+Deno.test("guardProposal refuses the prompt's own framing echoed into a page", () => {
+  const prior = new Map<string, string | null>([
+    ["wiki/Deno_Fork_Options.md", "---\n'@type': schema:TechArticle\n---\n\n# Deno fork options\n"],
+  ]);
+
+  // The shape the pass actually returned, frontmatter and all.
+  const echoed = guardProposal(
+    [{
+      path: "wiki/Deno_Fork_Options.md",
+      content: "---\n'@type': schema:TechArticle\n---\n\n" +
+        "## --- BEGIN page wiki/Deno_Fork_Options.md ---\n\n" +
+        '## "@type": schema:TechArticle schema:name: Deno fork options\n\n' +
+        "# Deno fork options\n\nMore.\n\n--- END page wiki/Deno_Fork_Options.md ---\n",
+      reason: "edit",
+    }],
+    prior,
+  );
+  assert(
+    echoed.some((p) => p.includes("carries the prompt's own framing")),
+    echoed.join("; "),
+  );
+
+  // A capture fence is the same mistake, and the guard names it the same way.
+  const captureFence = guardProposal([{
+    path: "wiki/Deno_Fork_Options.md",
+    content: "---\n'@type': schema:TechArticle\n---\n\n--- BEGIN capture raw/discord/x.md ---\n",
+    reason: "edit",
+  }]);
+  assert(
+    captureFence.some((p) => p.includes("carries the prompt's own framing")),
+    captureFence.join("; "),
+  );
+});
+
+/**
+ * A guard that refused a bare `---` would refuse every page, so the ways a page legitimately
+ * uses three dashes are pinned here: the frontmatter block's own delimiters, a horizontal
+ * rule, and a markdown table's separator row.
+ */
+Deno.test("guardProposal leaves the legitimate uses of three dashes alone", () => {
+  assertEquals(
+    guardProposal([
+      {
+        path: "wiki/Deno_Fork_Options.md",
+        content:
+          "---\n'@type': schema:TechArticle\n---\n\n# Title\n\n---\n\n| Fork | Keeps |\n| --- | --- |\n| Compatibility | Deno |\n",
+        reason: "edit",
+      },
+    ]),
+    [],
+  );
+});
 
 Deno.test("snapshot then restore returns the tree to its prior state", async () => {
   const root = await Deno.makeTempDir();

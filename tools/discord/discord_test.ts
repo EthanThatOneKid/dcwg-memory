@@ -249,7 +249,10 @@ Deno.test("a venue's threads are its own parent's, active and archived, oldest f
   const restore = stubThreads({
     calls,
     active: [thread("300", "ours, active", VENUE), thread("999", "someone else's", "OTHER")],
-    archived: [{ threads: [thread("100", "ours, archived", VENUE, "2026-08-01T00:00:00Z")], has_more: false }],
+    archived: [{
+      threads: [thread("100", "ours, archived", VENUE, "2026-08-01T00:00:00Z")],
+      has_more: false,
+    }],
   });
   try {
     const out = await fetchVenueThreads({ id: VENUE, name: "idea", guild_id: "G" }, "t", noSleep);
@@ -309,7 +312,11 @@ Deno.test("archived threads page backwards on the oldest archive timestamp", asy
 
 Deno.test("a channel whose archived threads are unreadable is not a capture failure", async () => {
   const calls: string[] = [];
-  const restore = stubThreads({ calls, archivedStatus: 403, active: [thread("300", "ours", VENUE)] });
+  const restore = stubThreads({
+    calls,
+    archivedStatus: 403,
+    active: [thread("300", "ours", VENUE)],
+  });
   try {
     const out = await fetchVenueThreads({ id: VENUE, name: "plan", guild_id: "G" }, "t", noSleep);
     assertEquals(out.map((t) => t.id), ["300"], "active threads are still captured");
@@ -336,7 +343,8 @@ Deno.test("a channel with no guild id skips the guild-wide active call", async (
  */
 function stubArchivedByContract(threads: unknown[]): () => void {
   const stamp = (t: unknown) =>
-    (t as { thread_metadata?: { archive_timestamp?: string } }).thread_metadata?.archive_timestamp ?? "";
+    (t as { thread_metadata?: { archive_timestamp?: string } }).thread_metadata
+      ?.archive_timestamp ?? "";
   const original = globalThis.fetch;
   globalThis.fetch = ((input: string | URL | Request) => {
     const url = new URL(String(input));
@@ -367,8 +375,11 @@ Deno.test("a thread sharing the boundary second survives pagination", async () =
   const base = Date.parse("2026-09-01T00:00:00Z");
   const tie = iso(Date.parse("2026-08-01T00:00:00Z"));
   const all = [
-    ...Array.from({ length: 99 }, (_, i) =>
-      thread(`2${String(i).padStart(2, "0")}`, `t${i}`, VENUE, iso(base + i * 86_400_000))),
+    ...Array.from(
+      { length: 99 },
+      (_, i) =>
+        thread(`2${String(i).padStart(2, "0")}`, `t${i}`, VENUE, iso(base + i * 86_400_000)),
+    ),
     thread("100", "tie a", VENUE, tie),
     thread("101", "tie b", VENUE, tie),
   ];

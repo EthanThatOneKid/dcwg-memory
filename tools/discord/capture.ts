@@ -115,7 +115,9 @@ export interface CaptureInput {
 export function renderBlocks(sections: CaptureSection[]): string {
   return sections
     .map((section) =>
-      section.title ? `## ${section.title}\n\n${renderBody(section.messages)}` : renderBody(section.messages)
+      section.title
+        ? `## ${section.title}\n\n${renderBody(section.messages)}`
+        : renderBody(section.messages)
     )
     .join("\n---\n\n");
 }
@@ -151,8 +153,7 @@ export function renderCapture(input: CaptureInput): string {
       "first message under its heading."
     : "";
 
-  const head =
-    "---\n" +
+  const head = "---\n" +
     `title: ${yamlStr(`Discord #${channelName} — ${day}`)}\n` +
     `source: ${yamlStr(`Discord REST API, channel ${channelId}, UTC timestamps`)}\n` +
     `channel_type: ${channelType}\n` +

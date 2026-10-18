@@ -30,9 +30,7 @@ const MAX_OUTPUT = 2_000;
 
 function clip(text: string): string {
   const trimmed = text.trim();
-  return trimmed.length <= MAX_OUTPUT
-    ? trimmed
-    : `${trimmed.slice(0, MAX_OUTPUT)}\n… (truncated)`;
+  return trimmed.length <= MAX_OUTPUT ? trimmed : `${trimmed.slice(0, MAX_OUTPUT)}\n… (truncated)`;
 }
 
 /** An audit report as `errors` then `warnings`, which is what the CLI prints. */

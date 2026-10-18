@@ -65,7 +65,16 @@ Deno.test("checkEditablePath refuses traversal and absolute paths", () => {
 });
 
 Deno.test("checkEditablePath refuses non-page filenames", () => {
-  for (const path of ["wiki/x.txt", "wiki/x.json", "wiki/.md", "wiki/x.md.bak", "wiki/", "wiki/sub/dir.md"]) {
+  for (
+    const path of [
+      "wiki/x.txt",
+      "wiki/x.json",
+      "wiki/.md",
+      "wiki/x.md.bak",
+      "wiki/",
+      "wiki/sub/dir.md",
+    ]
+  ) {
     const check = checkEditablePath(path);
     assert(!check.ok, `${path} was allowed`);
   }
@@ -109,6 +118,8 @@ Deno.test("validateSummary refuses a missing key, a wrong type, and a bad status
   assert(validateSummary(summary({ ingested: null })).length > 0);
   assert(validateSummary(summary({ status: "BROKEN" })).length > 0);
   assert(validateSummary(summary({ lastRun: "yesterday" })).length > 0);
-  assert(validateSummary(summary({ connector: "discord", status: "NEEDS_ATTENTION" })).length === 0);
+  assert(
+    validateSummary(summary({ connector: "discord", status: "NEEDS_ATTENTION" })).length === 0,
+  );
   assert(validateSummary(null).length > 0);
 });

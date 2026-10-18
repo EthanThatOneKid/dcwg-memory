@@ -18,7 +18,10 @@ import {
 
 Deno.test("the invite grants read access and nothing else", () => {
   assertEquals(PERMISSIONS, 66560);
-  assertEquals(READ_ONLY_BITS["View Channel"] | READ_ONLY_BITS["Read Message History"], PERMISSIONS);
+  assertEquals(
+    READ_ONLY_BITS["View Channel"] | READ_ONLY_BITS["Read Message History"],
+    PERMISSIONS,
+  );
   assertEquals(selfCheck(), []);
 });
 
@@ -38,7 +41,11 @@ Deno.test("the URL preselects and locks the guild by default", () => {
   assertEquals(url.searchParams.get("client_id"), "1559632041484484709");
   assertEquals(url.searchParams.get("permissions"), "66560");
   assertEquals(url.searchParams.get("scope"), "bot");
-  assertEquals(url.searchParams.get("integration_type"), "0", "a guild install, not a user install");
+  assertEquals(
+    url.searchParams.get("integration_type"),
+    "0",
+    "a guild install, not a user install",
+  );
   assertEquals(url.searchParams.get("guild_id"), DEFAULT_GUILD);
   assertEquals(url.searchParams.get("disable_guild_select"), "true");
 });
