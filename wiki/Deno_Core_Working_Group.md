@@ -50,3 +50,9 @@ Ethan reported on 2026-10-11 that he had reached out to Divy and Crowl: Divy Sri
 - [Ende](Ende_Runtime.md): the one fork with a published roadmap.
 - [Runtime architecture proposals](Runtime_Architecture_Proposals.md): the second capture, where the group argued about the core.
 - [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): what already implements the architecture being proposed.
+
+- [Rust core rewrite proposal](Rust_Core_Proposal.md): the rewrite that got formalized the next day, and the zig prototype it started as.
+- [Benchmarking dodo](Dodo_Benchmarks.md): the performance baseline the rewrite will eventually be judged against.
+- [Deno versus Node features](Deno_vs_Node_Features.md): whether the project's purpose is to stay a distinct runtime at all.
+- [Fork sustainability](Fork_Sustainability.md): how the group proposed to pay for any of it.
+- [Rust upskilling](Rust_Upskilling.md): the skill survey and what to learn first.

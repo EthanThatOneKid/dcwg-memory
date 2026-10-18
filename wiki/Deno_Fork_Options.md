@@ -53,3 +53,9 @@ One correction is worth keeping, because it is the only check anyone ran on the 
 - Whether the compatibility fork is a separate project or a configuration of Ende, now that a plugin ecosystem is on the table. See [Runtime architecture proposals](Runtime_Architecture_Proposals.md).
 - Who maintains the compatibility fork if `netop://ウィビ` is maintaining the stripped one, since nobody in the log volunteered.
 - Whether the fork keeps Deno's compiled-in extension set or adopts the loadable one argued about later the same day. [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md) covers who has already built the latter.
+
+## Related
+
+- [Fork sustainability](Fork_Sustainability.md): the funding question, raised the day after the naming thread.
+- [Deno versus Node features](Deno_vs_Node_Features.md): the later argument about whether a distinct runtime is the point.
+- [Rust core rewrite proposal](Rust_Core_Proposal.md): where the rewrite option went after this thread.

@@ -63,3 +63,7 @@ Each footnote names what it was read for, and every source was read on 2026-10-1
 [^3]: [trynova/nova](https://github.com/trynova/nova) and the [nova_vm crate](https://crates.io/crates/nova_vm) page: engine scope, design priorities, and missing features.
 
 [^5]: [microsoft/ClearScript](https://github.com/microsoft/ClearScript) and [sebastienros/jint](https://github.com/sebastienros/jint): the .NET hosting precedent.
+
+## Related
+
+- [Rust core rewrite proposal](Rust_Core_Proposal.md): the proposal to build a new runtime on `rusty_v8` rather than on `deno_core`, and what happened to it.
