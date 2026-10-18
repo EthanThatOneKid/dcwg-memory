@@ -102,10 +102,16 @@ export function checkEditablePath(path: string, contentBytes = 0): PathCheck {
     return { ok: false, reason: "traversal or empty segment" };
   }
   if (!path.startsWith(WIKI_PREFIX)) {
-    return { ok: false, reason: `outside ${WIKI_PREFIX} (captures and config are not model-writable)` };
+    return {
+      ok: false,
+      reason: `outside ${WIKI_PREFIX} (captures and config are not model-writable)`,
+    };
   }
   if (CODE_OWNED.has(path)) {
-    return { ok: false, reason: `${path} is generated from the tree, so the model may not write it` };
+    return {
+      ok: false,
+      reason: `${path} is generated from the tree, so the model may not write it`,
+    };
   }
 
   const basename = segments[segments.length - 1];

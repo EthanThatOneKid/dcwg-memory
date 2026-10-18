@@ -17,7 +17,13 @@ const CHANNEL = "1558888938842624093";
 const TOKEN_ENV = "DCWG_DISCORD_BOT_TOKEN";
 
 function message(id: string, timestamp: string): DiscordMessage {
-  return { id, content: `message ${id}`, timestamp, author: { id: "1", username: "andy" }, type: 0 };
+  return {
+    id,
+    content: `message ${id}`,
+    timestamp,
+    author: { id: "1", username: "andy" },
+    type: 0,
+  };
 }
 
 /** Stub the API and record every request path with its query, so the anchor shows. */

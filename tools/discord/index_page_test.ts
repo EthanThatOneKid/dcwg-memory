@@ -35,7 +35,12 @@ Deno.test("the rendered index is a pure function of the captures and pages", () 
   const input = {
     siteOrigin: "https://example.test/memory",
     captures: [
-      { path: "raw/discord/2026-10-11_a.md", title: "First", description: "The first one.", source: "Discord" },
+      {
+        path: "raw/discord/2026-10-11_a.md",
+        title: "First",
+        description: "The first one.",
+        source: "Discord",
+      },
       { path: "raw/briefs/2026-10-11_b.md", title: "Second", description: "", source: "A brief" },
     ],
     pages: [
@@ -85,7 +90,10 @@ Deno.test("writing the index is idempotent", async () => {
       `${dir}/wiki/Ende.md`,
       `---\nschema:name: Ende\nschema:description: A fork.\n---\n\nbody\n`,
     );
-    await Deno.writeTextFile(`${dir}/wiki.yml`, `graph:\n  context:\n    wiki: https://example.test/memory/\n`);
+    await Deno.writeTextFile(
+      `${dir}/wiki.yml`,
+      `graph:\n  context:\n    wiki: https://example.test/memory/\n`,
+    );
 
     assertEquals(await writeCapturesIndex(dir), true, "first write should change the tree");
     assertEquals(await writeCapturesIndex(dir), false, "second write should be a no-op");

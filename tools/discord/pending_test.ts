@@ -112,7 +112,10 @@ Deno.test("advance retires an entry once the capture is fully absorbed", () => {
 });
 
 Deno.test("stall counts a run that could not fold a capture, and moves nothing else", () => {
-  const started = [fold({ offset: 900 }), fold({ capture: "raw/discord/2026-10-12_dcwg-propose.md" })];
+  const started = [
+    fold({ offset: 900 }),
+    fold({ capture: "raw/discord/2026-10-12_dcwg-propose.md" }),
+  ];
   const stalled = stall(started, CAPTURE);
   assertEquals(stalled, [
     fold({ offset: 900, stalls: 1 }),

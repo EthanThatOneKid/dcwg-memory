@@ -127,7 +127,9 @@ export function advance(
  * the next run has to retry this material rather than skip it.
  */
 export function stall(folds: PendingFold[], capture: string): PendingFold[] {
-  return folds.map((fold) => fold.capture === capture ? { ...fold, stalls: fold.stalls + 1 } : fold);
+  return folds.map((fold) =>
+    fold.capture === capture ? { ...fold, stalls: fold.stalls + 1 } : fold
+  );
 }
 
 /** Forget an entry, for a capture that is no longer on disk. */

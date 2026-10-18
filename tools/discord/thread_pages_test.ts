@@ -8,15 +8,21 @@
  */
 
 import { assert, assertEquals } from "@std/assert";
-import { findForumThreads, findThreadProblems, threadAnchors, threadHeadings } from "./thread_pages.ts";
+import {
+  findForumThreads,
+  findThreadProblems,
+  threadAnchors,
+  threadHeadings,
+} from "./thread_pages.ts";
 
 const FORUM = "1559218298128695386";
 
 /** A capture in the connector's own shape, with one heading per thread. */
 function capture(kind: string, threads: Array<[string, string]>): string {
-  const blocks = threads.map(([id, name]) => `## ${name} (thread ${id})\n\n**andy** — a message\n`).join(
-    "\n---\n\n",
-  );
+  const blocks = threads.map(([id, name]) => `## ${name} (thread ${id})\n\n**andy** — a message\n`)
+    .join(
+      "\n---\n\n",
+    );
   return `---\ntitle: "Discord #propose — 2026-10-16"\n` +
     `source: "Discord REST API, channel ${FORUM}, UTC timestamps"\n` +
     `channel_type: ${kind}\n---\n\nbody\n\n---\n${blocks}`;
