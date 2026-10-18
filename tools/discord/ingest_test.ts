@@ -8,6 +8,7 @@
  */
 
 import { assert, assertEquals } from "@std/assert";
+import { fromFileUrl } from "@std/path";
 import { main } from "./ingest.ts";
 import { validateSummary } from "./guard.ts";
 import type { DiscordMessage } from "./discord.ts";
@@ -118,12 +119,17 @@ async function withEnv(fn: () => Promise<void>): Promise<void> {
  * and the stand-in is how "it did not start one" becomes an observation instead of an
  * assumption: a run that never spawns it never writes the marker.
  */
-async function withBudgetEnv(keyBody: unknown, fn: (bin: string, marker: string) => Promise<void>) {
+async function withBudgetEnv(
+  keyBody: unknown,
+  fn: (bin: string, marker: string) => Promise<void>,
+  /** What the stand-in pass exits with. 0 is a pass that ran and wrote nothing. */
+  exitCode = 1,
+) {
   const restoreFetch = stubFetch(keyBody);
   const dir = await Deno.makeTempDir();
   const bin = `${dir}/opencode-stand-in`;
   const marker = `${dir}/started`;
-  await Deno.writeTextFile(bin, `#!/bin/sh\ntouch '${marker}'\nexit 1\n`);
+  await Deno.writeTextFile(bin, `#!/bin/sh\ntouch '${marker}'\nexit ${exitCode}\n`);
   await Deno.chmod(bin, 0o755);
   const priorToken = Deno.env.get(TOKEN_ENV);
   const priorKey = Deno.env.get("OPENROUTER_API_KEY");
@@ -225,6 +231,37 @@ async function seedWiki(root: string): Promise<void> {
     "---\n'@type': schema:TechArticle\nname: Talk History\n---\n\n# Talk History\n\n" +
       "What the channel has talked about so far.\n",
   );
+}
+
+/** The repository root, so a fixture can copy the real wiki into a temp checkout. */
+const REPO_ROOT = fromFileUrl(new URL("../..", import.meta.url));
+
+async function copyTree(from: string, to: string): Promise<void> {
+  await Deno.mkdir(to, { recursive: true });
+  for await (const entry of Deno.readDir(from)) {
+    const source = `${from}/${entry.name}`;
+    const target = `${to}/${entry.name}`;
+    if (entry.isDirectory) await copyTree(source, target);
+    else await Deno.copyFile(source, target);
+  }
+}
+
+/**
+ * A checkout whose wiki already passes every gate, copied from this repository.
+ *
+ * A test that needs a pass to be recorded has to reach the point where the connector
+ * decides a fold happened, and that only happens when the gates pass. A synthetic seed
+ * cannot get there: a page with no inbound link fails the orphan gate, so a fixture pass
+ * fails on its own structure and never exercises the behaviour under test. Copying the
+ * real `wiki/` (plus `wiki.yml`, `layouts/`, and `assets/`, which the gates read) reuses
+ * what CI already proves gate-clean on `main`.
+ */
+async function seedGateCleanWiki(root: string): Promise<void> {
+  for (const dir of ["wiki", "layouts", "assets"]) {
+    await copyTree(`${REPO_ROOT}/${dir}`, `${root}/${dir}`);
+  }
+  await Deno.copyFile(`${REPO_ROOT}/wiki.yml`, `${root}/wiki.yml`);
+  await Deno.mkdir(`${root}/raw/discord`, { recursive: true });
 }
 
 Deno.test("one run writes an append-only capture, a cursor, and a contract-valid summary", async () => {
@@ -381,6 +418,53 @@ Deno.test("a queued capture is retried before anything newer, and stays queued",
     assertEquals(cursor._pending[0].capture, "raw/discord/2026-08-01_dcwg-talk.md");
     assertEquals(cursor._pending[1].capture, "raw/discord/2026-08-01_dcwg-talk-2.md");
   });
+});
+
+/**
+ * A pass that runs to completion and writes nothing is not a fold.
+ *
+ * This is the failure that loses material in silence, and it happened: on 2026-10-18 the
+ * `#brainstorm` pass over the 594-message backfill spent all 24 of its steps and 174,449
+ * input tokens, changed no page, passed every gate because an untouched tree has nothing
+ * to fail, advanced the queue past the capture, and reported `OK` with `pages: []`. The
+ * capture stayed on disk and the wiki never carried it.
+ */
+Deno.test("a pass that changes no page keeps the capture queued instead of folding it", async () => {
+  await withBudgetEnv(FRESH_KEY_BODY, async (_bin, marker) => {
+    const root = await Deno.makeTempDir();
+    await seedGateCleanWiki(root);
+    const { code, out } = await runCli([...AGENTIC, "--budget-share", "1/1", "--root", root]);
+
+    assertEquals(code, 1, "material the wiki did not absorb is a run that needs attention");
+    assertEquals(exists(marker), true, "the pass ran; it wrote nothing");
+
+    const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
+    assertEquals(
+      cursor._pending[0].offset,
+      0,
+      "the queue does not advance past a capture no page absorbed",
+    );
+    assertEquals(cursor._pending[0].stalls, 1, "a no-op pass is a run that failed to fold it");
+
+    const summary = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/SUMMARY.json`));
+    assertEquals(summary.status, "NEEDS_ATTENTION", "an unchanged tree must not report OK");
+
+    const result = out.find((line) => line.startsWith("RESULT "));
+    assert(result, "the CLI still prints a machine-readable RESULT line");
+    const payload = JSON.parse(result.slice("RESULT ".length));
+    assertEquals(payload.status, "NEEDS_ATTENTION");
+    assertEquals(payload.folded, 0, "nothing was folded");
+    assertEquals(
+      payload.noop,
+      "raw/discord/2026-08-01_dcwg-talk.md",
+      "the report names the capture the pass wrote nothing for",
+    );
+    assert(
+      out.some((line) => line.includes("the pass changed no page")),
+      "the log says the pass ran and wrote nothing, not that the model failed",
+    );
+    assertEquals(payload.budget, undefined, "this was not a budget condition");
+  }, 0);
 });
 
 Deno.test("a missing token fails loudly instead of half-running", async () => {

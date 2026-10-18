@@ -665,6 +665,18 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   let budgetBlocked = false;
   let budgetBlockedCapture = "";
   let budgetBlockedReason = "";
+  /**
+   * Set when the pass ran and changed no page, so the wiki did not absorb the capture.
+   *
+   * A no-op pass used to be counted as a fold, and that is how the 594-message
+   * `#brainstorm` capture left the queue on 2026-10-18 without a page being written:
+   * an unchanged tree passes every gate, so the connector advanced the entry to the end
+   * of a capture the wiki still did not carry. The entry now stays queued and the run
+   * says which capture it was.
+   */
+  let noopFold = false;
+  let noopCapture = "";
+  let noopReason = "";
 
   for (let foldCount = 0; foldCount < foldCeiling; foldCount++) {
     const fold = pendingFor(pending, args.venue)[0];
@@ -760,6 +772,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
      * reads on from there instead of losing the rest of the capture.
      */
     const recordFold = async () => {
+      // A fold that landed supersedes an earlier attempt that wrote nothing: the
+      // material is in the wiki now, so the run is not reporting a no-op fold.
+      noopFold = false;
       pending = advance(pending, foldPath, absorbed, captureText.length);
       allWritten = [...allWritten, ...changedThisFold];
       folded++;
@@ -904,6 +919,22 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         for (const adjustment of wiki.adjustments) console.log(`  adjusted: ${adjustment}`);
       }
 
+      // A pass that changed no page did not fold the capture, whatever the gates say
+      // about an untouched tree, so this is settled before the gates rather than left to
+      // them: an untouched tree passes all six. It is a failed attempt, not a fold, so
+      // the retry sees the same material with that feedback, and the entry stays queued
+      // when every attempt comes back empty. `noopFold` carries the condition to the
+      // report, where it reads differently from a stall: a stall is this material's
+      // verdict, while this one says the model ran and wrote nothing at all.
+      if (changedThisFold.length === 0) {
+        await revert();
+        noopFold = true;
+        lastFailure = "the pass changed no page, so the wiki did not absorb the capture";
+        feedback = lastFailure;
+        console.log(`attempt ${attempt}/${attempts}: the pass changed no page`);
+        continue;
+      }
+
       await writeCapturesIndex(root);
 
       if (args.noGates) {
@@ -979,6 +1010,29 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         console.log(`fold deferred: ${budgetBlockedReason}`);
         break;
       }
+      /**
+       * Every attempt ran and wrote nothing, which is the outcome that has to be loud:
+       * the material is still on disk, the wiki still does not carry it, and a run that
+       * reported this as a fold would advance the queue past it.
+       *
+       * It counts as a stall, because it is a run that failed to fold the capture and
+       * `stalls` is the number that makes a venue stuck on one capture visible. It is
+       * reported as its own condition rather than as a generic stall, so the log says
+       * what actually happened: the model ran, and produced no pages.
+       */
+      if (noopFold) {
+        pending = stall(pending, foldPath);
+        const attemptsSoFar = pending.find((entry) => entry.capture === foldPath)?.stalls ?? 1;
+        noopCapture = foldPath;
+        noopReason = `${foldPath} did not fold in on any of ${attempts} attempt(s): every pass ` +
+          `ran to completion and changed no page, so the wiki did not absorb the capture. ` +
+          `It stays queued (${attemptsSoFar} consecutive stall(s)).`;
+        console.log(
+          `fold stalled: ${foldPath} stays queued for the next run (${attemptsSoFar} consecutive stall(s)); the pass changed no page`,
+        );
+        break;
+      }
+
       stalled = true;
       stalledCapture = foldPath;
       pending = stall(pending, foldPath);
@@ -1016,7 +1070,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
 
   const stillQueued = pendingFor(pending, args.venue).length;
   summary.ingested = allWritten.length;
-  if (stalled || budgetBlocked) summary.status = "NEEDS_ATTENTION";
+  if (stalled || budgetBlocked || noopFold) summary.status = "NEEDS_ATTENTION";
 
   const summaryErrors = validateSummary(summary);
   if (summaryErrors.length) {
@@ -1049,6 +1103,24 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       },
       "NEEDS_ATTENTION",
       `archived ${archived}; ${foldedNote}, but ${budgetBlockedCapture} was not folded for want of model budget: ${budgetBlockedReason}. It stays queued, so the next run retries it.`,
+    );
+  }
+
+  if (noopFold) {
+    return report(
+      {
+        venue: args.venue,
+        channel: args.channel,
+        capture: capturePath,
+        captured: messages.length,
+        folded,
+        pending: stillQueued,
+        noop: noopCapture,
+        attempts: foldAttempts,
+        output: lastFailure.slice(-1200),
+      },
+      "NEEDS_ATTENTION",
+      `archived ${archived}; ${foldedNote}, but ${noopReason}`,
     );
   }
 

@@ -163,7 +163,13 @@ queue oldest first and stops after one capture unless `--drain`, because each fo
 a whole page pass with its own attempts and a backlog should drain over several runs
 rather than overrun the job's own time limit. A fold that cannot pass its gates after
 `--attempts` reports NEEDS_ATTENTION, commits nothing to `wiki/`, and leaves its entry
-queued, so the next run retries that material instead of skipping it. Each venue
+queued, so the next run retries that material instead of skipping it. A pass that runs
+to completion and changes no page is the same kind of failure, settled before the gates
+rather than left to them, because an untouched tree passes all six: the pages revert,
+the entry stays queued and its stall count rises, and the run reports NEEDS_ATTENTION
+naming the capture. Measured 2026-10-18, that silent success is not hypothetical: the
+`#brainstorm` pass over a 288-message capture spent all 24 of its steps and 174,449
+input tokens, wrote nothing, and reported `OK` with `pages: []`. Each venue
 commits and pushes its own capture, cursor, and pages inside the workflow's venue
 loop, as soon as its own fold finishes, so one venue's failure cannot discard
 another venue's work; the job still fails at the end when any venue reported

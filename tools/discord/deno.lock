@@ -1986,6 +1986,7 @@
     "dependencies": [
       "jsr:@std/assert@1",
       "jsr:@std/cli@1",
+      "jsr:@std/path@1",
       "jsr:@std/yaml@1",
       "jsr:@wazoo/wiki@0.6",
       "npm:@ai-sdk/anthropic@4",
