@@ -144,8 +144,9 @@ cursor parked in an unmerged pull request would make every run re-fetch the same
 range. The gates are the review step, and a failing gate reverts the pass's page
 edits while leaving the capture committed. It needs two repository secrets,
 `DISCORD_BOT_TOKEN` and `AI_GATEWAY_API_KEY`. Inference runs on the Vercel AI
-Gateway, and the Gateway is the only provider: one key, one catalogue, and one
-budget probe. It runs the free model `nvidia/nemotron-3.5-lightning-free` by
+Gateway by default, which is the one provider a pass runs on unless `--provider`
+says otherwise: one key, one catalogue, and one budget probe. It runs the free
+model `nvidia/nemotron-3.5-lightning-free` by
 default, which costs nothing and is metered by rate rather than by the day; any
 model id the Gateway publishes works with `--model`. A reasoning model is the
 trade: the first real run, a 593-message backfill, cost ~25k input and ~24k
@@ -259,6 +260,50 @@ overruns. The agent's own step ceiling is `max_agent_steps` in the repo's
 capped at 3 reported four steps and exited with the task unfinished, so it bounds
 an agentic request without being an exact count of the requests a pass makes.
 
+## Providers
+
+`--provider` picks who pays for the inference, and it is the only axis that changes
+between providers. Everything downstream of the model call is the same code: the same
+editor, the same write surface, the same six gates, the same queue.
+
+- **`gateway`** (default) is the Vercel AI Gateway: `AI_GATEWAY_API_KEY`, one
+  catalogue, one credit probe. A pass is metered in money.
+- **`gemini`** is Google's free tier: `GEMINI_API_KEY`, metered by request rather than
+  by credits, so the credit probe is skipped and the provider's own rate limit is what
+  bounds a pass. Measured 2026-10-18: a full fx pass that read two pages and wrote a
+  third completed on `gemini-2.5-flash` with no charge and no paid key.
+
+The two are not interchangeable at the wire level, and that is why gemini has a shim.
+Gemini publishes an OpenAI-compatible endpoint, but it is not consistently
+compatible, and fx is a pinned binary that cannot be taught to tolerate it. Four
+defects were reproduced on 2026-10-18 and `tools/discord/gemini_proxy.ts` repairs all
+four in flight: streamed tool calls arrive without an `index`, non-streamed tool calls
+do too, `arguments` arrives as a JSON string rather than an object, and a usage total
+counts thinking tokens its own other fields exclude. The shim holds no credential, logs
+neither a header nor a body, and forwards the caller's own key upstream. A gemini pass
+is pointed at it by `baseUrl` in `providers.ts`, so the connector and the shim agree on
+one loopback address rather than two.
+
+What a gemini run needs that a gateway run does not:
+
+1. The shim listening on that address. The workflow starts it and waits for `/health`.
+2. A `providers.gemini` block in `~/.fx/settings.json` naming the shim's `base_url` and
+   the variable the key rides in. That file is per-machine and cannot be committed, so
+   the workflow writes it and the connector checks it: `fxProviderProblems` refuses the
+   run, by name, when the block is missing or reads the key from a variable this run does
+   not export. Checked rather than written, because a connector that edited a user's
+   global settings would be doing something a run should never do.
+
+The default model per provider lives in `providers.ts` and nowhere else, so a run's
+report names what it will actually spend (`provider: gemini (gemini-2.5-flash),
+unmetered`). On the host the key is `DCWG_GEMINI_API_KEY`, because Zo secrets are
+account-wide; in the workflow it is the bare `GEMINI_API_KEY`, because repository
+secrets are already scoped. Both names are tried, canonical first.
+
+The repository variable `DCWG_PROVIDER` repoints the daily schedule without editing the
+workflow, the same way `DCWG_MODEL` repoints the model. One caveat: `DCWG_MODEL` holds a
+Gateway model id, so setting both would send a Gateway id to Gemini. Pick one.
+
 ## The budget
 
 Metering is settled, and on the Gateway it is counted in money rather than
@@ -268,6 +313,9 @@ requests do I have" but "can these credits pay for a pass". Measured 2026-10-18
 against the connector's own key, `GET /v1/credits` answers
 `{"balance": "4.513395538", "total_used": "1.692157662"}`.
 
+This probe is the Gateway's. A provider that is not metered has no balance to read, so
+a gemini run skips both probes and is bounded by Google's rate limit instead, which the
+pass retries through (see "Providers").
 That replaces the ceiling this automation used to run against. On OpenRouter's free
 tier, 50 requests a day was spendable in two runs of the 594-message backfill, and
 one venue's two attempts spent a whole day on 2026-10-17, which left the next run

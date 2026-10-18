@@ -12,6 +12,7 @@
     "@std/yaml": "jsr:@std/yaml@^1",
     "ai": "npm:ai@^7.0.0",
     "@ai-sdk/gateway": "npm:@ai-sdk/gateway@^4.0.0",
+    "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^3.0.0",
     "zod": "npm:zod@^4.0.0",
     "@wazoo/wiki": "jsr:@wazoo/wiki@^0.6.0",
     "@std/path": "jsr:@std/path@^1"

@@ -571,7 +571,6 @@ Deno.test("--tag replaces the default tags instead of adding to them", async () 
   });
 });
 
-
 /** A balance with room in it, as the Gateway reports one. */
 const FRESH_KEY_BODY = { balance: "0.04", total_used: "1.69" };
 
@@ -667,4 +666,153 @@ Deno.test("a share that can pay for one pass starts it, and its failure is a sta
     assertEquals(payload.budget, undefined, "this run was not budget-blocked");
     assertEquals(payload.stalled, "raw/discord/2026-08-01_dcwg-talk.md");
   });
+});
+
+/**
+ * The provider is a precondition rather than a hope.
+ *
+ * A run that reached a model on a provider this machine cannot serve would spend its
+ * whole time budget to learn what one line of checking says first, so the connector
+ * resolves the provider, its key, and fx's own settings before it fetches anything.
+ */
+async function withProviderEnv(
+  provider: string,
+  fn: () => Promise<void>,
+  options: { settings?: unknown; key?: string | undefined; gatewayKey?: string | undefined } = {},
+): Promise<void> {
+  const prior: Array<[string, string | undefined]> = [];
+  const remember = (name: string) => prior.push([name, Deno.env.get(name)]);
+  const settingsPath = `${await Deno.makeTempDir()}/settings.json`;
+  if (options.settings !== undefined) {
+    await Deno.writeTextFile(settingsPath, JSON.stringify(options.settings));
+  }
+  for (
+    const name of [
+      TOKEN_ENV,
+      "GEMINI_API_KEY",
+      "DCWG_GEMINI_API_KEY",
+      "AI_GATEWAY_API_KEY",
+      "DCWG_FX_SETTINGS",
+    ]
+  ) remember(name);
+  Deno.env.set(TOKEN_ENV, "test-token-not-real");
+  Deno.env.set("DCWG_FX_SETTINGS", settingsPath);
+  for (
+    const [name, value] of [
+      ["GEMINI_API_KEY", options.key],
+      ["AI_GATEWAY_API_KEY", options.gatewayKey],
+    ] as const
+  ) {
+    if (value === undefined) Deno.env.delete(name);
+    else Deno.env.set(name, value);
+  }
+  try {
+    await fn();
+  } finally {
+    for (const [name, value] of prior) {
+      if (value === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, value);
+    }
+  }
+}
+
+Deno.test("a provider the connector does not have is refused by name", async () => {
+  const root = await Deno.makeTempDir();
+  const { code, errors } = await runCliErrors([
+    ...AGENTIC,
+    "--provider",
+    "openrouter",
+    "--root",
+    root,
+  ]);
+
+  assertEquals(code, 2);
+  assert(errors[0].includes("--provider must be one of gateway, gemini"));
+});
+
+Deno.test("a gemini run with no gemini key names the variable instead of borrowing the Gateway's", async () => {
+  await withProviderEnv("gemini", async () => {
+    const root = await Deno.makeTempDir();
+    const { code, errors } = await runCliErrors([
+      ...AGENTIC,
+      "--provider",
+      "gemini",
+      "--root",
+      root,
+    ]);
+
+    assertEquals(code, 2, "a missing key is configuration, not a fold to retry");
+    assert(errors[0].includes("GEMINI_API_KEY"));
+    assert(errors[0].includes("DCWG_GEMINI_API_KEY"), "the host's prefixed name is the other fix");
+    assertEquals(exists(`${root}/raw`), false, "nothing was fetched: the check runs first");
+  }, { gatewayKey: "test-key-not-real" });
+});
+
+Deno.test("a gemini run whose fx settings name no such provider names the file and the block", async () => {
+  await withProviderEnv("gemini", async () => {
+    const root = await Deno.makeTempDir();
+    const { code, errors } = await runCliErrors([
+      ...AGENTIC,
+      "--provider",
+      "gemini",
+      "--root",
+      root,
+    ]);
+
+    assertEquals(code, 2);
+    assert(errors[0].includes("providers.gemini"), "the fix names the block to add");
+    assertEquals(exists(`${root}/raw`), false);
+  }, { key: "test-key-not-real", settings: { provider: "gateway" } });
+});
+
+Deno.test("an unmetered provider is never asked what it has left", async () => {
+  const hits: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = ((input: string | URL | Request) => {
+    const url = new URL(String(input));
+    hits.push(url.href);
+    if (url.pathname === `/api/v10/channels/${CHANNEL}`) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: CHANNEL, name: "talk" }), { status: 200 }),
+      );
+    }
+    if (url.pathname === `/api/v10/channels/${CHANNEL}/messages`) {
+      return Promise.resolve(
+        new Response(JSON.stringify([...apiMessages()].reverse()), { status: 200 }),
+      );
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 404 }));
+  }) as typeof fetch;
+  try {
+    await withProviderEnv("gemini", async () => {
+      const root = await Deno.makeTempDir();
+      await seedWiki(root);
+      const { code, out } = await runCli([
+        "--channel",
+        CHANNEL,
+        "--venue",
+        "dcwg-talk",
+        "--all",
+        "--provider",
+        "gemini",
+        "--editor",
+        "api",
+        "--root",
+        root,
+      ]);
+
+      assertEquals(code, 1, "the shim is not listening here, so the fold stalls");
+      assertEquals(
+        hits.filter((hit) => hit.includes("/credits")).length,
+        0,
+        "a free tier is bounded by its own rate limit, not by credits a share could divide",
+      );
+      assert(
+        out.some((line) => line === "provider: gemini (gemini-2.5-flash), unmetered"),
+        `the run report names who paid: ${out.join(" | ")}`,
+      );
+    }, { key: "test-key-not-real" });
+  } finally {
+    globalThis.fetch = original;
+  }
 });

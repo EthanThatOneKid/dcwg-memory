@@ -31,7 +31,6 @@ function passInput(root: string, generate: PassGenerate) {
     root,
     channelName: "talk",
     capturePath: "raw/discord/2026-10-15_talk.md",
-    provider: "openrouter" as const,
     apiKey: "test-key",
     pages: [{ path: "wiki/Deno_Runtime.md", text: PAGE }],
     captureText: "# talk\n",

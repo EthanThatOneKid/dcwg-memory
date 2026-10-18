@@ -310,8 +310,23 @@ export interface FxRunInput {
   briefPath: string;
   /** The agent's standing instructions, handed in with `--system`. */
   system: string;
-  /** Gateway model id, e.g. `nvidia/nemotron-3.5-lightning-free`. */
+  /** Model id on this pass's provider, e.g. `nvidia/nemotron-3.5-lightning-free`. */
   model?: string;
+  /**
+   * The provider this pass runs on. Decides `FX_PROVIDER`, and with `apiKey` the
+   * variable the child inherits the credential under.
+   *
+   * Structural rather than a `ProviderSpec` import: fx.ts drives a process and has no
+   * business knowing which providers exist.
+   */
+  provider?: { fxProvider: string; keyEnv: string };
+  /**
+   * The credential for `provider`, exported to the child under `provider.keyEnv`.
+   *
+   * fx looks a key up in its own environment by the name its settings give, so the value
+   * is handed over here rather than written into the settings file.
+   */
+  apiKey?: string;
   timeoutMs?: number;
   /** Path to the CLI, for tests and for a pin that is not on PATH. */
   bin?: string;
@@ -328,10 +343,10 @@ export interface FxRunInput {
  * an argument, through `--system`, because they are a fixed 4 KB file that replaces the
  * built-in base prompt; `AGENTS.md` is read by fx itself.
  *
- * `--no-save` keeps no session state between runs, and `FX_PROVIDER` pins the Gateway so
- * a machine's own default provider cannot serve an automation pass. `FX_AUTO_UPGRADE=0`
- * keeps the binary from replacing itself mid-run, which matters because the version
- * decides the tool set and the shape of the envelope parsed above.
+ * `--no-save` keeps no session state between runs, and `FX_PROVIDER` names the provider so
+ * a machine's own default cannot serve an automation pass. `FX_AUTO_UPGRADE=0` keeps the
+ * binary from replacing itself mid-run, which matters because the version decides the tool
+ * set and the shape of the envelope parsed above.
  */
 export async function runFx(input: FxRunInput): Promise<FxRunResult> {
   const bin = input.bin ?? Deno.env.get("DCWG_FX_BIN") ?? "fx";
@@ -352,7 +367,10 @@ export async function runFx(input: FxRunInput): Promise<FxRunResult> {
     env: {
       ...Deno.env.toObject(),
       FX_AUTO_UPGRADE: "0",
-      FX_PROVIDER: "gateway",
+      FX_PROVIDER: input.provider?.fxProvider ?? "gateway",
+      // The key rides in the environment rather than in a flag, so it cannot reach a
+      // process list or a log line, and under the name the settings read it by.
+      ...(input.provider && input.apiKey ? { [input.provider.keyEnv]: input.apiKey } : {}),
     },
   });
 

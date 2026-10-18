@@ -4,12 +4,7 @@
  * function of the files, and writing it is idempotent.
  */
 import { assert, assertEquals } from "@std/assert";
-import {
-  frontmatter,
-  INDEX_PAGE,
-  renderCapturesIndex,
-  writeCapturesIndex,
-} from "./index_page.ts";
+import { frontmatter, INDEX_PAGE, renderCapturesIndex, writeCapturesIndex } from "./index_page.ts";
 
 Deno.test("frontmatter reads quoted strings, colon keys, and lists", () => {
   const fm = frontmatter(

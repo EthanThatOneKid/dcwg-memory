@@ -12,10 +12,13 @@
  *
  * Credentials (never passed as arguments, never logged):
  *   DCWG_DISCORD_BOT_TOKEN   the capture bot's token
- *   AI_GATEWAY_API_KEY       the wiki pass, both editors, on the Vercel AI Gateway
+ *   AI_GATEWAY_API_KEY       the wiki pass on the default provider, the Vercel AI Gateway
+ *   DCWG_GEMINI_API_KEY      the wiki pass on --provider gemini, Google's free tier
  *
- * The Gateway is the only inference provider: one key, one catalogue, and one budget
- * probe. `--editor` chooses between an agentic pass (`fx`) and a one-shot one (`api`).
+ * `--provider` picks who pays for the inference and `--editor` picks how the pass edits
+ * pages: an agentic CLI (`fx`) or one JSON list of rewrites (`api`). The Gateway meters
+ * money and Gemini's free tier meters requests, so the credit probe in `budget.ts` applies
+ * to the former only. See "Providers" and "The budget" in AGENTS.md.
  */
 
 import { parseArgs } from "@std/cli/parse-args";
@@ -64,12 +67,18 @@ import {
   buildPrompt,
   CAPTURE_CHAR_CAP,
   captureSlice,
-  DEFAULT_MODEL,
-  GATEWAY_KEY_NAME,
   readPages,
   runWikiPass,
   writePage,
 } from "./wiki.ts";
+import {
+  describeProvider,
+  fxProviderProblems,
+  missingKeyMessage,
+  parseProviderName,
+  resolveApiKey,
+  resolveProvider,
+} from "./providers.ts";
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
 import { captureKind, findThreadProblems, POST_SHAPED, postsInCapture } from "./thread_pages.ts";
@@ -79,6 +88,7 @@ import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
 import type { PageEdit } from "./wiki.ts";
 import type { BudgetShare, GatewayCredits, ModelPrice } from "./budget.ts";
+import type { ProviderSpec } from "./providers.ts";
 import type { PendingFold } from "./pending.ts";
 
 const USAGE = `dcwg-memory Discord connector
@@ -105,8 +115,13 @@ Options:
   --all                 ignore the cursor and pull from the channel's first message
   --since <iso>         ISO-8601 UTC lower bound (overrides the cursor)
   --token-env <name>    env var holding the bot token (default: DCWG_DISCORD_BOT_TOKEN)
-  --model <id>          Gateway model id for the wiki pass, vendor/model
-                        (default: the free model wiki.ts names)
+  --provider <name>     who pays for the wiki pass: gateway (default) or gemini. A
+                        gemini pass reaches Google's free tier through the local shim
+                        (tools/discord/gemini_proxy.ts), so the shim has to be listening
+                        and ~/.fx/settings.json has to name that provider
+  --model <id>          model id for the wiki pass on that provider, e.g.
+                        nvidia/nemotron-3.5-lightning-free on gateway (the default) or
+                        gemini-2.5-flash on gemini (the default)
   --skip-wiki           capture only; do not touch wiki pages
   --editor <name>       how the page pass edits pages. fx (default) runs an agentic
                         CLI that reads the capture and edits wiki/ files itself;
@@ -147,6 +162,8 @@ interface Args {
   tokenEnv: string;
   /** Unset means the model the pass itself defaults to. */
   model?: string;
+  /** Who pays for the pass, and what that implies about the budget and the key. */
+  provider: ProviderSpec;
   skipWiki: boolean;
   /** Which editor produces the page changes. */
   editor: "fx" | "api";
@@ -185,6 +202,7 @@ function parseCliArgs(argv: string[]): Args {
         "since",
         "token-env",
         "model",
+        "provider",
         "editor",
         "pass-timeout",
         "attempts",
@@ -236,6 +254,10 @@ function parseCliArgs(argv: string[]): Args {
   if (editor !== undefined && editor !== "fx" && editor !== "api") {
     throw new Error(`--editor must be fx or api, not '${editor}'`);
   }
+  const providerFlag = str("provider");
+  const provider = resolveProvider(
+    providerFlag === undefined ? undefined : parseProviderName(providerFlag),
+  );
   const budgetShareRaw = str("budget-share");
   const budgetShare = budgetShareRaw === undefined
     ? { index: 1, count: 1 }
@@ -265,6 +287,7 @@ function parseCliArgs(argv: string[]): Args {
     ...(since === undefined ? {} : { since }),
     tokenEnv: str("token-env") ?? "DCWG_DISCORD_BOT_TOKEN",
     ...(model === undefined ? {} : { model }),
+    provider,
     skipWiki: parsed["skip-wiki"] === true,
     editor: editor ?? "fx",
     passTimeoutSec: num("pass-timeout", 900),
@@ -291,6 +314,18 @@ function requireToken(name: string): string {
     );
   }
   return token;
+}
+
+/**
+ * Where fx keeps its per-machine settings.
+ *
+ * fx resolves the provider it is pointed at against this file, so a run checks it rather
+ * than writing it: the connector does not edit a user's global settings, and a machine
+ * whose file names no such provider should fail here in one line rather than inside a
+ * pass. `DCWG_FX_SETTINGS` overrides the path, for tests and for a home that is not $HOME.
+ */
+function fxSettingsPath(): string {
+  return Deno.env.get("DCWG_FX_SETTINGS") ?? `${Deno.env.get("HOME") ?? ""}/.fx/settings.json`;
 }
 
 /** The repo's own validation, in the order AGENTS.md prescribes. */
@@ -329,12 +364,15 @@ async function readExistingCaptures(dir: string): Promise<string[]> {
 async function passBudget(
   args: Args,
 ): Promise<{ credits: GatewayCredits; passCostUsd: number | undefined } | undefined> {
+  // An unmetered provider has no balance to read: a Gemini pass is bounded by Google's
+  // own rate limit, which fx retries through, not by credits a share could divide.
+  if (!args.provider.metered) return undefined;
   if (args.editor !== "fx") return undefined;
-  const apiKey = Deno.env.get(GATEWAY_KEY_NAME);
+  const apiKey = Deno.env.get(args.provider.keyEnv);
   if (!apiKey) return undefined;
   const credits = await probeGatewayCredits({ apiKey });
   if (credits === undefined) return undefined;
-  const modelId = args.model ?? DEFAULT_MODEL;
+  const modelId = args.model ?? args.provider.defaultModel;
   return { credits, passCostUsd: estimatePassCostUsd(await probeModelPrice({ apiKey, modelId })) };
 }
 
@@ -380,6 +418,33 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     }
     throw error;
   }
+  /**
+   * The pass's credential and its fx preconditions, checked before any capture is
+   * fetched. Both failures are configuration rather than content, so they exit 2 with the
+   * fix named: a run that got as far as calling a model on an unreadable provider would
+   * spend its whole time budget to learn what this check says in a line.
+   */
+  let passKey: string | undefined;
+  if (!args.skipWiki && !args.dryRun) {
+    const resolved = resolveApiKey(args.provider, (name) => Deno.env.get(name));
+    if (!resolved) {
+      console.error(`error: ${missingKeyMessage(args.provider)}`);
+      return 2;
+    }
+    passKey = resolved.value;
+    if (args.editor === "fx") {
+      const problems = fxProviderProblems(
+        await readJson(fxSettingsPath()),
+        args.provider,
+        resolved.name,
+      );
+      if (problems.length) {
+        console.error(`error: ${problems.join("\n  ")}`);
+        return 2;
+      }
+    }
+  }
+
   const root = args.root;
   const outDir = args.out.startsWith("/") ? args.out : `${root}/${args.out}`;
   const cursorPath = `${outDir}/.cursor`;
@@ -743,8 +808,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     const budget = await passBudget(args);
     const credits = budget?.credits;
     const passCostUsd = budget?.passCostUsd;
-    const modelId = args.model ?? DEFAULT_MODEL;
+    const modelId = args.model ?? args.provider.defaultModel;
     if (credits) console.log(describeGatewayCredits(credits));
+    console.log(`provider: ${describeProvider(args.provider, modelId)}`);
     /**
      * What this run may spend on this fold, and how many attempts that buys.
      *
@@ -758,7 +824,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
      * or price could not be read is ungoverned here: it spends what `--attempts` allows
      * and the provider's own 429 handling covers the rest.
      */
-    const allowance = credits === undefined ? undefined : creditAllowance(credits, args.budgetShare);
+    const allowance = credits === undefined
+      ? undefined
+      : creditAllowance(credits, args.budgetShare);
     const attempts = allowance === undefined || passCostUsd === undefined
       ? args.attempts
       : affordableAttempts(allowance, passCostUsd, args.attempts);
@@ -839,7 +907,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
           root,
           briefPath,
           system: standingInstructions,
-          model: args.model,
+          // The resolved id rather than `args.model`: the run report names this model, so
+          // the pass has to run the model it named, on either provider.
+          model: modelId,
+          provider: args.provider,
+          apiKey: passKey,
           timeoutMs: args.passTimeoutSec * 1000,
         }).catch(async (error: unknown) => {
           await revert();
@@ -900,7 +972,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
           forum: foldForum,
           capturePath: foldPath,
           offset: fold.offset,
-          model: args.model,
+          model: modelId,
+          provider: args.provider,
+          apiKey: passKey,
           feedback,
         });
 
