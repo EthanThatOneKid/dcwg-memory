@@ -1,6 +1,7 @@
 /**
- * Drive the wiki pass through `opencode`, an agentic coding CLI, instead of
- * asking a model for a JSON list of whole-file rewrites.
+ * Drive the wiki pass through `fx`, the Vercel Labs coding agent, against the
+ * Vercel AI Gateway, instead of asking a model for a JSON list of whole-file
+ * rewrites.
  *
  * The connector used to hand the model every wiki page inline and ask for a
  * complete new body for each page it wanted to change. That works, and it has
@@ -17,22 +18,28 @@
  *    notice that a claim it is about to add already has a page.
  *
  * What the connector keeps is the part that must stay deterministic: it decides
- * what may change, verifies it, and owns the revert. opencode's own permission
- * globs are not the boundary. Measured 2026-10-16 on 1.19.3, the same
- * `{"wiki/**": "allow", "**": "deny"}` rule allowed `wiki/Alpha.md` in one
- * checkout and refused `wiki/New.md` in another, so a rule that fails open is
- * not a control. `snapshotTree`/`diffTree` are: they compare the tree either side
- * of the run and revert anything outside `wiki/`.
+ * what may change, verifies it, and owns the revert. fx's permission rules are a
+ * second control rather than the boundary. `snapshotTree`/`diffTree` compare the
+ * tree either side of the run and revert anything outside `wiki/`, and that is
+ * what a run is trusted against, because a rule that fails open is not a control.
+ * The rules do work at the tool layer, though: measured 2026-10-18 on 0.0.14,
+ * with `{"*": "deny", "edit": {"*": "deny", "wiki/**": "allow"}}`, a
+ * `write_file` to `wiki/New.md` was allowed and one to `other/Bad.md` was denied.
+ * Two details are load-bearing: the allow pattern must be the tree form
+ * (`wiki/**`, not `wiki/*`), because a create is matched against the new file's
+ * parent, and `edit` is the permission name for both `write_file` and
+ * `edit_file`. The rules live in `~/.fx/settings.json`, which is per-machine
+ * rather than per-repo, so the workflow writes them before the pass runs.
  *
- * `dcwg.md` in `prompt/` is the agent's standing instructions, wired through the
- * `dcwg` agent in the repo's `opencode.json`. Nothing here shells out to a shell:
- * the agent's tool set is read/glob/grep/list/write/edit, with bash, webfetch,
- * websearch, task, and question denied, so a run cannot exfiltrate the OpenRouter
- * key it is handed or run a command nobody reviewed.
+ * `dcwg.md` in `prompt/` is the agent's standing instructions, handed in with
+ * `--system`; fx reads the repository's `AGENTS.md` itself. The tool set is
+ * read/glob/grep/list/edit with `bash` denied by those same rules, so a run
+ * cannot exfiltrate the Gateway key it is handed or run a command nobody
+ * reviewed.
  */
 
 /** Directories the snapshot ignores: version control, tool state, build output. */
-const IGNORED_DIRS = [".git", ".opencode", ".dcwg", "_site", "node_modules"];
+const IGNORED_DIRS = [".git", ".fx", ".dcwg", "_site", "node_modules"];
 
 export interface FileTree {
   /** Repo-relative path -> file content. Text only; this repo is all text. */
@@ -177,119 +184,133 @@ export function renderBrief(input: BriefInput): string {
   return parts.join("\n\n") + "\n";
 }
 
-export interface OpencodeUsage {
+/**
+ * One `fx ask --json` result, as far as the connector reads it.
+ *
+ * fx emits a single JSON object rather than opencode's per-step event stream, so the
+ * spend is read off the envelope instead of accumulated. Measured 2026-10-18 on
+ * 0.0.14, the keys are `exit_code`, `final_output`, `model`, `output`,
+ * `resolved_provider`, `session_id`, `steps`, `tool_calls`, and `usage`; `recovery`
+ * appears only when fx retried a response, and is absent otherwise.
+ */
+export interface FxResult {
+  steps?: number;
+  model?: string;
+  exit_code?: number;
+  tool_calls?: Array<{ name?: string; status?: string }>;
+  usage?: { input_tokens?: number | null; output_tokens?: number | null };
+  output?: string;
+  final_output?: string;
+  recovery?: { state?: string; kind?: string; attempt?: number };
+}
+
+export interface FxUsage {
+  /**
+   * Tool calls the pass reported, which is what fx's `steps` counts.
+   *
+   * Not model requests: measured 2026-10-18 on 0.0.14, a probe run capped at
+   * `max_agent_steps: 2` made 6 tool calls and reported `steps: 6`, and the
+   * 594-message pass reported 39 against exactly 39 tool calls. `max_agent_steps`
+   * bounds the model's own turns, which is a coarser unit than either, so neither
+   * number is used as a request count anywhere in this repo.
+   */
   steps: number;
   inputTokens: number;
   outputTokens: number;
-  reasoningTokens: number;
-  cost: number;
-  sessionId?: string;
+  /** The model the Gateway resolved for the pass. */
+  model?: string;
+  /** fx's own note when it retried a response, e.g. through a rate limit. */
+  recovery?: string;
 }
 
 /**
- * Sum the per-step token counts and cost out of the JSON event stream.
+ * Parse the JSON envelope.
  *
- * opencode emits one `step_finish` per model request, each carrying that
- * request's usage, so the totals have to be accumulated rather than read off a
- * final envelope. A model request is also the unit the OpenRouter free tier
- * meters, which makes `steps` the number that decides whether a day's runs stay
- * inside its cap.
+ * The envelope is the whole of stdout, but a stray line before or after it should not
+ * cost the run its spend figures, so the last line that parses as an object is accepted
+ * too. `undefined` for output that holds no object at all, which is what a crash before
+ * the first request looks like.
  */
-export function parseUsage(jsonl: string): OpencodeUsage {
-  const usage: OpencodeUsage = {
-    steps: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    reasoningTokens: 0,
-    cost: 0,
-  };
-  for (const line of jsonl.split("\n")) {
-    const text = line.trim();
-    if (!text.startsWith("{")) continue;
-    let event: Record<string, unknown>;
+export function parseFxResult(stdout: string): FxResult | undefined {
+  const text = stdout.trim();
+  if (!text) return undefined;
+  for (const candidate of [text, ...text.split("\n").reverse()]) {
+    const line = candidate.trim();
+    if (!line.startsWith("{")) continue;
     try {
-      event = JSON.parse(text) as Record<string, unknown>;
+      const value = JSON.parse(line);
+      if (typeof value === "object" && value !== null) return value as FxResult;
     } catch {
-      continue;
+      // not this line; try the next candidate
     }
-    if (event.type !== "step_finish") continue;
-    const part = event.part as { tokens?: Record<string, number>; cost?: number } | undefined;
-    if (!part) continue;
-    usage.steps += 1;
-    usage.sessionId ??= typeof event.sessionID === "string" ? event.sessionID : undefined;
-    const tokens = part.tokens ?? {};
-    usage.inputTokens += tokens.input ?? 0;
-    usage.outputTokens += tokens.output ?? 0;
-    usage.reasoningTokens += tokens.reasoning ?? 0;
-    usage.cost += part.cost ?? 0;
   }
-  return usage;
+  return undefined;
 }
+
+function count(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+/** Read a pass's spend off a parsed envelope. */
+export function fxUsage(result: FxResult | undefined): FxUsage {
+  const recovery = result?.recovery;
+  const note = recovery?.state
+    ? `${recovery.state}${recovery.kind ? ` (${recovery.kind})` : ""}` +
+      `${typeof recovery.attempt === "number" ? ` after ${recovery.attempt} attempt(s)` : ""}`
+    : undefined;
+  return {
+    steps: count(result?.steps),
+    inputTokens: count(result?.usage?.input_tokens),
+    outputTokens: count(result?.usage?.output_tokens),
+    ...(typeof result?.model === "string" ? { model: result.model } : {}),
+    ...(note ? { recovery: note } : {}),
+  };
+}
+
+/** Anything a run's own output might say about a spent or throttled provider budget. */
+const RATE_LIMIT = /(\b429\b|rate.?limit|too many requests|throttl|quota)/i;
 
 /**
  * The provider's own rate-limit message, when a pass died on one.
  *
- * A spent budget arrives in the same JSON event stream `parseUsage` already walks,
- * and it is the only thing that separates a pass that never reached the model from
- * one the model ran and got wrong. Measured 2026-10-17 (run 39052618604), the event
- * was:
- *
- *   {"type":"error","error":{"name":"APIError","data":{"message":"Rate limit
- *    exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model
- *    requests per day","statusCode":429,"responseHeaders":{...}}}}
- *
- * Returns the last such message, because that is the failure the run ended on. A
- * pass that failed some other way returns `undefined` and is judged on the material.
+ * A spent budget has to be told apart from material the model could not fold: the
+ * connector reports the first as a budget condition and the second as a stall, because a
+ * pass the provider refused judged nothing. fx folds a retried response into `recovery`
+ * in the envelope and writes its diagnostics to stderr, so both are read, and stderr is
+ * what a failure before the first request leaves behind.
  */
-export function parseRateLimit(jsonl: string): string | undefined {
-  let found: string | undefined;
-  for (const line of jsonl.split("\n")) {
-    const text = line.trim();
-    if (!text.startsWith("{")) continue;
-    let event: Record<string, unknown>;
-    try {
-      event = JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      continue;
-    }
-    if (event.type !== "error") continue;
-    const error = event.error;
-    const details = errorRecord(errorRecord(error)?.data) ?? errorRecord(error);
-    const status = details?.statusCode ?? details?.status;
-    const message = details?.message ?? (typeof error === "string" ? error : undefined);
-    if (status !== 429 && !(typeof message === "string" && /rate limit/i.test(message))) continue;
-    found = typeof message === "string" ? message : "HTTP 429 from the model provider";
+export function parseFxRateLimit(result: FxResult | undefined, stderr: string): string | undefined {
+  const recovery = result?.recovery ? JSON.stringify(result.recovery) : "";
+  for (const line of `${recovery}\n${stderr}`.split("\n")) {
+    if (RATE_LIMIT.test(line)) return line.trim().slice(0, 300);
   }
-  return found;
+  return undefined;
 }
 
-function errorRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null ? value as Record<string, unknown> : undefined;
-}
-
-export interface OpencodeRunResult {
+export interface FxRunResult {
   /** The process exited on its own, with code 0. */
   ok: boolean;
   code: number;
   timedOut: boolean;
-  usage: OpencodeUsage;
-  /** Last lines of stderr, for the run report. Never contains the API key. */
+  usage: FxUsage;
+  /** Last lines of stderr, for the run report. Never contains the Gateway key. */
   stderr: string;
   stdout: string;
   /**
-   * The provider's rate-limit message when the pass died on one, so a spent budget
-   * is reported as a budget condition rather than as material the model could not
-   * fold. `undefined` for every other failure.
+   * The provider's rate-limit message when the pass died on one, so a spent budget is
+   * reported as a budget condition rather than as material the model could not fold.
+   * `undefined` for every other failure.
    */
   rateLimited: string | undefined;
 }
 
-export interface OpencodeRunInput {
+export interface FxRunInput {
   root: string;
-  /** The agent to run; matches the `dcwg` entry in the repo's `opencode.json`. */
-  agent: string;
   /** The brief, already written to disk by the caller. */
   briefPath: string;
+  /** The agent's standing instructions, handed in with `--system`. */
+  system: string;
+  /** Gateway model id, e.g. `nvidia/nemotron-3.5-lightning-free`. */
   model?: string;
   timeoutMs?: number;
   /** Path to the CLI, for tests and for a pin that is not on PATH. */
@@ -299,30 +320,40 @@ export interface OpencodeRunInput {
 /**
  * Run one pass and wait for it.
  *
- * The prompt is a fixed sentence naming the brief, rather than the brief itself.
- * The brief goes in as a file the agent reads with its own tool, which keeps the
- * capture out of an argument list: measured 2026-10-16, the pending
- * `#brainstorm` capture alone is 115,516 bytes, and Linux caps a single argument
- * at 128 KiB, so a venue that grows a little would fail an exec rather than
- * truncate it.
+ * The prompt is a fixed sentence naming the brief, rather than the brief itself. The
+ * brief goes in as a file the agent reads with its own tool, which keeps the capture out
+ * of an argument list: measured 2026-10-16, the pending `#brainstorm` capture alone is
+ * 115,516 bytes, and Linux caps a single argument at 128 KiB, so a venue that grows a
+ * little would fail an exec rather than truncate it. The standing instructions do ride in
+ * an argument, through `--system`, because they are a fixed 4 KB file that replaces the
+ * built-in base prompt; `AGENTS.md` is read by fx itself.
+ *
+ * `--no-save` keeps no session state between runs, and `FX_PROVIDER` pins the Gateway so
+ * a machine's own default provider cannot serve an automation pass. `FX_AUTO_UPGRADE=0`
+ * keeps the binary from replacing itself mid-run, which matters because the version
+ * decides the tool set and the shape of the envelope parsed above.
  */
-export async function runOpencode(input: OpencodeRunInput): Promise<OpencodeRunResult> {
-  const bin = input.bin ?? Deno.env.get("DCWG_OPENCODE_BIN") ?? "opencode";
+export async function runFx(input: FxRunInput): Promise<FxRunResult> {
+  const bin = input.bin ?? Deno.env.get("DCWG_FX_BIN") ?? "fx";
   const timeoutMs = input.timeoutMs ?? 900_000;
   const command = new Deno.Command(bin, {
     cwd: input.root,
     args: [
-      "run",
-      "--agent",
-      input.agent,
-      "--format",
-      "json",
+      "ask",
+      "--json",
+      "--no-save",
+      "--system",
+      input.system,
       ...(input.model ? ["--model", input.model] : []),
       `Read ${input.briefPath} and carry out the instructions in it.`,
     ],
     stdout: "piped",
     stderr: "piped",
-    env: { ...Deno.env.toObject(), OPENCODE_DISABLE_AUTOUPDATE: "1" },
+    env: {
+      ...Deno.env.toObject(),
+      FX_AUTO_UPGRADE: "0",
+      FX_PROVIDER: "gateway",
+    },
   });
 
   const child = command.spawn();
@@ -341,14 +372,15 @@ export async function runOpencode(input: OpencodeRunInput): Promise<OpencodeRunR
     const decoder = new TextDecoder();
     const stdout = decoder.decode(output.stdout);
     const stderr = decoder.decode(output.stderr);
+    const result = parseFxResult(stdout);
     return {
       ok: !timedOut && output.code === 0,
       code: output.code,
       timedOut,
-      usage: parseUsage(stdout),
+      usage: fxUsage(result),
       stderr: stderr.trim().split("\n").slice(-20).join("\n"),
       stdout,
-      rateLimited: parseRateLimit(stdout),
+      rateLimited: parseFxRateLimit(result, stderr),
     };
   } finally {
     clearTimeout(timer);
@@ -373,6 +405,7 @@ export async function cleanBrief(root: string): Promise<void> {
     // nothing to clean
   }
 }
+
 /**
  * The marker that tells the workflow `wiki/` is safe to commit.
  *
@@ -402,43 +435,68 @@ export async function writePagesOk(root: string, ok: boolean): Promise<void> {
   await Deno.mkdir(`${root}/.dcwg`, { recursive: true });
   await Deno.writeTextFile(path, `${new Date().toISOString()}\n`);
 }
+
 /**
- * The step ceiling a pass falls back to when `opencode.json` does not name one.
+ * Where the pass's step ceiling lives in the repo.
  *
- * Matches the `dcwg` agent's own `steps`, so a config the connector cannot read
- * budgets the pass the same way the config it can read does.
+ * fx splits its configuration by scope: `~/.fx/settings.json` holds the per-machine
+ * settings, including the permission rules, and a workspace's `.fx.json` holds the
+ * per-repo ones. Only the second can be committed, which is why the ceiling is read from
+ * here and the rules are written by the workflow.
+ */
+export const FX_CONFIG_PATH = ".fx.json";
+
+/** The agent's standing instructions, relative to the repo root. */
+export const STANDING_INSTRUCTIONS_PATH = "tools/discord/prompt/dcwg.md";
+
+/**
+ * Read the agent's standing instructions.
+ *
+ * Throws rather than returning a default: a pass with no rules is a pass that writes
+ * whatever it likes, and a missing prompt file is a broken checkout, not a reason to run
+ * the model ungoverned.
+ */
+export function readStandingInstructions(root: string): Promise<string> {
+  return Deno.readTextFile(`${root}/${STANDING_INSTRUCTIONS_PATH}`);
+}
+
+/**
+ * The step ceiling a pass falls back to when `.fx.json` does not name one.
+ *
+ * Matches the `max_agent_steps` a working config uses. A ceiling that bounds nothing is
+ * worse than a low one: the pass is capped by fx itself, and this number is only what the
+ * connector reports when the file it reads is missing or unreadable.
  */
 export const DEFAULT_AGENT_STEPS = 24;
 
 /**
- * Read an agent's step ceiling out of a parsed `opencode.json`.
+ * Read a step ceiling out of a parsed `.fx.json`.
  *
- * `steps` is what bounds a pass, and it is what a pass costs: opencode emits one
- * `step_finish` per model request, so the ceiling is the worst-case spend in requests.
- * The connector needs that number to decide whether the day can pay for an attempt at
- * all, and it reads it from the config rather than restating it, because the ceiling
- * that bounds the pass is the one opencode actually applies.
+ * `max_agent_steps` bounds an fx pass, and it is read from the config rather than
+ * restated here because the ceiling that bounds the pass is the one fx applies.
+ *
+ * Measured 2026-10-18 on 0.0.14: a workspace configured with `{"max_agent_steps": 2}`
+ * stopped after six tool calls, printed "Agent step limit reached", and exited non-zero
+ * with the task unfinished. So one agent step is not one tool call, and the connector
+ * counts neither as model requests: what a run spends is read from the pass's own
+ * token usage, which is what the Gateway bills.
  */
-export function agentSteps(config: unknown, agent: string): number {
-  const agents = (config as { agent?: Record<string, unknown> } | null)?.agent;
-  const entry = agents?.[agent] as { steps?: unknown } | undefined;
-  const steps = entry?.steps;
+export function fxSteps(config: unknown): number {
+  const steps = (config as { max_agent_steps?: unknown } | null)?.max_agent_steps;
   return typeof steps === "number" && Number.isInteger(steps) && steps > 0
     ? steps
     : DEFAULT_AGENT_STEPS;
 }
 
 /**
- * `agentSteps` for the repo on disk.
+ * `fxSteps` for the repo on disk.
  *
  * Answers the fallback rather than throwing when the file is missing or unreadable: a
- * budget decision must not be the thing that fails a run, and an unreadable config is
- * not evidence that the pass is free.
+ * report must not be the thing that fails a run.
  */
-export async function readAgentSteps(root: string, agent: string): Promise<number> {
+export async function readFxSteps(root: string): Promise<number> {
   try {
-    const config = JSON.parse(await Deno.readTextFile(`${root}/opencode.json`));
-    return agentSteps(config, agent);
+    return fxSteps(JSON.parse(await Deno.readTextFile(`${root}/${FX_CONFIG_PATH}`)));
   } catch {
     return DEFAULT_AGENT_STEPS;
   }

@@ -11,9 +11,8 @@
     "@std/cli": "jsr:@std/cli@^1",
     "@std/yaml": "jsr:@std/yaml@^1",
     "ai": "npm:ai@^7.0.0",
-    "@ai-sdk/anthropic": "npm:@ai-sdk/anthropic@^4.0.0",
+    "@ai-sdk/gateway": "npm:@ai-sdk/gateway@^4.0.0",
     "zod": "npm:zod@^4.0.0",
-    "@openrouter/ai-sdk-provider": "npm:@openrouter/ai-sdk-provider@^3.0.0",
     "@wazoo/wiki": "jsr:@wazoo/wiki@^0.6.0",
     "@std/path": "jsr:@std/path@^1"
   },

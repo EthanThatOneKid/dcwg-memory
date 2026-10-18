@@ -10,6 +10,6 @@ _site/
 secrets/
 .ruff_cache/
 
-# The wiki pass: opencode keeps its own workspace and the connector its brief
-.opencode/
+# The wiki pass: fx keeps its own workspace and the connector its brief
+.fx/
 .dcwg/

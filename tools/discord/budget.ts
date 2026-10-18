@@ -1,38 +1,37 @@
 /**
- * What the inference provider says is left of the day's free budget.
+ * What the inference provider says is left to spend.
  *
- * The reason this exists at all: the OpenRouter free tier is capped by
- * **requests**, not tokens. Measured 2026-10-17 against the connector's own key,
- * `GET /api/v1/auth/key` answers
+ * On the Vercel AI Gateway the unit is money, not requests. The Gateway bills tokens at
+ * the provider's list price and every team gets $5 of credits a month, so the question a
+ * run has to answer is not "how many requests do I have" but "can these credits pay for
+ * a pass". Measured 2026-10-18 against the connector's own key:
  *
- *   "is_free_tier": true,
- *   "usage": 0,
- *   "free_model_daily_requests": { "used": 51, "limit": 50, "remaining": 0 }
+ *   GET /v1/credits -> { "balance": "4.513395538", "total_used": "1.692157662" }
  *
- * and the failing call carried `x-ratelimit-limit: 50`,
- * `x-ratelimit-remaining: 0`. Capping tokens would therefore bound nothing on this
- * path: one agentic step is one request whatever it carries, so a 594-message
- * backfill and a three-message day cost the same until the agent runs out of
- * steps. `steps` in `opencode.json` is the number that decides the spend, and this
- * module is how a run learns whether it can afford to start.
+ * which is read here and nowhere else. The previous provider metered free-model requests
+ * (50 a day, 1,000 after $10 of credits), and that is a ceiling an agentic pass can spend
+ * in two runs; credits are not, because a free model costs nothing and a paid one costs
+ * what it costs.
  *
- * Two tiers, per OpenRouter's published limits: 50 free-model requests per day
- * until $10 of credits have been bought at any point, then 1,000 per day,
- * permanently. The 20-requests-per-minute limit is unchanged by credits.
+ * So a run asks two things and multiplies them: what is left of the balance, and what one
+ * pass costs at the model this run was pointed at. The second comes from the Gateway's own
+ * catalogue price for that model and this connector's own measurement of what a pass
+ * spends, which is why it is an estimate rather than a quote.
  */
 
-/** The free-model counters an OpenRouter key publishes. */
-export interface ModelBudget {
-  /** Requests per day this account is allowed on free models. */
-  limit: number;
-  /** Requests already spent today. */
-  used: number;
-  /** What is left of `limit`. */
-  remaining: number;
+/** The Gateway's credit ledger for the team the key belongs to. */
+export interface GatewayCredits {
+  /** Remaining balance, in USD. */
+  balanceUsd: number;
+  /** Lifetime spend, in USD. */
+  totalUsedUsd: number;
 }
 
-/** Where OpenRouter reports the limits and usage of the key that was presented. */
-export const OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/auth/key";
+/** Where the Gateway reports the team's balance. */
+export const GATEWAY_CREDITS_URL = "https://ai-gateway.vercel.sh/v1/credits";
+
+/** Where the Gateway publishes every model it serves, with prices. */
+export const GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -40,33 +39,30 @@ function record(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function count(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+/** A money or price field, which the Gateway publishes as a string. */
+function amount(value: unknown): number | undefined {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : undefined;
 }
 
 /**
- * Read the free-model counters out of an `/api/v1/auth/key` body.
+ * Read the balance out of a `/v1/credits` body.
  *
- * Pure, so the shapes can be pinned by a test without a network call. Accepts both
- * the wrapped body the endpoint returns today (`{ "data": { ... } }`) and the
- * counters at the top level, because a shape change there should degrade to "no
- * budget was reported" rather than to a throw. Anything else, including a paid key
- * with no free-model counters, is `undefined`.
+ * Pure, so the shape can be pinned by a test without a network call. The endpoint returns
+ * both fields as decimal strings; a number is accepted too, so a shape change degrades to
+ * the right answer instead of to "no budget was reported". Anything missing either field
+ * is `undefined`.
  */
-export function parseModelBudget(payload: unknown): ModelBudget | undefined {
-  const unwrap = (source: Record<string, unknown> | undefined): ModelBudget | undefined => {
-    const counters = record(source?.["free_model_daily_requests"]);
-    const limit = count(counters?.["limit"]);
-    const used = count(counters?.["used"]);
-    const remaining = count(counters?.["remaining"]);
-    if (limit === undefined || used === undefined || remaining === undefined) return undefined;
-    return { limit, used, remaining };
-  };
+export function parseGatewayCredits(payload: unknown): GatewayCredits | undefined {
   const root = record(payload);
-  return unwrap(record(root?.["data"])) ?? unwrap(root);
+  if (!root) return undefined;
+  const balanceUsd = amount(root["balance"]);
+  const totalUsedUsd = amount(root["total_used"]);
+  if (balanceUsd === undefined || totalUsedUsd === undefined) return undefined;
+  return { balanceUsd, totalUsedUsd };
 }
 
-export interface BudgetProbeOptions {
+export interface CreditsProbeOptions {
   /** The key to ask about. Never logged, never returned. */
   apiKey: string;
   /** Overridden in tests. */
@@ -76,45 +72,132 @@ export interface BudgetProbeOptions {
 }
 
 /**
- * Ask the provider what is left of today's free requests.
+ * Ask the Gateway what is left of the balance.
  *
  * Best-effort by construction: it answers `undefined` rather than throwing when the
- * endpoint is unreachable, the key is rejected, the body is not JSON, or the shape
- * is one `parseModelBudget` does not know. A run must not fail because its budget
- * could not be read, so "no answer" is the only outcome a caller has to handle, and
- * it is the same outcome as "no budget applies here".
+ * endpoint is unreachable, the key is rejected, the body is not JSON, or the shape is one
+ * `parseGatewayCredits` does not know. A run must not fail because its budget could not be
+ * read, so "no answer" is the only outcome a caller has to handle, and it is the same
+ * outcome as "no budget applies here".
  *
- * This call is free: reading a key's limits does not spend a free-model request.
+ * This call is free: reading a balance spends nothing.
  */
-export async function probeModelBudget(
-  options: BudgetProbeOptions,
-): Promise<ModelBudget | undefined> {
+export async function probeGatewayCredits(
+  options: CreditsProbeOptions,
+): Promise<GatewayCredits | undefined> {
   const fetchImpl = options.fetchImpl ?? fetch;
   try {
-    const response = await fetchImpl(options.url ?? OPENROUTER_KEY_URL, {
+    const response = await fetchImpl(options.url ?? GATEWAY_CREDITS_URL, {
       headers: { Authorization: `Bearer ${options.apiKey}` },
     });
     if (!response.ok) return undefined;
-    return parseModelBudget(await response.json());
+    return parseGatewayCredits(await response.json());
   } catch {
     return undefined;
   }
 }
 
 /** One line for the run log, and the phrase the deferred-fold message is built from. */
-export function describeModelBudget(budget: ModelBudget | undefined): string {
-  return budget === undefined
-    ? "free-model budget: not reported by the provider"
-    : `free-model budget: ${budget.remaining} of ${budget.limit} request(s) left today (${budget.used} used)`;
+export function describeGatewayCredits(credits: GatewayCredits | undefined): string {
+  return credits === undefined
+    ? "gateway credits: not reported by the provider"
+    : `gateway credits: $${credits.balanceUsd.toFixed(2)} left, ${
+      credits.totalUsedUsd.toFixed(2)
+    } spent`;
 }
+
+/** What the Gateway charges for a model, per token, in USD. */
+export interface ModelPrice {
+  inputUsdPerToken: number;
+  outputUsdPerToken: number;
+}
+
+/**
+ * Read one model's price out of a `/v1/models` body.
+ *
+ * Prices are per token, as decimal strings. Tiered models publish their dearest tier on
+ * the top-level `input`/`output` fields, which is the right direction to be wrong in: a
+ * pass that reads a long capture is exactly the pass that would reach a higher tier.
+ *
+ * `undefined` when the model is not in the catalogue, which the caller has to treat as
+ * "this pass cannot be priced" rather than as "this pass is free".
+ */
+export function parseModelPrice(payload: unknown, modelId: string): ModelPrice | undefined {
+  const models = record(payload)?.["data"];
+  if (!Array.isArray(models)) return undefined;
+  for (const entry of models) {
+    const model = record(entry);
+    if (model?.["id"] !== modelId) continue;
+    const pricing = record(model["pricing"]);
+    const inputUsdPerToken = amount(pricing?.["input"]);
+    const outputUsdPerToken = amount(pricing?.["output"]);
+    if (inputUsdPerToken === undefined || outputUsdPerToken === undefined) return undefined;
+    return { inputUsdPerToken, outputUsdPerToken };
+  }
+  return undefined;
+}
+
+export interface PriceProbeOptions extends CreditsProbeOptions {
+  /** The Gateway model id to price, e.g. `nvidia/nemotron-3.5-lightning-free`. */
+  modelId: string;
+}
+
+/** Ask the Gateway what a model costs. `undefined` for anything it cannot answer. */
+export async function probeModelPrice(
+  options: PriceProbeOptions,
+): Promise<ModelPrice | undefined> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  try {
+    const response = await fetchImpl(options.url ?? GATEWAY_MODELS_URL, {
+      headers: { Authorization: `Bearer ${options.apiKey}` },
+    });
+    if (!response.ok) return undefined;
+    return parseModelPrice(await response.json(), options.modelId);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * What one pass spends, measured rather than assumed.
+ *
+ * The 594-message `#brainstorm` capture folded on 2026-10-18 on
+ * `nvidia/nemotron-3.5-lightning-free`: 966,946 input and 19,488 output tokens over 39
+ * tool calls. A day's capture is usually far smaller, so this is the shape of a backlog
+ * pass, and pricing it against the catalogue is what turns a balance into an attempt
+ * count. It is an estimate of a whole pass, not a ceiling on one.
+ */
+export const MEASURED_PASS_TOKENS = { input: 966_946, output: 19_488 } as const;
+
+/**
+ * Price one pass at a model.
+ *
+ * `undefined` when the model could not be priced, `0` when the model is free. The two are
+ * different and the caller must not conflate them: a free model is genuinely unlimited
+ * apart from the provider's own rate limits, while an unpriced model is a model whose
+ * spend nothing is bounding.
+ */
+export function estimatePassCostUsd(price: ModelPrice | undefined): number | undefined {
+  if (price === undefined) return undefined;
+  return MEASURED_PASS_TOKENS.input * price.inputUsdPerToken +
+    MEASURED_PASS_TOKENS.output * price.outputUsdPerToken;
+}
+
+/** One line for the run log, saying what a pass is expected to cost and why. */
+export function describePassCost(passCostUsd: number | undefined): string {
+  if (passCostUsd === undefined) return "one pass costs: not priced by the Gateway catalogue";
+  if (passCostUsd === 0) return "one pass costs: nothing, the model is free";
+  return `one pass costs about $${passCostUsd.toFixed(4)}`;
+}
+
 /**
  * This run's place in the day's schedule of runs.
  *
- * The free allowance is shared by everything that runs that day, and the workflow
- * serves its venues one process at a time, so a run that spends the whole remainder
- * starves every run after it. `--budget-share <i>/<n>` says which of the day's n runs
- * this is, which is what keeps a later venue's small daily delta affordable while an
- * earlier venue still owes the wiki a backlog.
+ * The balance is shared by everything that runs that day, and the workflow serves its
+ * venues one process at a time, so a run that spends the whole remainder starves every run
+ * after it. `--budget-share <i>/<n>` says which of the day's n runs this is, which is what
+ * keeps a later venue's small daily delta affordable while an earlier venue still owes the
+ * wiki a backlog.
  */
 export interface BudgetShare {
   /** 1-based position in the day's schedule. */
@@ -136,31 +219,32 @@ export function parseBudgetShare(value: string): BudgetShare {
 }
 
 /**
- * What this run may spend, in model requests, out of what the provider reports left.
+ * What this run may spend, in USD, out of what the Gateway reports left.
  *
- * Divided by the runs still to come, this one included, so an early venue cannot spend
- * a later venue's share. The last run of the day sees the remainder and takes all of
- * it. A spent budget answers 0, which is the same answer as a share too small to be
+ * Divided by the runs still to come, this one included, so an early venue cannot spend a
+ * later venue's share. The last run of the day sees the remainder and takes all of it.
+ * An exhausted balance answers 0, which is the same answer as a share too small to be
  * worth spending.
  */
-export function budgetAllowance(budget: ModelBudget, share: BudgetShare): number {
+export function creditAllowance(credits: GatewayCredits, share: BudgetShare): number {
   const stillToCome = share.count - share.index + 1;
-  return Math.max(0, Math.floor(budget.remaining / stillToCome));
+  return Math.max(0, credits.balanceUsd / stillToCome);
 }
 
 /**
  * How many attempts an allowance can pay for.
  *
- * One agentic attempt spends one request per step, so an attempt costs its agent's step
- * ceiling whatever it carries: 24 steps is 24 requests, whether the capture holds 594
- * messages or three. Zero means the allowance cannot pay for a single pass, and the
- * caller defers the fold rather than spending the day on 429s.
+ * A free model costs nothing per pass, so the allowance buys every attempt the caller
+ * asked for; what bounds it is the provider's own rate limit, which fx retries through and
+ * the connector reports when it gives up. A priced model buys `allowanceUsd / passCostUsd`
+ * attempts, and zero means the allowance cannot pay for one pass: the caller defers the
+ * fold rather than starting a pass that will stop halfway.
  */
 export function affordableAttempts(
-  allowance: number,
-  stepsPerAttempt: number,
+  allowanceUsd: number,
+  passCostUsd: number,
   wanted: number,
 ): number {
-  if (stepsPerAttempt <= 0) return wanted;
-  return Math.max(0, Math.min(wanted, Math.floor(allowance / stepsPerAttempt)));
+  if (!(passCostUsd > 0)) return wanted;
+  return Math.max(0, Math.min(wanted, Math.floor(allowanceUsd / passCostUsd)));
 }

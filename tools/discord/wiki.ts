@@ -7,12 +7,11 @@
  *   writePage()    apply one edit
  *   revert()       put the snapshot back, used when a gate rejects the result
  *
- * Provider is the Vercel AI SDK with the Anthropic provider. Model and key are
+ * Inference is the Vercel AI SDK on the Vercel AI Gateway. Model and key are
  * injectable so the pass can be exercised without a live key.
  */
 
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createGateway } from "@ai-sdk/gateway";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import {
@@ -24,26 +23,18 @@ import {
   WIKI_PREFIX,
 } from "./guard.ts";
 
-/** Sonnet-class by default: the pass writes prose into a public record, so a
- *  small model is the wrong floor. Override with --model. */
-export const DEFAULT_MODEL = "claude-sonnet-4-5";
+/**
+ * The free model by default, because it costs nothing to run and the Gateway
+ * meters it by rate rather than by the day. Override with --model; any model id
+ * the Gateway publishes works, and a paid one is bounded by the credit probe in
+ * `budget.ts` rather than by this default.
+ *
+ * The id is the Gateway's own `vendor/model`, not a bare model name.
+ */
+export const DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning-free";
 
-/** The default when inference runs on OpenRouter instead of Anthropic. Verified
- *  2026-10-12 to honour a strict json_schema response format at zero cost, which
- *  is what the structured page-edit output needs. Override with --model. */
-export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
-
-export type Provider = "anthropic" | "openrouter";
-
-/** Which provider to use: explicit wins, otherwise whichever key is present. */
-export function resolveProvider(explicit?: Provider): Provider {
-  if (explicit) return explicit;
-  return Deno.env.get("OPENROUTER_API_KEY") ? "openrouter" : "anthropic";
-}
-
-function keyNameFor(provider: Provider): string {
-  return provider === "openrouter" ? "OPENROUTER_API_KEY" : "ANTHROPIC_API_KEY";
-}
+/** The one credential this repo's inference uses, for either editor. */
+export const GATEWAY_KEY_NAME = "AI_GATEWAY_API_KEY";
 
 /** Per-page and per-capture caps so a long history cannot blow the budget. */
 export const PAGE_CHAR_CAP = 8_000;
@@ -189,8 +180,6 @@ export interface WikiPassInput {
    */
   offset?: number;
   model?: string;
-  /** Which provider to run on; defaults to whichever API key is present. */
-  provider?: Provider;
   apiKey?: string;
   /** Page snapshot to send instead of reading the tree. Used by tests. */
   pages?: Array<{ path: string; text: string }>;
@@ -496,12 +485,12 @@ async function dumpProposal(
  * the model's proposal was refused. Writes nothing on the rejected path.
  */
 export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult> {
-  const providerName = input.provider ?? resolveProvider();
-  const apiKey = input.apiKey ?? Deno.env.get(keyNameFor(providerName));
+  const apiKey = input.apiKey ?? Deno.env.get(GATEWAY_KEY_NAME);
   if (!apiKey) {
     throw new Error(
-      `the wiki pass needs an API key: set ${keyNameFor(providerName)} ` +
-        `(OPENROUTER_API_KEY runs the free models), or pass --skip-wiki`,
+      `the wiki pass needs an API key: set ${GATEWAY_KEY_NAME} to a Vercel AI
+` +
+        `Gateway key, or pass --skip-wiki`,
     );
   }
 
@@ -510,11 +499,8 @@ export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult>
     await Deno.readTextFile(`${input.root}/${input.capturePath}`);
   const lastUpdated = input.lastUpdated ?? await readLastUpdated(input.root);
 
-  const defaultModel = providerName === "openrouter" ? DEFAULT_OPENROUTER_MODEL : DEFAULT_MODEL;
-  const modelId = input.model ?? defaultModel;
-  const provider = providerName === "openrouter"
-    ? createOpenRouter({ apiKey })
-    : createAnthropic({ apiKey });
+  const modelId = input.model ?? DEFAULT_MODEL;
+  const provider = createGateway({ apiKey });
   // The AI SDK's generateText is heavily overloaded; narrow it once, here, to
   // the shape the pass actually reads.
   const generate = (input.generate ?? generateText) as unknown as PassGenerate;
