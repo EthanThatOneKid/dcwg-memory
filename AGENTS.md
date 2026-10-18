@@ -245,26 +245,38 @@ tokens would bound nothing on this path: an agentic step is one request whatever
 carries, so a 594-message backfill and a three-message day cost the same until the
 agent runs out of steps.
 
-What a run has to fit is therefore requests, and the ceiling is easy to exceed.
-`opencode.json` caps the agent at 24 steps, `--attempts` defaults to 2, and the cron
-runs two venues, so the worst case is 96 requests against a budget of 50. One
-venue's two attempts over the 594-message backfill spent a whole day on 2026-10-17
-and left the next run answering 429 to its first request, which is what made a
-healthy venue look like a venue with bad content.
+The automation stays on `nvidia/nemotron-3-super-120b-a12b:free`, by Ethan's call on
+2026-10-18: the free tier is the budget, and the schedule fits it rather than the
+other way round. So what a run has to fit is requests, and the ceiling is easy to
+exceed. `opencode.json` caps the agent at 24 steps, `--attempts` defaults to 2, and
+the cron runs two venues, so the worst case is 96 requests against a budget of 50.
+One venue's two attempts over the 594-message backfill spent a whole day on
+2026-10-17 and left the next run answering 429 to its first request, which is what
+made a healthy venue look like a venue with bad content.
 
 `tools/discord/budget.ts` is how a run learns what it can afford. Before each fold
 the connector asks the provider what is left of the day, logs it, and does not start
-a pass it cannot pay for. A fold that never reached the model is reported as a
-budget condition rather than a stall, because `stalls` counts runs that failed to
-fold material and a pass the provider refused judged nothing; the status stays
-`NEEDS_ATTENTION` either way, since `VALID_STATUSES` mirrors the hub's contract.
+a pass it cannot pay for. The day is shared rather than first come: the workflow runs
+each venue with `--budget-share <i>/<n>`, and a venue's share is what the provider
+reports left divided by the runs still to come, so a venue holding a backlog cannot
+spend a later venue's allowance. A share buys attempts at the agent's own step
+ceiling, which the connector reads from `opencode.json` rather than restating: at 50
+requests over two venues each venue gets 25, which is one 24-step pass, so a free day
+is one pass per venue and a fold that needs a second attempt waits for tomorrow's
+budget. A share that cannot pay for a single pass defers the fold without calling the
+model at all. A fold that never reached the model is reported as a budget condition
+rather than a stall, because `stalls` counts runs that failed to fold material and a
+pass the provider refused judged nothing; the status stays `NEEDS_ATTENTION` either
+way, since `VALID_STATUSES` mirrors the hub's contract.
 
-To go past 50 requests a day without spending money, point `--model` at a provider
-with more headroom. `google/gemini-2.5-flash` is a built-in opencode provider on
-roughly 1,500 free requests a day, and opencode's own `opencode/*-free` models
-answer with no credential at all, verified 2026-10-17 driving the agent loop through
-a `read` and a `write` at a total cost of 0. Either one is billed by that provider,
-so the connector skips the OpenRouter probe when `--model` names a different one.
+If the free tier proves too tight for the material, three verified ways out are on
+record, and none of them changes the connector: $10 of OpenRouter credits raises the
+same key to 1,000 requests a day permanently; `google/gemini-2.5-flash` is a built-in
+opencode provider on roughly 1,500 free requests a day; and opencode's own
+`opencode/*-free` models answer with no credential at all, verified 2026-10-17
+driving the agent loop through a `read` and a `write` at a total cost of 0. Each of
+the last two is billed by that provider, so the connector skips the OpenRouter probe
+when `--model` names a different one.
 
 ## Maintaining the wiki: the self-healing pass
 

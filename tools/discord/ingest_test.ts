@@ -42,10 +42,21 @@ function apiMessages(): DiscordMessage[] {
   ];
 }
 
-function stubFetch(): () => void {
+/**
+ * The API, stubbed: Discord answers, and the provider's key endpoint answers whatever
+ * budget the caller wants a run to see.
+ *
+ * The budget body is part of the stub because the connector's governance reads it
+ * before every fold, so a test of what a run does with a spent day has to be able to
+ * tell it the day is spent.
+ */
+function stubFetch(keyBody?: unknown): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = ((input: string | URL | Request) => {
     const url = new URL(String(input));
+    if (url.hostname === "openrouter.ai") {
+      return Promise.resolve(Response.json(keyBody ?? {}));
+    }
     if (url.pathname === `/api/v10/channels/${CHANNEL}`) {
       return Promise.resolve(
         new Response(JSON.stringify({ id: CHANNEL, name: "talk" }), { status: 200 }),
@@ -99,6 +110,62 @@ async function withEnv(fn: () => Promise<void>): Promise<void> {
     else Deno.env.set(TOKEN_ENV, prior);
   }
 }
+/**
+ * Run a test with a stubbed API that reports a free-model budget, and a stand-in for
+ * the page-pass CLI that records being started.
+ *
+ * Both halves matter. The budget decides whether the connector starts a pass at all,
+ * and the stand-in is how "it did not start one" becomes an observation instead of an
+ * assumption: a run that never spawns it never writes the marker.
+ */
+async function withBudgetEnv(keyBody: unknown, fn: (bin: string, marker: string) => Promise<void>) {
+  const restoreFetch = stubFetch(keyBody);
+  const dir = await Deno.makeTempDir();
+  const bin = `${dir}/opencode-stand-in`;
+  const marker = `${dir}/started`;
+  await Deno.writeTextFile(bin, `#!/bin/sh\ntouch '${marker}'\nexit 1\n`);
+  await Deno.chmod(bin, 0o755);
+  const priorToken = Deno.env.get(TOKEN_ENV);
+  const priorKey = Deno.env.get("OPENROUTER_API_KEY");
+  const priorBin = Deno.env.get("DCWG_OPENCODE_BIN");
+  Deno.env.set(TOKEN_ENV, "test-token-not-real");
+  Deno.env.set("OPENROUTER_API_KEY", "test-key-not-real");
+  Deno.env.set("DCWG_OPENCODE_BIN", bin);
+  try {
+    await fn(bin, marker);
+  } finally {
+    restoreFetch();
+    const prior: Array<[string, string | undefined]> = [
+      [TOKEN_ENV, priorToken],
+      ["OPENROUTER_API_KEY", priorKey],
+      ["DCWG_OPENCODE_BIN", priorBin],
+    ];
+    for (const [name, value] of prior) {
+      if (value === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, value);
+    }
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+/** Whether a path exists, without throwing. */
+function exists(path: string): boolean {
+  try {
+    Deno.statSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The budget body the connector's own key returned on 2026-10-17, spent. */
+const SPENT_KEY_BODY = {
+  data: {
+    is_free_tier: true,
+    usage: 0,
+    free_model_daily_requests: { limit: 50, used: 51, remaining: 0 },
+  },
+};
 
 const BASE = ["--channel", CHANNEL, "--venue", "dcwg-talk", "--skip-wiki", "--all"];
 /** The same run, but with the page pass left on, so the fold is attempted. */
@@ -407,5 +474,94 @@ Deno.test("--tag replaces the default tags instead of adding to them", async () 
       !capture.includes('- "dcwg"'),
       "the first explicit --tag replaces the defaults rather than adding to them",
     );
+  });
+});
+
+/**
+ * The folding invocation on the agentic editor, which is the one the budget governs.
+ *
+ * `--attempts 2` is deliberate: it is the configuration whose worst case the free tier
+ * cannot pay for, so the assertions below are about the run cutting that ceiling down
+ * to what the day actually has.
+ */
+const AGENTIC = [
+  "--channel",
+  CHANNEL,
+  "--venue",
+  "dcwg-talk",
+  "--all",
+  "--editor",
+  "opencode",
+  "--attempts",
+  "2",
+];
+
+/** A day with room in it, as the key endpoint reports one. */
+const FRESH_KEY_BODY = {
+  data: {
+    is_free_tier: true,
+    usage: 0,
+    free_model_daily_requests: { limit: 50, used: 12, remaining: 38 },
+  },
+};
+
+Deno.test("a spent day defers the fold without starting a pass", async () => {
+  await withBudgetEnv(SPENT_KEY_BODY, async (_bin, marker) => {
+    const root = await Deno.makeTempDir();
+    await seedWiki(root);
+    const { code, out } = await runCli([...AGENTIC, "--budget-share", "1/2", "--root", root]);
+
+    assertEquals(code, 1, "the wiki is still behind, so the run needs attention");
+    assertEquals(exists(marker), false, "a pass the day cannot pay for is never started");
+    assert(
+      out.some((line) => line.includes("fold deferred")),
+      "the run names the deferral rather than reporting a fold failure",
+    );
+
+    const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
+    assertEquals(
+      cursor._pending[0].stalls,
+      0,
+      "a budget condition is not a stall: no attempt judged the material",
+    );
+
+    const result = out.find((line) => line.startsWith("RESULT "));
+    assert(result, "the CLI still prints a machine-readable RESULT line");
+    const payload = JSON.parse(result.slice("RESULT ".length));
+    assertEquals(payload.status, "NEEDS_ATTENTION");
+    assertEquals(payload.attempts, 0, "the report says no attempt ran");
+    assert(
+      String(payload.budget).includes("cannot pay for one pass"),
+      "the payload says which constraint was hit",
+    );
+    assertEquals(payload.stalled, undefined, "a deferred fold is not reported as a stall");
+  });
+});
+
+Deno.test("a share that can pay for one pass starts it, and its failure is a stall", async () => {
+  await withBudgetEnv(FRESH_KEY_BODY, async (_bin, marker) => {
+    const root = await Deno.makeTempDir();
+    await seedWiki(root);
+    const { code, out } = await runCli([...AGENTIC, "--budget-share", "1/1", "--root", root]);
+
+    assertEquals(code, 1, "the stand-in pass fails, so the run needs attention");
+    assertEquals(exists(marker), true, "a pass the day can pay for is started");
+
+    const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
+    assertEquals(
+      cursor._pending[0].stalls,
+      1,
+      "this pass reached the model and failed, which is what a stall counts",
+    );
+
+    const result = out.find((line) => line.startsWith("RESULT "));
+    const payload = JSON.parse(result!.slice("RESULT ".length));
+    assertEquals(
+      payload.attempts,
+      1,
+      "38 requests buys one 24-step attempt, not the two --attempts asked for",
+    );
+    assertEquals(payload.budget, undefined, "this run was not budget-blocked");
+    assertEquals(payload.stalled, "raw/discord/2026-08-01_dcwg-talk.md");
   });
 });

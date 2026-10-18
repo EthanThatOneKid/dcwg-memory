@@ -402,3 +402,44 @@ export async function writePagesOk(root: string, ok: boolean): Promise<void> {
   await Deno.mkdir(`${root}/.dcwg`, { recursive: true });
   await Deno.writeTextFile(path, `${new Date().toISOString()}\n`);
 }
+/**
+ * The step ceiling a pass falls back to when `opencode.json` does not name one.
+ *
+ * Matches the `dcwg` agent's own `steps`, so a config the connector cannot read
+ * budgets the pass the same way the config it can read does.
+ */
+export const DEFAULT_AGENT_STEPS = 24;
+
+/**
+ * Read an agent's step ceiling out of a parsed `opencode.json`.
+ *
+ * `steps` is what bounds a pass, and it is what a pass costs: opencode emits one
+ * `step_finish` per model request, so the ceiling is the worst-case spend in requests.
+ * The connector needs that number to decide whether the day can pay for an attempt at
+ * all, and it reads it from the config rather than restating it, because the ceiling
+ * that bounds the pass is the one opencode actually applies.
+ */
+export function agentSteps(config: unknown, agent: string): number {
+  const agents = (config as { agent?: Record<string, unknown> } | null)?.agent;
+  const entry = agents?.[agent] as { steps?: unknown } | undefined;
+  const steps = entry?.steps;
+  return typeof steps === "number" && Number.isInteger(steps) && steps > 0
+    ? steps
+    : DEFAULT_AGENT_STEPS;
+}
+
+/**
+ * `agentSteps` for the repo on disk.
+ *
+ * Answers the fallback rather than throwing when the file is missing or unreadable: a
+ * budget decision must not be the thing that fails a run, and an unreadable config is
+ * not evidence that the pass is free.
+ */
+export async function readAgentSteps(root: string, agent: string): Promise<number> {
+  try {
+    const config = JSON.parse(await Deno.readTextFile(`${root}/opencode.json`));
+    return agentSteps(config, agent);
+  } catch {
+    return DEFAULT_AGENT_STEPS;
+  }
+}

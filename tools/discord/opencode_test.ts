@@ -1,9 +1,12 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
+  agentSteps,
+  DEFAULT_AGENT_STEPS,
   diffTree,
   outsideWiki,
   parseRateLimit,
   parseUsage,
+  readAgentSteps,
   renderBrief,
   restoreTree,
   snapshotTree,
@@ -218,4 +221,36 @@ Deno.test("parseRateLimit is undefined for a pass that failed on its own work", 
   ].join("\n");
   assertEquals(parseRateLimit(stream), undefined);
   assertEquals(parseRateLimit(""), undefined);
+});
+
+Deno.test("agentSteps reads the agent's own ceiling, and falls back when it cannot", () => {
+  assertEquals(agentSteps({ agent: { dcwg: { steps: 24 } } }, "dcwg"), 24);
+  assertEquals(agentSteps({ agent: { dcwg: { steps: 8 } } }, "dcwg"), 8);
+  // A config that names another agent, or names no ceiling, does not bound this one.
+  assertEquals(agentSteps({ agent: { other: { steps: 5 } } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps({ agent: { dcwg: {} } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  // A ceiling that is not a usable count is not a ceiling: zero would defer every fold,
+  // and a non-integer is not a number of requests.
+  assertEquals(agentSteps({ agent: { dcwg: { steps: 0 } } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps({ agent: { dcwg: { steps: 2.5 } } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps({ agent: { dcwg: { steps: "24" } } }, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps(undefined, "dcwg"), DEFAULT_AGENT_STEPS);
+  assertEquals(agentSteps("not a config", "dcwg"), DEFAULT_AGENT_STEPS);
+});
+
+Deno.test("readAgentSteps reads the repo's own opencode.json", async () => {
+  await withTempTree(
+    { "opencode.json": JSON.stringify({ agent: { dcwg: { steps: 12 } } }) },
+    async (root) => {
+      assertEquals(await readAgentSteps(root, "dcwg"), 12);
+    },
+  );
+  // A missing or unparsable config answers the fallback rather than failing the run:
+  // a budget decision must not be the thing that stops a capture.
+  await withTempTree({ "opencode.json": "{ not json" }, async (root) => {
+    assertEquals(await readAgentSteps(root, "dcwg"), DEFAULT_AGENT_STEPS);
+  });
+  await withTempTree({}, async (root) => {
+    assertEquals(await readAgentSteps(root, "dcwg"), DEFAULT_AGENT_STEPS);
+  });
 });

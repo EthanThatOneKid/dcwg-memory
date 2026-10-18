@@ -107,3 +107,60 @@ export function describeModelBudget(budget: ModelBudget | undefined): string {
     ? "free-model budget: not reported by the provider"
     : `free-model budget: ${budget.remaining} of ${budget.limit} request(s) left today (${budget.used} used)`;
 }
+/**
+ * This run's place in the day's schedule of runs.
+ *
+ * The free allowance is shared by everything that runs that day, and the workflow
+ * serves its venues one process at a time, so a run that spends the whole remainder
+ * starves every run after it. `--budget-share <i>/<n>` says which of the day's n runs
+ * this is, which is what keeps a later venue's small daily delta affordable while an
+ * earlier venue still owes the wiki a backlog.
+ */
+export interface BudgetShare {
+  /** 1-based position in the day's schedule. */
+  index: number;
+  /** How many runs share the day. */
+  count: number;
+}
+
+/** Parse `--budget-share <i>/<n>`. Throws on anything that is not a share. */
+export function parseBudgetShare(value: string): BudgetShare {
+  const match = /^(\d+)\/(\d+)$/.exec(value.trim());
+  if (!match) throw new Error(`--budget-share must look like <i>/<n>, not '${value}'`);
+  const index = Number(match[1]);
+  const count = Number(match[2]);
+  if (index < 1 || count < 1 || index > count) {
+    throw new Error(`--budget-share must satisfy 1 <= i <= n, not '${value}'`);
+  }
+  return { index, count };
+}
+
+/**
+ * What this run may spend, in model requests, out of what the provider reports left.
+ *
+ * Divided by the runs still to come, this one included, so an early venue cannot spend
+ * a later venue's share. The last run of the day sees the remainder and takes all of
+ * it. A spent budget answers 0, which is the same answer as a share too small to be
+ * worth spending.
+ */
+export function budgetAllowance(budget: ModelBudget, share: BudgetShare): number {
+  const stillToCome = share.count - share.index + 1;
+  return Math.max(0, Math.floor(budget.remaining / stillToCome));
+}
+
+/**
+ * How many attempts an allowance can pay for.
+ *
+ * One agentic attempt spends one request per step, so an attempt costs its agent's step
+ * ceiling whatever it carries: 24 steps is 24 requests, whether the capture holds 594
+ * messages or three. Zero means the allowance cannot pay for a single pass, and the
+ * caller defers the fold rather than spending the day on 429s.
+ */
+export function affordableAttempts(
+  allowance: number,
+  stepsPerAttempt: number,
+  wanted: number,
+): number {
+  if (stepsPerAttempt <= 0) return wanted;
+  return Math.max(0, Math.min(wanted, Math.floor(allowance / stepsPerAttempt)));
+}

@@ -34,12 +34,20 @@ import {
   nextCapturePath,
   renderCapture,
 } from "./capture.ts";
-import { describeModelBudget, probeModelBudget } from "./budget.ts";
+import {
+  affordableAttempts,
+  budgetAllowance,
+  describeModelBudget,
+  parseBudgetShare,
+  probeModelBudget,
+} from "./budget.ts";
 import { checkEditablePath, validateSummary } from "./guard.ts";
 import {
   cleanBrief,
+  DEFAULT_AGENT_STEPS,
   diffTree,
   outsideWiki,
+  readAgentSteps,
   renderBrief,
   restoreTree,
   runOpencode,
@@ -47,6 +55,8 @@ import {
   writeBrief,
   writePagesOk,
 } from "./opencode.ts";
+/** The `opencode.json` agent the page pass runs as. Also what its step ceiling is read for. */
+const PASS_AGENT = "dcwg";
 import {
   buildPrompt,
   CAPTURE_CHAR_CAP,
@@ -63,7 +73,7 @@ import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
 import type { PageEdit, Provider } from "./wiki.ts";
-import type { ModelBudget } from "./budget.ts";
+import type { BudgetShare, ModelBudget } from "./budget.ts";
 import type { PendingFold } from "./pending.ts";
 
 const USAGE = `dcwg-memory Discord connector
@@ -101,6 +111,11 @@ Options:
                         (default 900)
   --attempts <n>        how many times the page pass may be retried against the gates
                         (default 2: one retry, because the usual failure is correctable)
+  --budget-share <i>/<n>
+                        this run's place in the day's schedule of runs that share the
+                        free-model budget (default 1/1). Its share is what the provider
+                        reports left divided by the runs still to come, so an early
+                        venue cannot spend a later venue's allowance
   --drain               fold every capture this venue still owes the wiki, not just the
                         oldest one (default: one fold per run, so a backlog drains over
                         several runs instead of overrunning the job's own time limit)
@@ -136,6 +151,8 @@ interface Args {
   noGates: boolean;
   /** How many times the page pass may be retried against the gates. */
   attempts: number;
+  /** This run's place in the day's schedule of runs sharing the free-model budget. */
+  budgetShare: BudgetShare;
   /** Fold every capture this venue still owes the wiki, not just the oldest. */
   drain: boolean;
   /** How many folds one --drain run may attempt, so a backlog cannot overrun the job. */
@@ -168,6 +185,7 @@ function parseCliArgs(argv: string[]): Args {
         "editor",
         "pass-timeout",
         "attempts",
+        "budget-share",
         "drain-max",
       ],
       boolean: ["all", "drain", "skip-wiki", "no-gates", "dry-run", "help"],
@@ -219,6 +237,10 @@ function parseCliArgs(argv: string[]): Args {
   if (editor !== undefined && editor !== "opencode" && editor !== "api") {
     throw new Error(`--editor must be opencode or api, not '${editor}'`);
   }
+  const budgetShareRaw = str("budget-share");
+  const budgetShare = budgetShareRaw === undefined
+    ? { index: 1, count: 1 }
+    : parseBudgetShare(budgetShareRaw);
   const drainMaxRaw = str("drain-max");
   let drainMax = 6;
   if (drainMaxRaw !== undefined) {
@@ -250,6 +272,7 @@ function parseCliArgs(argv: string[]): Args {
     passTimeoutSec: num("pass-timeout", 900),
     noGates: parsed["no-gates"] === true,
     attempts: num("attempts", 2),
+    budgetShare,
     drain: parsed.drain === true,
     drainMax,
     dryRun: parsed["dry-run"] === true,
@@ -595,6 +618,21 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   const foldCeiling = args.drain ? args.drainMax : 1;
 
   /**
+   * What one attempt costs, in model requests.
+   *
+   * opencode emits one `step_finish` per model request, so an agent's step ceiling is
+   * its pass's worst-case spend, and the ceiling that bounds the pass is the one
+   * `opencode.json` actually applies. Read from there rather than duplicated here, so
+   * the number that governs the schedule is the number the agent runs under.
+   */
+  const passSteps = args.editor === "opencode"
+    ? await readAgentSteps(root, PASS_AGENT)
+    : DEFAULT_AGENT_STEPS;
+
+  /** Attempts the last fold was allowed, so the report names what actually ran. */
+  let foldAttempts = args.attempts;
+
+  /**
    * Persist the queue to the cursor file.
    *
    * Called after every fold that lands and again once the loop is over, so the queue on
@@ -669,10 +707,34 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
      */
     const budget = await passBudget(args);
     if (budget) console.log(describeModelBudget(budget));
-    if (budget && budget.remaining <= 0) {
+    /**
+     * What this run may spend on this fold, and how many attempts that buys.
+     *
+     * The free tier meters requests, and the day is shared: the workflow serves its
+     * venues one process at a time, so a run that spends the whole remainder starves
+     * the runs after it. `--budget-share` divides the remainder by the runs still to
+     * come, and an attempt costs up to the agent's step ceiling, so a share that
+     * cannot pay for one pass defers the fold instead of spending the day on 429s.
+     * A run the provider reported no budget for is ungoverned here: it spends what
+     * `--attempts` allows and the provider's own 429 handling covers the rest.
+     */
+    const allowance = budget === undefined ? undefined : budgetAllowance(budget, args.budgetShare);
+    const attempts = allowance === undefined
+      ? args.attempts
+      : affordableAttempts(allowance, passSteps, args.attempts);
+    foldAttempts = attempts;
+    if (budget !== undefined && allowance !== undefined) {
+      console.log(
+        `budget: run ${args.budgetShare.index} of ${args.budgetShare.count}, share ${allowance} request(s) of ${budget.limit}/day, one pass costs up to ${passSteps}: ` +
+          `${attempts} attempt(s) of ${args.attempts}`,
+      );
+    }
+    if (attempts === 0) {
       budgetBlocked = true;
       budgetBlockedCapture = foldPath;
-      budgetBlockedReason = `${describeModelBudget(budget)}; no requests left for this pass`;
+      budgetBlockedReason = `${describeModelBudget(budget)}; this run's share of ${
+        allowance ?? 0
+      } request(s) cannot pay for one pass of up to ${passSteps}`;
       console.log(`fold deferred: ${budgetBlockedReason}`);
       break;
     }
@@ -704,7 +766,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       await persistQueue();
     };
 
-    for (let attempt = 1; attempt <= args.attempts; attempt++) {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
       let revert: () => Promise<void>;
 
       if (args.editor === "opencode") {
@@ -730,7 +792,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         );
         const run = await runOpencode({
           root,
-          agent: "dcwg",
+          agent: PASS_AGENT,
           briefPath,
           model: args.model,
           timeoutMs: args.passTimeoutSec * 1000,
@@ -759,7 +821,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
             }`;
           feedback = lastFailure;
           console.log(
-            `attempt ${attempt}/${args.attempts} ${
+            `attempt ${attempt}/${attempts} ${
               !run.ok
                 ? run.timedOut
                   ? `timed out after ${args.passTimeoutSec}s`
@@ -773,7 +835,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
           if (run.rateLimited) {
             rateLimitedAttempts += 1;
             rateLimitNote = run.rateLimited;
-            console.log(`attempt ${attempt}/${args.attempts} was rate-limited: ${run.rateLimited}`);
+            console.log(`attempt ${attempt}/${attempts} was rate-limited: ${run.rateLimited}`);
           }
           continue;
         }
@@ -782,7 +844,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         notes = `opencode: ${run.usage.steps} step(s), ${run.usage.inputTokens} in / ` +
           `${run.usage.outputTokens} out`;
         console.log(
-          `attempt ${attempt}/${args.attempts}: ${changedThisFold.length} page file(s) changed: ${
+          `attempt ${attempt}/${attempts}: ${changedThisFold.length} page file(s) changed: ${
             changedThisFold.join(", ") || "none"
           }`,
         );
@@ -805,7 +867,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
             : `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
           feedback = lastFailure;
           console.log(
-            `attempt ${attempt}/${args.attempts} rejected: ${
+            `attempt ${attempt}/${attempts} rejected: ${
               byModel ? "the model call failed" : "the write guard"
             }`,
           );
@@ -825,7 +887,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
             "reason" in check ? check.reason : "no reason given"
           })`;
           feedback = lastFailure;
-          console.log(`attempt ${attempt}/${args.attempts} proposed an unwritable path`);
+          console.log(`attempt ${attempt}/${attempts} proposed an unwritable path`);
           continue;
         }
 
@@ -835,7 +897,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         revert = wiki.revert;
         for (const edit of wiki.edits) await writePage(root, edit as PageEdit);
         console.log(
-          `attempt ${attempt}/${args.attempts}: ${changedThisFold.length} page edit(s): ${
+          `attempt ${attempt}/${attempts}: ${changedThisFold.length} page edit(s): ${
             changedThisFold.join(", ") || "none"
           }`,
         );
@@ -891,9 +953,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       lastFailure = gateFeedback(outcomes);
       feedback = lastFailure;
       console.log(
-        `attempt ${attempt}/${args.attempts} failed ${
-          failed.map((outcome) => outcome.name).join(", ")
-        }`,
+        `attempt ${attempt}/${attempts} failed ${failed.map((outcome) => outcome.name).join(", ")}`,
       );
     }
 
@@ -912,7 +972,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
        * NEEDS_ATTENTION either way: `VALID_STATUSES` mirrors the hub's contract, so a
        * new status value would be a cross-repo change.
        */
-      if (rateLimitedAttempts > 0 && rateLimitedAttempts === args.attempts) {
+      if (rateLimitedAttempts > 0 && rateLimitedAttempts === attempts) {
         budgetBlocked = true;
         budgetBlockedCapture = foldPath;
         budgetBlockedReason = `every attempt was rate-limited by the provider: ${rateLimitNote}`;
@@ -984,7 +1044,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         folded,
         pending: stillQueued,
         budget: budgetBlockedReason,
-        attempts: args.attempts,
+        attempts: foldAttempts,
         output: lastFailure.slice(-1200),
       },
       "NEEDS_ATTENTION",
@@ -1004,11 +1064,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         folded,
         pending: stillQueued,
         stalled: stalledCapture,
-        attempts: args.attempts,
+        attempts: foldAttempts,
         output: lastFailure.slice(-1200),
       },
       "NEEDS_ATTENTION",
-      `archived ${archived}; ${foldedNote}, but ${stalledCapture} did not fold in on any of ${args.attempts} attempt(s). It stays queued, so the next run retries it:\n${
+      `archived ${archived}; ${foldedNote}, but ${stalledCapture} did not fold in on any of ${foldAttempts} attempt(s). It stays queued, so the next run retries it:\n${
         lastFailure.slice(-1200)
       }`,
     );

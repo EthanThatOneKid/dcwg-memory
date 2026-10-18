@@ -11,11 +11,14 @@
  * against `limit: 50`, which is what a run that overshoots its cap looks like.
  */
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
+  affordableAttempts,
+  budgetAllowance,
   describeModelBudget,
   type ModelBudget,
   OPENROUTER_KEY_URL,
+  parseBudgetShare,
   parseModelBudget,
   probeModelBudget,
 } from "./budget.ts";
@@ -132,4 +135,44 @@ Deno.test("describeModelBudget names what is left, and says so when nothing was 
   assertStringIncludes(describeModelBudget(SPENT), "0 of 50 request(s) left today");
   assertStringIncludes(describeModelBudget(undefined), "not reported by the provider");
   assert(describeModelBudget(undefined) !== describeModelBudget(FRESH));
+});
+
+Deno.test("parseBudgetShare reads a share and refuses anything else", () => {
+  assertEquals(parseBudgetShare("1/2"), { index: 1, count: 2 });
+  assertEquals(parseBudgetShare(" 2/2 "), { index: 2, count: 2 });
+  assertEquals(parseBudgetShare("1/1"), { index: 1, count: 1 });
+  for (const bad of ["2", "1-2", "0/2", "3/2", "1/0", "-1/2", "a/b", ""]) {
+    assertThrows(() => parseBudgetShare(bad), Error);
+  }
+});
+
+Deno.test("budgetAllowance reserves the runs still to come, and the last run takes the rest", () => {
+  // 38 left, two venues to serve: the first takes half, because the second still has
+  // to fold its own delta out of what is left.
+  assertEquals(budgetAllowance(FRESH, { index: 1, count: 2 }), 19);
+  // The last venue of the day sees whatever the earlier ones did not spend, and is
+  // entitled to all of it. It cannot know that until it looks, which is why the
+  // probe is per fold rather than once per run.
+  assertEquals(budgetAllowance(FRESH, { index: 2, count: 2 }), 38);
+  // A spent budget is a share of zero, whichever position asked.
+  assertEquals(budgetAllowance(SPENT, { index: 1, count: 1 }), 0);
+  assertEquals(budgetAllowance(SPENT, { index: 2, count: 3 }), 0);
+  // Odd remainders round down rather than over-promising.
+  assertEquals(budgetAllowance({ limit: 50, used: 19, remaining: 31 }, { index: 1, count: 3 }), 10);
+});
+
+Deno.test("affordableAttempts buys what the share can pay for, and zero when it cannot", () => {
+  // 24-step ceiling: a 50 request share is two attempts, a 25 request share is one.
+  assertEquals(affordableAttempts(50, 24, 2), 2);
+  assertEquals(affordableAttempts(25, 24, 2), 1);
+  assertEquals(affordableAttempts(24, 24, 2), 1);
+  // Below one pass the answer is zero, which is the deferral: 23 requests cannot pay
+  // for a pass that may spend 24, and a pass that stops halfway is not a fold.
+  assertEquals(affordableAttempts(23, 24, 2), 0);
+  assertEquals(affordableAttempts(0, 24, 2), 0);
+  // The configured ceiling is never exceeded, however rich the day is.
+  assertEquals(affordableAttempts(1000, 24, 2), 2);
+  // A config that reports no ceiling cannot bound anything, so the caller's own
+  // attempt count stands rather than being silently reduced to zero.
+  assertEquals(affordableAttempts(5, 0, 2), 2);
 });
