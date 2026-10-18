@@ -23,27 +23,30 @@ name: Discord ingest
 # run can now commit, the Pages deploy no longer waits for the ingest workflow to
 # report success.
 #
-# The page pass runs `opencode`, an agentic CLI, which edits the wiki files
-# itself instead of returning one JSON list of rewrites. It is installed below
-# as a pinned CLI: the version decides the agent loop, the tool set, and the
-# event stream the connector parses, so an unpinned install would let the
-# automation change underneath a run. `--editor api` selects the older one-shot
-# path, which needs no CLI.
+# The page pass runs `fx`, the Vercel Labs coding agent, against the Vercel AI
+# Gateway, which edits the wiki files itself instead of returning one JSON list
+# of rewrites. It is installed below as a pinned binary: the version decides the
+# agent loop, the tool set, and the JSON envelope the connector parses, so an
+# unpinned install would let the automation change underneath a run. `--editor
+# api` selects the older one-shot path, which needs no CLI.
 #
-# Required repository secrets:
+# The Gateway is the only inference provider: one key, one catalogue, and one
+# budget probe. Required repository secrets:
 #   DISCORD_BOT_TOKEN       the capture bot's token (its own application)
-#   OPENROUTER_API_KEY      inference for the wiki pass, on a free model by
-#                           default. ANTHROPIC_API_KEY also works if set, and
-#                           --provider picks between them.
-# An agentic pass spends one model request per step, and a free OpenRouter key
-# allows 50 of them per day, so the connector asks the provider what is left
-# before each fold and refuses to start a pass it cannot pay for. Each venue runs
-# with --budget-share <i>/<n>, so the day is divided between the venues that
-# share it rather than spent by whichever runs first. See "The request budget" in
-# AGENTS.md for the arithmetic and for the providers that raise the ceiling
-# without spending money.
-# Neither is ever echoed: the connector reads them from the environment and
+#   AI_GATEWAY_API_KEY      inference for the wiki pass, both editors
+# A pass costs money rather than requests here, and the free models cost
+# nothing: the connector asks the Gateway for the team's credit balance and for
+# the catalogue price of the model this run was pointed at, and refuses to start
+# a pass the balance cannot pay for. Each venue runs with --budget-share <i>/<n>,
+# so the balance is divided between the venues that share it rather than spent by
+# whichever runs first. See "The budget" in AGENTS.md for the arithmetic.
+# The bot token is never echoed: the connector reads it from the environment and
 # never accepts a token as a command-line argument.
+#
+# The pass's permission rules are written below rather than committed, because fx
+# keeps them in `~/.fx/settings.json`, which is per-machine and not per-repo. They
+# are a second control, not the boundary: the connector compares the tree either
+# side of a pass and reverts anything outside `wiki/`.
 
 on:
   schedule:
@@ -60,15 +63,11 @@ on:
         type: boolean
         default: false
       model:
-        description: "Model for the wiki pass. Blank = the default. With --editor opencode this must be provider/model, e.g. openrouter/nvidia/nemotron-3-super-120b-a12b:free"
-        type: string
-        default: ""
-      provider:
-        description: "anthropic or openrouter (blank = whichever key is set)"
+        description: "Model for the wiki pass. Blank = the default. A Gateway id, vendor/model, e.g. nvidia/nemotron-3.5-lightning-free"
         type: string
         default: ""
       editor:
-        description: "opencode or api (blank = the connector's default)"
+        description: "fx or api (blank = the connector's default)"
         type: string
         default: ""
 
@@ -91,13 +90,11 @@ jobs:
         dcwg-propose=1559218298128695386
       # github.event.inputs is a string map that is empty on a scheduled run, so
       # every one of these falls back in the shell rather than in an expression.
-      # MODEL is the one exception, and it falls back in the expression on
-      # purpose: a scheduled run cannot take an input, so the repository variable
-      # DCWG_MODEL is how the schedule is repointed at another provider (e.g.
-      # google/gemini-2.5-flash or opencode/nemotron-3.5-lightning-free) without
-      # editing this file. Unset, the connector uses opencode.json's own default.
+      # MODEL falls back in the expression on purpose: a scheduled run cannot
+      # take an input, so the repository variable DCWG_MODEL is how the schedule
+      # is repointed at another model (e.g. alibaba/qwen3.7-flash) without editing
+      # this file. Unset, the connector uses the default wiki.ts names.
       MODEL: ${{ github.event.inputs.model || vars.DCWG_MODEL }}
-      PROVIDER: ${{ github.event.inputs.provider }}
       EDITOR: ${{ github.event.inputs.editor }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       SKIP_WIKI: ${{ github.event.inputs.skip_wiki }}
@@ -108,13 +105,38 @@ jobs:
         with:
           deno-version: "2.x"
 
-      # Pinned, because the connector parses this CLI's JSON event stream and
-      # drives its agent loop: a silent major upgrade would change both. The
-      # version is asserted so the pin cannot drift into a lie.
+      # Pinned, because the connector parses this binary's JSON envelope and drives
+      # its agent loop: a silent upgrade would change both. The version is asserted
+      # so the pin cannot drift into a lie.
       - name: Install the page-pass CLI
         run: |
-          npm install -g opencode-ai@1.19.3
-          test "$(opencode --version)" = "1.19.3"
+          curl -fsSL https://fx.sh/setup.sh | bash -s -- v0.0.14
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          test "$("$HOME/.local/bin/fx" --version)" = "0.0.14"
+
+      # fx reads its permission rules from a per-machine file that cannot be
+      # committed, so the workflow writes them. `edit` is the permission name for
+      # both `write_file` and `edit_file`, and the allow pattern has to be the tree
+      # form `wiki/**`: a bare `wiki/*` matches an edit to an existing page but
+      # denies creating a new one, because a create is matched against its parent.
+      - name: Write the pass's permission rules
+        run: |
+          mkdir -p "$HOME/.fx"
+          cat > "$HOME/.fx/settings.json" <<'JSON'
+          {
+            "provider": "gateway",
+            "permission_mode": "auto",
+            "permission": {
+              "*": "deny",
+              "read": "allow",
+              "glob": "allow",
+              "grep": "allow",
+              "list": "allow",
+              "bash": "deny",
+              "edit": { "*": "deny", "wiki/**": "allow" }
+            }
+          }
+          JSON
 
       - name: Unit-test the connector before trusting it
         run: deno test -A
@@ -127,12 +149,7 @@ jobs:
           # secrets are account-wide and a bare DISCORD_BOT_TOKEN on this host
           # is another project's bot.
           DCWG_DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Only needed when DCWG_MODEL names a google/* model. Set it and the
-          # Google free tier's ~1,500 requests a day replace OpenRouter's 50; leave
-          # it unset and this expands to an empty string, which no editor reads.
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
         run: |
           # Per-venue commits, inside the loop. The runner is ephemeral and one venue must
           # not be able to discard another venue's work: each venue commits and pushes its
@@ -175,11 +192,9 @@ jobs:
             # behind a message cap.
             args=(--channel "$channel" --venue "$venue" --root . --limit 0 \
               --budget-share "$venue_index/$venue_total")
-            # Only pin a model or provider when one was asked for: passing the
-            # other provider's default id would send an unknown model to the one
-            # that is actually configured.
+            # Only pin a model when one was asked for: passing the connector's
+            # default id would send a model nobody chose to the Gateway.
             if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
-            if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
             if [ -n "${EDITOR:-}" ]; then args+=(--editor "$EDITOR"); fi
             [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
             [ "${SKIP_WIKI:-false}" = "true" ] && args+=(--skip-wiki)

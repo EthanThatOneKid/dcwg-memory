@@ -17,13 +17,12 @@
     "jsr:@wazoo/linked-markdown@0.1": "0.1.0",
     "jsr:@wazoo/sparql-engine@0.4.4": "0.4.4",
     "jsr:@wazoo/wiki@0.6": "0.6.0",
-    "npm:@ai-sdk/anthropic@4": "4.0.78_zod@4.6.6",
+    "npm:@ai-sdk/gateway@4": "4.0.110_zod@4.6.6",
     "npm:@dprint/formatter@0.5.1": "0.5.1",
     "npm:@dprint/json@0.21.3": "0.21.3",
     "npm:@dprint/markdown@0.20.0": "0.20.0",
     "npm:@dprint/typescript@0.96.1": "0.96.1",
     "npm:@eslint/markdown@8.0.3": "8.0.3",
-    "npm:@openrouter/ai-sdk-provider@3": "3.1.0_ai@7.0.137__zod@4.6.6_zod@4.6.6",
     "npm:@rdfjs/types@^2.0.1": "2.0.1",
     "npm:@types/jsonld@^1.5.15": "1.5.15",
     "npm:@zazuko/env-node@3": "3.1.0_@types+rdfjs__fetch-lite@3.0.11_@types+rdfjs__formats@4.0.1_@rdfjs+types@2.0.1_@types+clownface@2.0.10_@types+rdf-dataset-ext@1.0.8_@types+rdfjs__data-model@2.0.9_@types+rdfjs__dataset@2.0.7_@types+rdfjs__environment@1.0.0_@types+rdfjs__namespace@2.0.10_@types+rdfjs__term-map@2.0.10_@types+rdfjs__term-set@2.0.9_@types+rdfjs__traverser@0.1.5",
@@ -132,14 +131,6 @@
     }
   },
   "npm": {
-    "@ai-sdk/anthropic@4.0.78_zod@4.6.6": {
-      "integrity": "sha512-lVMxa9tLM5WoB72bqxjzWEWQlCwtBTo1L3yIKxAefowWATd+1YKohrINey6wTn8gtGEqyYm79z4DUGJBYauUFw==",
-      "dependencies": [
-        "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
-        "zod"
-      ]
-    },
     "@ai-sdk/gateway@4.0.110_zod@4.6.6": {
       "integrity": "sha512-5IwnOR6v7KC+D9eddUqsCobXl/FbLUVb2LaQc/uyuQdpP3/n9s0YLc9zl4/W3IS/R2pjHrqUfCzEAeOu7bFLoQ==",
       "dependencies": [
@@ -299,13 +290,6 @@
     },
     "@humanwhocodes/retry@0.4.3": {
       "integrity": "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="
-    },
-    "@openrouter/ai-sdk-provider@3.1.0_ai@7.0.137__zod@4.6.6_zod@4.6.6": {
-      "integrity": "sha512-BQy1TA9fKrh47s9ivsO6FY5QimN7GUF0i8Qon3pkxQclEgShso0dClpcWn8OIyPLEZZPFaFKgI8TW4S/O0p0Dw==",
-      "dependencies": [
-        "ai",
-        "zod"
-      ]
     },
     "@rdfjs/data-model@2.1.2": {
       "integrity": "sha512-yoSVlyCltqbaCTse3uSdf5Vo3q4UskcTm+3klaUQTwOq7Z5aCZLtLPZatXTPzr+S0WEcjTZvD++A+r3QmgamsA==",
@@ -1989,8 +1973,7 @@
       "jsr:@std/path@1",
       "jsr:@std/yaml@1",
       "jsr:@wazoo/wiki@0.6",
-      "npm:@ai-sdk/anthropic@4",
-      "npm:@openrouter/ai-sdk-provider@3",
+      "npm:@ai-sdk/gateway@4",
       "npm:ai@7",
       "npm:zod@4"
     ]

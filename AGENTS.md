@@ -143,13 +143,14 @@ when they pass. It pushes rather than opening a pull request because the cursor 
 cursor parked in an unmerged pull request would make every run re-fetch the same
 range. The gates are the review step, and a failing gate reverts the pass's page
 edits while leaving the capture committed. It needs two repository secrets,
-`DISCORD_BOT_TOKEN` and `OPENROUTER_API_KEY`. Inference runs on OpenRouter
-by default on a free model (`nvidia/nemotron-3-super-120b-a12b:free`), which was
-verified to honour the strict `json_schema` the page edits need; `ANTHROPIC_API_KEY`
-also works and `--provider` picks between them. A reasoning model is the trade:
-the first real run, a 593-message backfill, cost ~25k input and ~24k output
-tokens and took about three minutes, at no charge. That run used the `api`
-editor; the default is now `opencode`, described next.
+`DISCORD_BOT_TOKEN` and `AI_GATEWAY_API_KEY`. Inference runs on the Vercel AI
+Gateway, and the Gateway is the only provider: one key, one catalogue, and one
+budget probe. It runs the free model `nvidia/nemotron-3.5-lightning-free` by
+default, which costs nothing and is metered by rate rather than by the day; any
+model id the Gateway publishes works with `--model`. A reasoning model is the
+trade: the first real run, a 593-message backfill, cost ~25k input and ~24k
+output tokens and took about three minutes, at no charge. That run used the `api`
+editor; the default is now `fx`, described next.
 
 If the pass or a gate fails, the page edits are reverted, so a bad inference never
 commits prose that does not pass the repo's own checks. The capture is committed
@@ -210,22 +211,22 @@ installed in the server, and a full backfill of `#talk` read 593 messages in abo
 four seconds. The manual steps above remain the fallback for a venue the bot cannot
 see.
 
-## The page pass runs opencode
+## The page pass runs fx
 
 `ingest.ts` folds a capture into the wiki in one of two ways, chosen with
-`--editor` (default `opencode`):
+`--editor` (default `fx`):
 
-- **`opencode`** runs `opencode`, an agentic coding CLI, as the `dcwg` agent
-  defined in the repo's `opencode.json`, whose standing instructions are
-  `tools/discord/prompt/dcwg.md`. The connector writes a per-run brief to
-  `.dcwg/brief.md` (gitignored, removed after the run) and tells the agent to
-  read it; the agent then reads the capture and whichever pages it wants to
-  change with its own tools, and edits `wiki/` itself. The workflow installs the
-  CLI pinned to `1.19.3` and asserts the version, because the connector parses
-  that version's JSON event stream and drives its agent loop.
+- **`fx`** runs `fx`, the Vercel Labs coding agent, against the Vercel AI
+  Gateway. Its standing instructions are `tools/discord/prompt/dcwg.md`, handed
+  in with `--system`; fx reads the repository's own `AGENTS.md` itself. The
+  connector writes a per-run brief to `.dcwg/brief.md` (gitignored, removed after
+  the run) and tells the agent to read it; the agent then reads the capture and
+  whichever pages it wants to change with its own tools, and edits `wiki/`
+  itself. The workflow installs the binary pinned to `0.0.14` and asserts the
+  version, because the version decides the tool set and the shape of the JSON
+  envelope the connector parses.
 - **`api`** asks the model for one JSON list of complete page rewrites, one
-  request per attempt. This is the original path, and `--provider`/`--model`
-  still select it; `ANTHROPIC_API_KEY` works here.
+  request per attempt, through the AI SDK on the same Gateway key.
 
 The agentic path exists because the one-shot one reads a long capture in pieces.
 The `api` editor gets `captureSlice`, at most `CAPTURE_CHAR_CAP` (24,000)
@@ -237,63 +238,65 @@ is already named rather than reasoning only from the pages it was handed.
 
 The write surface is enforced by the connector, not by the agent's own
 permission rules. `snapshotTree`, `diffTree`, and `restoreTree` in
-`tools/discord/opencode.ts` compare the whole tree either side of a run and
-revert the attempt when anything outside `wiki/` changed. That is deliberate:
-measured 2026-10-16 on opencode 1.19.3, the same `{"wiki/**": "allow", "**":
-"deny"}` rule allowed `wiki/Alpha.md` in one checkout and refused `wiki/New.md`
-in another, so a rule that fails open is not a control. `opencode.json` still
-denies bash, webfetch, websearch, task, and question, so a run cannot exfiltrate
-the OpenRouter key it is handed or run a command nobody reviewed.
+`tools/discord/fx.ts` compare the whole tree either side of a run and revert the
+attempt when anything outside `wiki/` changed. fx's rules are a second control
+rather than the boundary, and they do work at the tool layer: measured 2026-10-18
+on 0.0.14, with `{"*": "deny", "edit": {"*": "deny", "wiki/**": "allow"}}`, a
+`write_file` to `wiki/New.md` was allowed and one to `other/Bad.md` was denied.
+Two details are load-bearing: the allow pattern must be the tree form (`wiki/**`,
+not `wiki/*`), because a create is matched against the new file's parent, and
+`edit` is the permission name for both `write_file` and `edit_file`. Those rules
+live in `~/.fx/settings.json`, which is per-machine rather than per-repo, so the
+workflow writes them before the pass runs; `bash` is denied there, which is what
+keeps a run from exfiltrating the Gateway key it is handed or running a command
+nobody reviewed.
 
-`--model` means different things to the two editors: opencode wants
-`provider/model` (e.g. `openrouter/nvidia/nemotron-3-super-120b-a12b:free`),
-while the `api` path wants the bare provider id. `--pass-timeout` (default 900
-seconds) kills an opencode pass that overruns.
+`--model` takes a Gateway model id (`vendor/model`, e.g.
+`nvidia/nemotron-3.5-lightning-free` or `alibaba/qwen3.7-flash`), and both editors
+read it the same way. `--pass-timeout` (default 900 seconds) kills an fx pass that
+overruns. The agent's own step ceiling is `max_agent_steps` in the repo's
+`.fx.json` (24), which fx enforces; measured 2026-10-18 on 0.0.14, a workspace
+capped at 3 reported four steps and exited with the task unfinished, so it bounds
+an agentic request without being an exact count of the requests a pass makes.
 
-## The request budget
+## The budget
 
-Metering is settled, and it is counted in requests rather than tokens. The
-OpenRouter free tier allows 50 free-model requests per day, rising permanently to
-1,000 once $10 of credits have been bought at any point; the per-minute limit is 20
-either way. Measured 2026-10-17 against the connector's own key,
-`GET /api/v1/auth/key` answers `"is_free_tier": true`, `"usage": 0`, and
-`"free_model_daily_requests": {"used": 51, "limit": 50, "remaining": 0}`. Capping
-tokens would bound nothing on this path: an agentic step is one request whatever it
-carries, so a 594-message backfill and a three-message day cost the same until the
-agent runs out of steps.
+Metering is settled, and on the Gateway it is counted in money rather than
+requests. The Gateway bills tokens at the provider's list price and every team gets
+$5 of credits a month, so the question a run has to answer is not "how many
+requests do I have" but "can these credits pay for a pass". Measured 2026-10-18
+against the connector's own key, `GET /v1/credits` answers
+`{"balance": "4.513395538", "total_used": "1.692157662"}`.
 
-The automation stays on `nvidia/nemotron-3-super-120b-a12b:free`, by Ethan's call on
-2026-10-18: the free tier is the budget, and the schedule fits it rather than the
-other way round. So what a run has to fit is requests, and the ceiling is easy to
-exceed. `opencode.json` caps the agent at 24 steps, `--attempts` defaults to 2, and
-the cron runs two venues, so the worst case is 96 requests against a budget of 50.
-One venue's two attempts over the 594-message backfill spent a whole day on
-2026-10-17 and left the next run answering 429 to its first request, which is what
-made a healthy venue look like a venue with bad content.
+That replaces the ceiling this automation used to run against. On OpenRouter's free
+tier, 50 requests a day was spendable in two runs of the 594-message backfill, and
+one venue's two attempts spent a whole day on 2026-10-17, which left the next run
+answering 429 to its first request and made a healthy venue look like a venue with
+bad content. A free model on the Gateway costs nothing, so the balance does not
+bound it at all: what bounds a free pass is the provider's own rate limit, which fx
+retries through and the connector reports when it gives up.
 
-`tools/discord/budget.ts` is how a run learns what it can afford. Before each fold
-the connector asks the provider what is left of the day, logs it, and does not start
-a pass it cannot pay for. The day is shared rather than first come: the workflow runs
-each venue with `--budget-share <i>/<n>`, and a venue's share is what the provider
+`tools/discord/budget.ts` is how a run learns what it can afford, and it asks two
+things: what is left of the balance, and what one pass costs at the model this run
+was pointed at. The second is the Gateway's own catalogue price for that model
+multiplied by this connector's measurement of what a pass spends (966,946 input and
+19,488 output tokens for the 594-message backfill), which is why it is an estimate
+rather than a quote. The balance is shared rather than first come: the workflow runs
+each venue with `--budget-share <i>/<n>`, and a venue's share is what the Gateway
 reports left divided by the runs still to come, so a venue holding a backlog cannot
-spend a later venue's allowance. A share buys attempts at the agent's own step
-ceiling, which the connector reads from `opencode.json` rather than restating: at 50
-requests over two venues each venue gets 25, which is one 24-step pass, so a free day
-is one pass per venue and a fold that needs a second attempt waits for tomorrow's
-budget. A share that cannot pay for a single pass defers the fold without calling the
-model at all. A fold that never reached the model is reported as a budget condition
-rather than a stall, because `stalls` counts runs that failed to fold material and a
-pass the provider refused judged nothing; the status stays `NEEDS_ATTENTION` either
-way, since `VALID_STATUSES` mirrors the hub's contract.
+spend a later venue's allowance. A share that cannot pay for one pass defers the
+fold without calling the model at all, and a fold that never reached the model is
+reported as a budget condition rather than a stall, because `stalls` counts runs
+that failed to fold material and a pass the provider refused judged nothing; the
+status stays `NEEDS_ATTENTION` either way, since `VALID_STATUSES` mirrors the hub's
+contract. A free model is never deferred: its pass costs zero, so the share buys
+every attempt `--attempts` asks for.
 
-If the free tier proves too tight for the material, three verified ways out are on
-record, and none of them changes the connector: $10 of OpenRouter credits raises the
-same key to 1,000 requests a day permanently; `google/gemini-2.5-flash` is a built-in
-opencode provider on roughly 1,500 free requests a day; and opencode's own
-`opencode/*-free` models answer with no credential at all, verified 2026-10-17
-driving the agent loop through a `read` and a `write` at a total cost of 0. Each of
-the last two is billed by that provider, so the connector skips the OpenRouter probe
-when `--model` names a different one.
+The default is `nvidia/nemotron-3.5-lightning-free`, by Ethan's call on 2026-10-18
+to move forward on a free model. A paid model is bounded by the same arithmetic
+against the credits, so pinning one at dispatch (`--model alibaba/qwen3.7-flash`,
+about 3.2 cents a pass, or roughly 140 passes on a $4.51 balance) is a matter of
+what the material needs rather than of what the connector can afford.
 
 ## Maintaining the wiki: the self-healing pass
 

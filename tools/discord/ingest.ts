@@ -12,8 +12,10 @@
  *
  * Credentials (never passed as arguments, never logged):
  *   DCWG_DISCORD_BOT_TOKEN   the capture bot's token
- *   OPENROUTER_API_KEY       the wiki pass, through opencode or the API provider
- *   ANTHROPIC_API_KEY        the wiki pass, when --provider anthropic
+ *   AI_GATEWAY_API_KEY       the wiki pass, both editors, on the Vercel AI Gateway
+ *
+ * The Gateway is the only inference provider: one key, one catalogue, and one budget
+ * probe. `--editor` chooses between an agentic pass (`fx`) and a one-shot one (`api`).
  */
 
 import { parseArgs } from "@std/cli/parse-args";
@@ -36,31 +38,34 @@ import {
 } from "./capture.ts";
 import {
   affordableAttempts,
-  budgetAllowance,
-  describeModelBudget,
+  creditAllowance,
+  describeGatewayCredits,
+  describePassCost,
+  estimatePassCostUsd,
   parseBudgetShare,
-  probeModelBudget,
+  probeGatewayCredits,
+  probeModelPrice,
 } from "./budget.ts";
 import { checkEditablePath, validateSummary } from "./guard.ts";
 import {
   cleanBrief,
-  DEFAULT_AGENT_STEPS,
   diffTree,
   outsideWiki,
-  readAgentSteps,
+  readFxSteps,
+  readStandingInstructions,
   renderBrief,
   restoreTree,
-  runOpencode,
+  runFx,
   snapshotTree,
   writeBrief,
   writePagesOk,
-} from "./opencode.ts";
-/** The `opencode.json` agent the page pass runs as. Also what its step ceiling is read for. */
-const PASS_AGENT = "dcwg";
+} from "./fx.ts";
 import {
   buildPrompt,
   CAPTURE_CHAR_CAP,
   captureSlice,
+  DEFAULT_MODEL,
+  GATEWAY_KEY_NAME,
   readPages,
   runWikiPass,
   writePage,
@@ -72,8 +77,8 @@ import { advance, drop, enqueue, pendingFor, readPending, setPending, stall } fr
 import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
-import type { PageEdit, Provider } from "./wiki.ts";
-import type { BudgetShare, ModelBudget } from "./budget.ts";
+import type { PageEdit } from "./wiki.ts";
+import type { BudgetShare, GatewayCredits, ModelPrice } from "./budget.ts";
 import type { PendingFold } from "./pending.ts";
 
 const USAGE = `dcwg-memory Discord connector
@@ -100,22 +105,22 @@ Options:
   --all                 ignore the cursor and pull from the channel's first message
   --since <iso>         ISO-8601 UTC lower bound (overrides the cursor)
   --token-env <name>    env var holding the bot token (default: DCWG_DISCORD_BOT_TOKEN)
-  --provider <name>     anthropic or openrouter (default: whichever key is set)
-  --model <id>          model id for the wiki pass (default: provider-specific)
+  --model <id>          Gateway model id for the wiki pass, vendor/model
+                        (default: the free model wiki.ts names)
   --skip-wiki           capture only; do not touch wiki pages
-  --editor <name>       how the page pass edits pages. opencode (default) runs an
-                        agentic CLI that reads the capture and edits wiki/ files
-                        itself; api asks the model for a JSON list of complete
-                        page rewrites, one request per attempt
-  --pass-timeout <sec>  kill an opencode pass that runs longer than this
+  --editor <name>       how the page pass edits pages. fx (default) runs an agentic
+                        CLI that reads the capture and edits wiki/ files itself;
+                        api asks the model for a JSON list of complete page
+                        rewrites, one request per attempt
+  --pass-timeout <sec>  kill an fx pass that runs longer than this
                         (default 900)
   --attempts <n>        how many times the page pass may be retried against the gates
                         (default 2: one retry, because the usual failure is correctable)
   --budget-share <i>/<n>
                         this run's place in the day's schedule of runs that share the
-                        free-model budget (default 1/1). Its share is what the provider
-                        reports left divided by the runs still to come, so an early
-                        venue cannot spend a later venue's allowance
+                        Gateway credit balance (default 1/1). Its share is what the
+                        Gateway reports left divided by the runs still to come, so an
+                        early venue cannot spend a later venue's allowance
   --drain               fold every capture this venue still owes the wiki, not just the
                         oldest one (default: one fold per run, so a backlog drains over
                         several runs instead of overrunning the job's own time limit)
@@ -140,13 +145,12 @@ interface Args {
   all: boolean;
   since?: string;
   tokenEnv: string;
-  provider?: Provider;
-  /** Unset means the provider's own default, so the two defaults cannot collide. */
+  /** Unset means the model the pass itself defaults to. */
   model?: string;
   skipWiki: boolean;
   /** Which editor produces the page changes. */
-  editor: "opencode" | "api";
-  /** Wall-clock cap on one opencode pass, in seconds. */
+  editor: "fx" | "api";
+  /** Wall-clock cap on one fx pass, in seconds. */
   passTimeoutSec: number;
   noGates: boolean;
   /** How many times the page pass may be retried against the gates. */
@@ -181,7 +185,6 @@ function parseCliArgs(argv: string[]): Args {
         "since",
         "token-env",
         "model",
-        "provider",
         "editor",
         "pass-timeout",
         "attempts",
@@ -229,13 +232,9 @@ function parseCliArgs(argv: string[]): Args {
     return collected;
   };
 
-  const provider = str("provider");
-  if (provider !== undefined && provider !== "anthropic" && provider !== "openrouter") {
-    throw new Error(`--provider must be anthropic or openrouter, not '${provider}'`);
-  }
   const editor = str("editor");
-  if (editor !== undefined && editor !== "opencode" && editor !== "api") {
-    throw new Error(`--editor must be opencode or api, not '${editor}'`);
+  if (editor !== undefined && editor !== "fx" && editor !== "api") {
+    throw new Error(`--editor must be fx or api, not '${editor}'`);
   }
   const budgetShareRaw = str("budget-share");
   const budgetShare = budgetShareRaw === undefined
@@ -265,10 +264,9 @@ function parseCliArgs(argv: string[]): Args {
     all: parsed.all === true,
     ...(since === undefined ? {} : { since }),
     tokenEnv: str("token-env") ?? "DCWG_DISCORD_BOT_TOKEN",
-    ...(provider === undefined ? {} : { provider }),
     ...(model === undefined ? {} : { model }),
     skipWiki: parsed["skip-wiki"] === true,
-    editor: editor ?? "opencode",
+    editor: editor ?? "fx",
     passTimeoutSec: num("pass-timeout", 900),
     noGates: parsed["no-gates"] === true,
     attempts: num("attempts", 2),
@@ -317,22 +315,27 @@ async function readExistingCaptures(dir: string): Promise<string[]> {
 }
 
 /**
- * The free-model budget this run will spend from, if any.
+ * What this run may spend from, and what a pass costs, before the fold starts.
  *
- * Only OpenRouter publishes per-key free-model counters, and only a pass OpenRouter
- * actually serves spends them. A `--model` naming another provider
- * (`google/gemini-2.5-flash`, `opencode/nemotron-3.5-lightning-free`) is billed by
- * that provider, so asking OpenRouter about it would report a cap this run cannot
- * reach. The API editor is skipped for a different reason: it has no step loop, so
- * its spend is the number of slices rather than anything a budget probe could bound.
+ * The Gateway meters money rather than requests, so a budget is two probes: the team's
+ * credit balance, and the catalogue price of the model this run was pointed at. The
+ * second is skipped for the API editor, which has no step loop to bound: its spend is
+ * the number of capture slices it is handed, not something a per-pass estimate covers.
+ *
+ * Both are best-effort. A probe that cannot answer leaves the run ungoverned rather than
+ * failing it, because an unreadable budget and an absent one are the same situation, and
+ * the provider's own refusal is the backstop.
  */
-async function passBudget(args: Args): Promise<ModelBudget | undefined> {
-  if (args.editor !== "opencode") return undefined;
-  const pinned = args.model?.split("/")[0];
-  if (pinned !== undefined && pinned !== "openrouter") return undefined;
-  const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+async function passBudget(
+  args: Args,
+): Promise<{ credits: GatewayCredits; passCostUsd: number | undefined } | undefined> {
+  if (args.editor !== "fx") return undefined;
+  const apiKey = Deno.env.get(GATEWAY_KEY_NAME);
   if (!apiKey) return undefined;
-  return await probeModelBudget({ apiKey });
+  const credits = await probeGatewayCredits({ apiKey });
+  if (credits === undefined) return undefined;
+  const modelId = args.model ?? DEFAULT_MODEL;
+  return { credits, passCostUsd: estimatePassCostUsd(await probeModelPrice({ apiKey, modelId })) };
 }
 
 function report(
@@ -618,16 +621,23 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   const foldCeiling = args.drain ? args.drainMax : 1;
 
   /**
-   * What one attempt costs, in model requests.
+   * What one attempt may spend, as the agent's own step ceiling.
    *
-   * opencode emits one `step_finish` per model request, so an agent's step ceiling is
-   * its pass's worst-case spend, and the ceiling that bounds the pass is the one
-   * `opencode.json` actually applies. Read from there rather than duplicated here, so
-   * the number that governs the schedule is the number the agent runs under.
+   * fx applies `max_agent_steps` from the workspace's `.fx.json`, and it bounds an
+   * agentic request rather than counting the requests a pass will make: measured
+   * 2026-10-18 on 0.0.14, a workspace capped at 3 reported four steps and exited with the
+   * task unfinished. It is read from the config rather than restated here so the number
+   * that governs the schedule is the number the agent runs under.
    */
-  const passSteps = args.editor === "opencode"
-    ? await readAgentSteps(root, PASS_AGENT)
-    : DEFAULT_AGENT_STEPS;
+  const passSteps = await readFxSteps(root);
+
+  /**
+   * The agent's standing instructions, handed to fx with `--system`.
+   *
+   * Read once per run rather than per fold: they do not change between folds, and a
+   * missing prompt file should stop the run here instead of halfway through a pass.
+   */
+  const standingInstructions = args.editor === "fx" ? await readStandingInstructions(root) : "";
 
   /** Attempts the last fold was allowed, so the report names what actually ran. */
   let foldAttempts = args.attempts;
@@ -702,15 +712,15 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     const kind = captureKind(captureText);
     const posts = postsInCapture(captureText);
     const foldForum = kind ? POST_SHAPED.has(kind) : forum;
-    // opencode reads the capture off disk with its own tools, so one pass folds the
+    // fx reads the capture off disk with its own tools, so one pass folds the
     // whole file; the API editor is handed one slice, and an entry stays queued behind
     // its offset while a capture longer than a prompt is still only half read.
-    const absorbed = args.editor === "opencode"
+    const absorbed = args.editor === "fx"
       ? captureText.length
       : captureSlice(captureText, fold.offset, CAPTURE_CHAR_CAP).to;
 
     /**
-     * Ask what the day has left before spending any of it.
+     * Ask what is left of the balance before spending any of it, and what one pass costs.
      *
      * The alternative is what happened on 2026-10-17: two attempts that each answered
      * 429 in about a minute, reported as a fold the material could not survive. A pass
@@ -718,35 +728,42 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
      * and spends the run's own time budget.
      */
     const budget = await passBudget(args);
-    if (budget) console.log(describeModelBudget(budget));
+    const credits = budget?.credits;
+    const passCostUsd = budget?.passCostUsd;
+    const modelId = args.model ?? DEFAULT_MODEL;
+    if (credits) console.log(describeGatewayCredits(credits));
     /**
      * What this run may spend on this fold, and how many attempts that buys.
      *
-     * The free tier meters requests, and the day is shared: the workflow serves its
-     * venues one process at a time, so a run that spends the whole remainder starves
-     * the runs after it. `--budget-share` divides the remainder by the runs still to
-     * come, and an attempt costs up to the agent's step ceiling, so a share that
-     * cannot pay for one pass defers the fold instead of spending the day on 429s.
-     * A run the provider reported no budget for is ungoverned here: it spends what
-     * `--attempts` allows and the provider's own 429 handling covers the rest.
+     * The Gateway bills tokens, so the unit is money and the balance is shared: the
+     * workflow serves its venues one process at a time, so a run that spends the whole
+     * remainder starves the runs after it. `--budget-share` divides the remainder by the
+     * runs still to come, and a pass costs what the catalogue prices at this run's model,
+     * so a share that cannot pay for one pass defers the fold rather than starting a pass
+     * that stops halfway. A free model costs nothing, so its share buys every attempt
+     * asked for and the provider's own rate limit is what bounds it. A run whose balance
+     * or price could not be read is ungoverned here: it spends what `--attempts` allows
+     * and the provider's own 429 handling covers the rest.
      */
-    const allowance = budget === undefined ? undefined : budgetAllowance(budget, args.budgetShare);
-    const attempts = allowance === undefined
+    const allowance = credits === undefined ? undefined : creditAllowance(credits, args.budgetShare);
+    const attempts = allowance === undefined || passCostUsd === undefined
       ? args.attempts
-      : affordableAttempts(allowance, passSteps, args.attempts);
+      : affordableAttempts(allowance, passCostUsd, args.attempts);
     foldAttempts = attempts;
-    if (budget !== undefined && allowance !== undefined) {
+    if (credits !== undefined && allowance !== undefined && passCostUsd !== undefined) {
       console.log(
-        `budget: run ${args.budgetShare.index} of ${args.budgetShare.count}, share ${allowance} request(s) of ${budget.limit}/day, one pass costs up to ${passSteps}: ` +
-          `${attempts} attempt(s) of ${args.attempts}`,
+        `budget: run ${args.budgetShare.index} of ${args.budgetShare.count}, share $${
+          allowance.toFixed(4)
+        } of $${credits.balanceUsd.toFixed(2)} left, ${describePassCost(passCostUsd)}, ` +
+          `capped at ${passSteps} agent step(s) by .fx.json: ${attempts} attempt(s) of ${args.attempts}`,
       );
     }
     if (attempts === 0) {
       budgetBlocked = true;
       budgetBlockedCapture = foldPath;
-      budgetBlockedReason = `${describeModelBudget(budget)}; this run's share of ${
-        allowance ?? 0
-      } request(s) cannot pay for one pass of up to ${passSteps}`;
+      budgetBlockedReason = `${describeGatewayCredits(credits)}; this run's share of $${
+        (allowance ?? 0).toFixed(4)
+      } cannot pay for one pass at ${modelId} (${describePassCost(passCostUsd)})`;
       console.log(`fold deferred: ${budgetBlockedReason}`);
       break;
     }
@@ -759,11 +776,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     let rateLimitNote = "";
 
     /**
-     * What an opencode pass is measured against, and what a failed attempt is
+     * What an fx pass is measured against, and what a failed attempt is
      * restored to. Taken here, after the connector's own capture and cursor
      * writes, so those are not mistaken for changes the agent made.
      */
-    const treeBefore = args.editor === "opencode" ? await snapshotTree(root) : undefined;
+    const treeBefore = args.editor === "fx" ? await snapshotTree(root) : undefined;
 
     /**
      * Mark this capture folded in: the queue advances past what the pass absorbed and
@@ -784,9 +801,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     for (let attempt = 1; attempt <= attempts; attempt++) {
       let revert: () => Promise<void>;
 
-      if (args.editor === "opencode") {
+      if (args.editor === "fx") {
         // Bound before the pass runs rather than after it: a spawn failure throws instead
-        // of returning `!ok` ("Failed to spawn 'opencode': entity not found" is how that
+        // of returning `!ok` ("Failed to spawn 'fx': entity not found" is how that
         // surfaces), and by then the agent may already have edited pages. Bound here, that
         // throw can undo them instead of leaving pages behind that no gate has seen.
         revert = () => restoreTree(root, treeBefore!);
@@ -805,10 +822,10 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
             feedback,
           }),
         );
-        const run = await runOpencode({
+        const run = await runFx({
           root,
-          agent: PASS_AGENT,
           briefPath,
+          system: standingInstructions,
           model: args.model,
           timeoutMs: args.passTimeoutSec * 1000,
         }).catch(async (error: unknown) => {
@@ -828,7 +845,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         if (!run.ok || stray.length) {
           await revert();
           lastFailure = !run.ok
-            ? `the opencode pass did not finish: ${
+            ? `the fx pass did not finish: ${
               run.timedOut ? `killed after ${args.passTimeoutSec}s` : `exit ${run.code}`
             }${run.stderr ? `\n${run.stderr}` : ""}`
             : `the pass changed files outside wiki/, so the whole attempt was reverted:\n  - ${
@@ -856,7 +873,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         }
 
         changedThisFold = changed;
-        notes = `opencode: ${run.usage.steps} step(s), ${run.usage.inputTokens} in / ` +
+        notes = `fx: ${run.usage.steps} step(s), ${run.usage.inputTokens} in / ` +
           `${run.usage.outputTokens} out`;
         console.log(
           `attempt ${attempt}/${attempts}: ${changedThisFold.length} page file(s) changed: ${
@@ -870,7 +887,6 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
           forum: foldForum,
           capturePath: foldPath,
           offset: fold.offset,
-          provider: args.provider,
           model: args.model,
           feedback,
         });

@@ -44,18 +44,21 @@ function apiMessages(): DiscordMessage[] {
 }
 
 /**
- * The API, stubbed: Discord answers, and the provider's key endpoint answers whatever
- * budget the caller wants a run to see.
+ * The API, stubbed: Discord answers, and the Gateway answers whatever balance and
+ * catalogue the caller wants a run to see.
  *
- * The budget body is part of the stub because the connector's governance reads it
- * before every fold, so a test of what a run does with a spent day has to be able to
- * tell it the day is spent.
+ * The balance body is part of the stub because the connector's governance reads it
+ * before every fold, so a test of what a run does with a spent balance has to be able
+ * to tell it the balance is spent.
  */
-function stubFetch(keyBody?: unknown): () => void {
+function stubFetch(keyBody?: unknown, modelsBody?: unknown): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = ((input: string | URL | Request) => {
     const url = new URL(String(input));
-    if (url.hostname === "openrouter.ai") {
+    if (url.hostname === "ai-gateway.vercel.sh") {
+      if (url.pathname === "/v1/models") {
+        return Promise.resolve(Response.json(modelsBody ?? MODEL_CATALOGUE));
+      }
       return Promise.resolve(Response.json(keyBody ?? {}));
     }
     if (url.pathname === `/api/v10/channels/${CHANNEL}`) {
@@ -127,24 +130,24 @@ async function withBudgetEnv(
 ) {
   const restoreFetch = stubFetch(keyBody);
   const dir = await Deno.makeTempDir();
-  const bin = `${dir}/opencode-stand-in`;
+  const bin = `${dir}/fx-stand-in`;
   const marker = `${dir}/started`;
   await Deno.writeTextFile(bin, `#!/bin/sh\ntouch '${marker}'\nexit ${exitCode}\n`);
   await Deno.chmod(bin, 0o755);
   const priorToken = Deno.env.get(TOKEN_ENV);
-  const priorKey = Deno.env.get("OPENROUTER_API_KEY");
-  const priorBin = Deno.env.get("DCWG_OPENCODE_BIN");
+  const priorKey = Deno.env.get("AI_GATEWAY_API_KEY");
+  const priorBin = Deno.env.get("DCWG_FX_BIN");
   Deno.env.set(TOKEN_ENV, "test-token-not-real");
-  Deno.env.set("OPENROUTER_API_KEY", "test-key-not-real");
-  Deno.env.set("DCWG_OPENCODE_BIN", bin);
+  Deno.env.set("AI_GATEWAY_API_KEY", "test-key-not-real");
+  Deno.env.set("DCWG_FX_BIN", bin);
   try {
     await fn(bin, marker);
   } finally {
     restoreFetch();
     const prior: Array<[string, string | undefined]> = [
       [TOKEN_ENV, priorToken],
-      ["OPENROUTER_API_KEY", priorKey],
-      ["DCWG_OPENCODE_BIN", priorBin],
+      ["AI_GATEWAY_API_KEY", priorKey],
+      ["DCWG_FX_BIN", priorBin],
     ];
     for (const [name, value] of prior) {
       if (value === undefined) Deno.env.delete(name);
@@ -164,14 +167,8 @@ function exists(path: string): boolean {
   }
 }
 
-/** The budget body the connector's own key returned on 2026-10-17, spent. */
-const SPENT_KEY_BODY = {
-  data: {
-    is_free_tier: true,
-    usage: 0,
-    free_model_daily_requests: { limit: 50, used: 51, remaining: 0 },
-  },
-};
+/** The balance body the Gateway returned on 2026-10-18, spent. */
+const SPENT_KEY_BODY = { balance: "0.00", total_used: "5.000000000" };
 
 const BASE = ["--channel", CHANNEL, "--venue", "dcwg-talk", "--skip-wiki", "--all"];
 /** The same run, but with the page pass left on, so the fold is attempted. */
@@ -198,16 +195,16 @@ const FOLDING = [
 async function withFoldEnv(fn: () => Promise<void>): Promise<void> {
   const restoreFetch = stubFetch();
   const priorToken = Deno.env.get(TOKEN_ENV);
-  const priorKey = Deno.env.get("OPENROUTER_API_KEY");
+  const priorKey = Deno.env.get("AI_GATEWAY_API_KEY");
   Deno.env.set(TOKEN_ENV, "test-token-not-real");
-  Deno.env.set("OPENROUTER_API_KEY", "test-key-not-real");
+  Deno.env.set("AI_GATEWAY_API_KEY", "test-key-not-real");
   try {
     await fn();
   } finally {
     restoreFetch();
     const prior: Array<[string, string | undefined]> = [
       [TOKEN_ENV, priorToken],
-      ["OPENROUTER_API_KEY", priorKey],
+      ["AI_GATEWAY_API_KEY", priorKey],
     ];
     for (const [name, value] of prior) {
       if (value === undefined) Deno.env.delete(name);
@@ -225,6 +222,7 @@ async function withFoldEnv(fn: () => Promise<void>): Promise<void> {
  * what it would write if it succeeded.
  */
 async function seedWiki(root: string): Promise<void> {
+  await seedPrompt(root);
   await Deno.mkdir(`${root}/wiki`, { recursive: true });
   await Deno.writeTextFile(
     `${root}/wiki/Talk_History.md`,
@@ -235,6 +233,17 @@ async function seedWiki(root: string): Promise<void> {
 
 /** The repository root, so a fixture can copy the real wiki into a temp checkout. */
 const REPO_ROOT = fromFileUrl(new URL("../..", import.meta.url));
+/**
+ * The standing instructions the fx pass is handed.
+ *
+ * The connector reads them out of the checkout rather than shipping a copy of its own,
+ * so a fixture checkout has to carry them or the pass cannot start at all.
+ */
+async function seedPrompt(root: string): Promise<void> {
+  const target = `${root}/tools/discord/prompt`;
+  await Deno.mkdir(target, { recursive: true });
+  await Deno.copyFile(`${REPO_ROOT}/tools/discord/prompt/dcwg.md`, `${target}/dcwg.md`);
+}
 
 async function copyTree(from: string, to: string): Promise<void> {
   await Deno.mkdir(to, { recursive: true });
@@ -262,6 +271,7 @@ async function seedGateCleanWiki(root: string): Promise<void> {
   }
   await Deno.copyFile(`${REPO_ROOT}/wiki.yml`, `${root}/wiki.yml`);
   await Deno.mkdir(`${root}/raw/discord`, { recursive: true });
+  await seedPrompt(root);
 }
 
 Deno.test("one run writes an append-only capture, a cursor, and a contract-valid summary", async () => {
@@ -353,7 +363,7 @@ Deno.test("a failed page pass still commits the capture, the cursor, and a queue
   await withFoldEnv(async () => {
     const root = await Deno.makeTempDir();
     await seedWiki(root);
-    const { code, out } = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
+    const { code, out } = await runCli([...FOLDING, "--root", root]);
     assertEquals(code, 1, "a stalled fold is a run that needs attention, not a silent success");
 
     const capture = `${root}/raw/discord/2026-08-01_dcwg-talk.md`;
@@ -399,13 +409,13 @@ Deno.test("a queued capture is retried before anything newer, and stays queued",
   await withFoldEnv(async () => {
     const root = await Deno.makeTempDir();
     await seedWiki(root);
-    const first = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
+    const first = await runCli([...FOLDING, "--root", root]);
     assertEquals(first.code, 1);
 
     // A second run the same day archives another capture, and the fold it attempts
     // is the older queued one: material this venue still owes the wiki is absorbed
     // before anything newer, and the run stops rather than folding over it.
-    const second = await runCli([...FOLDING, "--provider", "openrouter", "--root", root]);
+    const second = await runCli([...FOLDING, "--root", root]);
     assertEquals(second.code, 1);
 
     const result = second.out.find((line) => line.startsWith("RESULT "))!;
@@ -561,12 +571,28 @@ Deno.test("--tag replaces the default tags instead of adding to them", async () 
   });
 });
 
+
+/** A balance with room in it, as the Gateway reports one. */
+const FRESH_KEY_BODY = { balance: "0.04", total_used: "1.69" };
+
+/**
+ * A model the Gateway charges for, and the catalogue entry that prices it.
+ *
+ * A free model is not governed by the balance at all: it costs nothing, so its share buys
+ * every attempt the caller asked for. These tests are about the arithmetic that does
+ * apply, which needs a pass that costs something, so they pin this model.
+ */
+const PAID_MODEL = "alibaba/qwen3.7-flash";
+const MODEL_CATALOGUE = {
+  data: [{ id: PAID_MODEL, pricing: { input: "0.00000003", output: "0.00000013" } }],
+};
+
 /**
  * The folding invocation on the agentic editor, which is the one the budget governs.
  *
- * `--attempts 2` is deliberate: it is the configuration whose worst case the free tier
- * cannot pay for, so the assertions below are about the run cutting that ceiling down
- * to what the day actually has.
+ * `--attempts 2` is deliberate: it is the configuration whose worst case the balance
+ * cannot pay for at a priced model, so the assertions below are about the run cutting
+ * that ceiling down to what the balance actually buys.
  */
 const AGENTIC = [
   "--channel",
@@ -575,19 +601,12 @@ const AGENTIC = [
   "dcwg-talk",
   "--all",
   "--editor",
-  "opencode",
+  "fx",
+  "--model",
+  PAID_MODEL,
   "--attempts",
   "2",
 ];
-
-/** A day with room in it, as the key endpoint reports one. */
-const FRESH_KEY_BODY = {
-  data: {
-    is_free_tier: true,
-    usage: 0,
-    free_model_daily_requests: { limit: 50, used: 12, remaining: 38 },
-  },
-};
 
 Deno.test("a spent day defers the fold without starting a pass", async () => {
   await withBudgetEnv(SPENT_KEY_BODY, async (_bin, marker) => {
@@ -643,7 +662,7 @@ Deno.test("a share that can pay for one pass starts it, and its failure is a sta
     assertEquals(
       payload.attempts,
       1,
-      "38 requests buys one 24-step attempt, not the two --attempts asked for",
+      "a $0.04 share buys one $0.03 pass, not the two --attempts asked for",
     );
     assertEquals(payload.budget, undefined, "this run was not budget-blocked");
     assertEquals(payload.stalled, "raw/discord/2026-08-01_dcwg-talk.md");

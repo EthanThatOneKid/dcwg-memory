@@ -15,13 +15,13 @@
 import { assert, assertStringIncludes } from "@std/assert";
 import { buildPrompt, SYSTEM_PROMPT } from "./wiki.ts";
 
-const OPENCODE_PROMPT = await Deno.readTextFile(new URL("./prompt/dcwg.md", import.meta.url));
+const FX_PROMPT = await Deno.readTextFile(new URL("./prompt/dcwg.md", import.meta.url));
 
 const FORBIDS_MD_LINKS = "Never write a markdown link whose target ends in";
 
-Deno.test("the opencode prompt instructs the link form the orphan gate counts", () => {
-  assertStringIncludes(OPENCODE_PROMPT, "(Deno_Fork_Options.md)");
-  assert(!OPENCODE_PROMPT.includes(FORBIDS_MD_LINKS));
+Deno.test("the fx prompt instructs the link form the orphan gate counts", () => {
+  assertStringIncludes(FX_PROMPT, "(Deno_Fork_Options.md)");
+  assert(!FX_PROMPT.includes(FORBIDS_MD_LINKS));
 });
 
 Deno.test("the api prompt instructs the link form the orphan gate counts", () => {
