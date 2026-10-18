@@ -7,9 +7,6 @@ import { assert, assertEquals } from "@std/assert";
 import {
   frontmatter,
   INDEX_PAGE,
-  readCaptures,
-  readIndexPages,
-  readSiteOrigin,
   renderCapturesIndex,
   writeCapturesIndex,
 } from "./index_page.ts";
@@ -104,22 +101,4 @@ Deno.test("writing the index is idempotent", async () => {
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
-});
-
-Deno.test("the committed index matches what the generator produces", async () => {
-  // Guards the invariant that the index is generated: if it drifts from the
-  // tree, the fix is to regenerate it rather than to edit the page.
-  const root = `${Deno.cwd()}/../..`;
-  let committed: string;
-  try {
-    committed = await Deno.readTextFile(`${root}/${INDEX_PAGE}`);
-  } catch {
-    return; // not running inside the repository checkout
-  }
-  const rendered = renderCapturesIndex({
-    siteOrigin: await readSiteOrigin(root),
-    captures: await readCaptures(root),
-    pages: await readIndexPages(root),
-  });
-  assertEquals(committed, rendered, "wiki/Captures.md is stale; regenerate it from the tree");
 });

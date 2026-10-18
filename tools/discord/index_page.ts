@@ -54,6 +54,16 @@ function asString(value: unknown): string {
   return "";
 }
 
+/** Whether this root holds a wiki at all, which its config file is what decides. */
+export async function isWikiTree(root: string): Promise<boolean> {
+  try {
+    await Deno.stat(`${root}/wiki.yml`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The published origin for capture links, taken from the `wiki:` CURIE in wiki.yml. */
 export async function readSiteOrigin(root: string): Promise<string> {
   const config = await Deno.readTextFile(`${root}/wiki.yml`);
@@ -165,6 +175,11 @@ export function renderCapturesIndex(input: {
 
 /** Write the index if it differs from what is on disk. Returns whether it changed. */
 export async function writeCapturesIndex(root: string): Promise<boolean> {
+  // A root with no wiki config is not a wiki, so there is no index to write and
+  // nothing to say: the connector's tests build minimal roots on purpose. A config
+  // that exists but carries no `wiki:` prefix is a real misconfiguration and still
+  // throws, because that tree claims to be a wiki and cannot name its own captures.
+  if (!(await isWikiTree(root))) return false;
   const rendered = renderCapturesIndex({
     siteOrigin: await readSiteOrigin(root),
     captures: await readCaptures(root),
