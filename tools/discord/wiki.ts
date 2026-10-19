@@ -7,11 +7,13 @@
  *   writePage()    apply one edit
  *   revert()       put the snapshot back, used when a gate rejects the result
  *
- * Inference is the Vercel AI SDK on the Vercel AI Gateway. Model and key are
- * injectable so the pass can be exercised without a live key.
+ * Inference is the Vercel AI SDK, on whichever provider this pass selected: the Vercel AI
+ * Gateway, or an OpenAI-compatible endpoint (Gemini's, through the local shim). Model and
+ * key are injectable so the pass can be exercised without a live key.
  */
 
 import { createGateway } from "@ai-sdk/gateway";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import {
@@ -22,19 +24,34 @@ import {
   MAX_PAGE_BYTES,
   WIKI_PREFIX,
 } from "./guard.ts";
+import {
+  GATEWAY_DEFAULT_MODEL,
+  missingKeyMessage,
+  PROVIDERS,
+  type ProviderSpec,
+  resolveApiKey,
+  resolveProvider,
+} from "./providers.ts";
 
 /**
- * The free model by default, because it costs nothing to run and the Gateway
- * meters it by rate rather than by the day. Override with --model; any model id
+ * The default model, which is the Gateway's free one: it costs nothing to run and the
+ * Gateway meters it by rate rather than by the day. Override with --model; any model id
  * the Gateway publishes works, and a paid one is bounded by the credit probe in
  * `budget.ts` rather than by this default.
  *
- * The id is the Gateway's own `vendor/model`, not a bare model name.
+ * The id is the Gateway's own `vendor/model`, not a bare model name. A pass on another
+ * provider takes that provider's default from `providers.ts` instead.
  */
-export const DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning-free";
+export const DEFAULT_MODEL = GATEWAY_DEFAULT_MODEL;
 
-/** The one credential this repo's inference uses, for either editor. */
-export const GATEWAY_KEY_NAME = "AI_GATEWAY_API_KEY";
+/**
+ * The Gateway's credential name, kept as the default this repo's inference reads.
+ *
+ * A pass on another provider reads that provider's name instead, from
+ * `providers.ts`; this stays exported because the Gateway is what a run gets when it
+ * names no provider.
+ */
+export const GATEWAY_KEY_NAME = PROVIDERS.gateway.keyEnv;
 
 /** Per-page and per-capture caps so a long history cannot blow the budget. */
 export const PAGE_CHAR_CAP = 8_000;
@@ -180,6 +197,8 @@ export interface WikiPassInput {
    */
   offset?: number;
   model?: string;
+  /** Which provider this pass runs on. Defaults to the Gateway. */
+  provider?: ProviderSpec;
   apiKey?: string;
   /** Page snapshot to send instead of reading the tree. Used by tests. */
   pages?: Array<{ path: string; text: string }>;
@@ -481,26 +500,37 @@ async function dumpProposal(
 }
 
 /**
+ * Build the model client for a provider.
+ *
+ * Two protocols, one call site: the Gateway has its own SDK client, and every other
+ * provider here is reached over the OpenAI chat-completions protocol. The Gemini path
+ * points at the loopback shim rather than at Google, because Google's endpoint is
+ * OpenAI-compatible but not consistently so and the shim is what makes it usable.
+ *
+ * The protocol is a property of the provider in `providers.ts` rather than a flag here,
+ * so a run cannot ask for a client that does not match the provider it selected.
+ */
+export function buildLanguageModel(spec: ProviderSpec, apiKey: string, modelId: string) {
+  if (spec.protocol === "gateway") return createGateway({ apiKey })(modelId);
+  return createOpenAICompatible({ name: spec.name, baseURL: spec.baseUrl, apiKey })(modelId);
+}
+
+/**
  * Run the pass. Returns either the edits with a `revert` closure, or the reasons
  * the model's proposal was refused. Writes nothing on the rejected path.
  */
 export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult> {
-  const apiKey = input.apiKey ?? Deno.env.get(GATEWAY_KEY_NAME);
-  if (!apiKey) {
-    throw new Error(
-      `the wiki pass needs an API key: set ${GATEWAY_KEY_NAME} to a Vercel AI
-` +
-        `Gateway key, or pass --skip-wiki`,
-    );
-  }
+  const spec = input.provider ?? resolveProvider(undefined);
+  const apiKey = input.apiKey ?? resolveApiKey(spec, (name) => Deno.env.get(name))?.value;
+  if (!apiKey) throw new Error(missingKeyMessage(spec));
 
   const pages = input.pages ?? await readPages(input.root);
   const captureText = input.captureText ??
     await Deno.readTextFile(`${input.root}/${input.capturePath}`);
   const lastUpdated = input.lastUpdated ?? await readLastUpdated(input.root);
 
-  const modelId = input.model ?? DEFAULT_MODEL;
-  const provider = createGateway({ apiKey });
+  const modelId = input.model ?? spec.defaultModel;
+  const model = buildLanguageModel(spec, apiKey, modelId);
   // The AI SDK's generateText is heavily overloaded; narrow it once, here, to
   // the shape the pass actually reads.
   const generate = (input.generate ?? generateText) as unknown as PassGenerate;
@@ -508,7 +538,7 @@ export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult>
   let result: PassCallResult;
   try {
     result = await generate({
-      model: provider(modelId),
+      model: model,
       system: SYSTEM_PROMPT,
       prompt: buildPrompt({ ...input, lastUpdated }, pages, captureText),
       output: Output.object({ schema: PageEditsSchema }),

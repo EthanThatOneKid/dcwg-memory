@@ -30,10 +30,18 @@ name: Discord ingest
 # unpinned install would let the automation change underneath a run. `--editor
 # api` selects the older one-shot path, which needs no CLI.
 #
-# The Gateway is the only inference provider: one key, one catalogue, and one
-# budget probe. Required repository secrets:
+# `--provider` picks who pays. The default, `gateway`, is the Vercel AI Gateway: one
+# key, one catalogue, and one credit probe. `gemini` runs the same fx pass against
+# Google's free tier, which is metered by request rather than by credits, so a gemini
+# run skips the credit probe entirely and is bounded by the provider's own rate limit.
+# Gemini's OpenAI-compatible endpoint is not consistently compatible (streamed tool
+# calls arrive without an `index`, `arguments` arrives as a JSON string), and fx is a
+# pinned binary, so a gemini run reaches Google through the local shim in
+# tools/discord/gemini_proxy.ts: the job starts it below and points fx at it through
+# ~/.fx/settings.json. Required repository secrets:
 #   DISCORD_BOT_TOKEN       the capture bot's token (its own application)
-#   AI_GATEWAY_API_KEY      inference for the wiki pass, both editors
+#   AI_GATEWAY_API_KEY      inference for the wiki pass on the Gateway (the default)
+#   GEMINI_API_KEY          inference for the wiki pass on --provider gemini
 # A pass costs money rather than requests here, and the free models cost
 # nothing: the connector asks the Gateway for the team's credit balance and for
 # the catalogue price of the model this run was pointed at, and refuses to start
@@ -66,6 +74,10 @@ on:
         description: "Model for the wiki pass. Blank = the default. A Gateway id, vendor/model, e.g. nvidia/nemotron-3.5-lightning-free"
         type: string
         default: ""
+      provider:
+        description: "Who pays for the wiki pass: gateway or gemini (blank = the connector's default, gateway)"
+        type: string
+        default: ""
       editor:
         description: "fx or api (blank = the connector's default)"
         type: string
@@ -95,6 +107,11 @@ jobs:
       # is repointed at another model (e.g. alibaba/qwen3.7-flash) without editing
       # this file. Unset, the connector uses the default wiki.ts names.
       MODEL: ${{ github.event.inputs.model || vars.DCWG_MODEL }}
+      # Same shape as MODEL: a scheduled run cannot take an input, so the repository
+      # variable DCWG_PROVIDER is how the daily run is repointed at the free Gemini
+      # tier (set it to `gemini`) without editing this file. Unset, the connector
+      # defaults to the Gateway.
+      PROVIDER: ${{ github.event.inputs.provider || vars.DCWG_PROVIDER }}
       EDITOR: ${{ github.event.inputs.editor }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       SKIP_WIKI: ${{ github.event.inputs.skip_wiki }}
@@ -138,6 +155,48 @@ jobs:
           }
           JSON
 
+
+      # A gemini pass runs through the shim, and fx reads the provider it was pointed at
+      # out of a per-machine file, so the job writes that block rather than committing it.
+      # `auth.env` has to name the variable the ingest step exports: the connector checks
+      # this file before a pass and refuses a mismatch by name instead of letting it
+      # surface as an unauthenticated request.
+      - name: Point fx at the shim when the pass runs on gemini
+        if: env.PROVIDER == 'gemini'
+        run: |
+          jq '.provider = "gemini" | .providers.gemini = {
+                "protocol": "openai-chat-completions",
+                "base_url": "http://127.0.0.1:8787/v1",
+                "auth": { "type": "bearer", "env": "GEMINI_API_KEY" },
+                "model_metadata": {
+                  "gemini-2.5-flash": {
+                    "context_window": 1048576,
+                    "max_output_tokens": 65536,
+                    "supports_tool_use": true
+                  }
+                }
+              }' "$HOME/.fx/settings.json" > "$HOME/.fx/settings.tmp"
+          mv "$HOME/.fx/settings.tmp" "$HOME/.fx/settings.json"
+          cat "$HOME/.fx/settings.json"
+
+      # The shim repairs the four ways Gemini's OpenAI-compatible endpoint is not
+      # OpenAI-compatible. It holds no credential: it forwards the caller's own
+      # Authorization header upstream and logs neither the header nor a body.
+      - name: Start the Gemini shim
+        if: env.PROVIDER == 'gemini'
+        run: |
+          deno run -A tools/discord/gemini_proxy.ts --port 8787 > /tmp/gemini-shim.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/health > /dev/null; then
+              echo "shim listening on 127.0.0.1:8787"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "the shim never answered on 127.0.0.1:8787"
+          cat /tmp/gemini-shim.log
+          exit 1
+
       - name: Unit-test the connector before trusting it
         run: deno test -A
         working-directory: tools/discord
@@ -150,6 +209,9 @@ jobs:
           # is another project's bot.
           DCWG_DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          # Only read when the pass runs on gemini; the connector resolves a provider's
+          # key from its own variable and refuses the run by name when it is absent.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           # Per-venue commits, inside the loop. The runner is ephemeral and one venue must
           # not be able to discard another venue's work: each venue commits and pushes its
@@ -196,6 +258,10 @@ jobs:
             # default id would send a model nobody chose to the Gateway.
             if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
             if [ -n "${EDITOR:-}" ]; then args+=(--editor "$EDITOR"); fi
+            # Who pays for the pass. Unset means the connector's own default, and a
+            # gemini pass also requires the shim started above and the settings block
+            # written above, both of which key off the same variable.
+            if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
             [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
             [ "${SKIP_WIKI:-false}" = "true" ] && args+=(--skip-wiki)
             if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then

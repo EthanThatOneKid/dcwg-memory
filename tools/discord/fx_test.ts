@@ -230,7 +230,8 @@ Deno.test("parseFxRateLimit lifts a rate limit out of the recovery block", () =>
 Deno.test("parseFxRateLimit reads stderr, which is where a failure before any request lands", () => {
   // fx writes diagnostics to stderr, so a pass rejected at the gateway has no envelope
   // to read and only this to go on.
-  const stderr = "fx: error: AI Gateway: rate limit exceeded for nvidia/nemotron-3.5-lightning-free";
+  const stderr =
+    "fx: error: AI Gateway: rate limit exceeded for nvidia/nemotron-3.5-lightning-free";
   assertStringIncludes(String(parseFxRateLimit(undefined, stderr)), "rate limit exceeded");
 });
 
