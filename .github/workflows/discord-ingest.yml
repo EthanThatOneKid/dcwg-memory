@@ -71,7 +71,7 @@ on:
         type: boolean
         default: false
       model:
-        description: "Model for the wiki pass. Blank = the default. A Gateway id, vendor/model, e.g. nvidia/nemotron-3.5-lightning-free"
+        description: "Model the wiki pass starts on. Blank = the default. A Gateway id, vendor/model, e.g. minimax/minimax-m3.1-flash. The provider's free fallbacks follow it"
         type: string
         default: ""
       provider:

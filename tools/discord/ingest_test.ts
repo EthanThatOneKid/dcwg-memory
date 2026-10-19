@@ -11,6 +11,7 @@ import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { main } from "./ingest.ts";
 import { validateSummary } from "./guard.ts";
+import { GATEWAY_DEFAULT_MODEL, GATEWAY_FALLBACK_MODELS } from "./providers.ts";
 import type { DiscordMessage } from "./discord.ts";
 
 const CHANNEL = "1558888938842624093";
@@ -815,4 +816,110 @@ Deno.test("an unmetered provider is never asked what it has left", async () => {
   } finally {
     globalThis.fetch = original;
   }
+});
+
+/**
+ * The models one run was handed, in the order it was handed them.
+ *
+ * The rotation is only observable through what the pass was spawned with, so the stand-in
+ * records `--model` on every call rather than answering anything: a test that asserted the
+ * run's own log line would be reading the connector's intent back to itself.
+ */
+async function withModelLogEnv(
+  stderrLine: string,
+  fn: (modelsLog: string) => Promise<void>,
+  exitCode = 1,
+): Promise<void> {
+  const restoreFetch = stubFetch(FRESH_KEY_BODY);
+  const dir = await Deno.makeTempDir();
+  const bin = `${dir}/fx-stand-in`;
+  const modelsLog = `${dir}/models`;
+  await Deno.writeTextFile(
+    bin,
+    "#!/bin/sh\n" +
+      'prev=""\n' +
+      'for arg in "$@"; do\n' +
+      `  if [ "$prev" = "--model" ]; then echo "$arg" >> '${modelsLog}'; fi\n` +
+      '  prev="$arg"\n' +
+      "done\n" +
+      `echo "${stderrLine}" 1>&2\n` +
+      `exit ${exitCode}\n`,
+  );
+  await Deno.chmod(bin, 0o755);
+  const priorToken = Deno.env.get(TOKEN_ENV);
+  const priorKey = Deno.env.get("AI_GATEWAY_API_KEY");
+  const priorBin = Deno.env.get("DCWG_FX_BIN");
+  Deno.env.set(TOKEN_ENV, "test-token-not-real");
+  Deno.env.set("AI_GATEWAY_API_KEY", "test-key-not-real");
+  Deno.env.set("DCWG_FX_BIN", bin);
+  try {
+    await fn(modelsLog);
+  } finally {
+    restoreFetch();
+    const prior: Array<[string, string | undefined]> = [
+      [TOKEN_ENV, priorToken],
+      ["AI_GATEWAY_API_KEY", priorKey],
+      ["DCWG_FX_BIN", priorBin],
+    ];
+    for (const [name, value] of prior) {
+      if (value === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, value);
+    }
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+/**
+ * The folding invocation that leaves the model to the connector, so the rotation is what
+ * decides it: `--attempts 2` against a rotation of two is exactly the two models.
+ */
+const ROTATING = [
+  "--channel",
+  CHANNEL,
+  "--venue",
+  "dcwg-talk",
+  "--all",
+  "--editor",
+  "fx",
+  "--attempts",
+  "2",
+];
+
+Deno.test("a rate-limited pass moves to the next model in the rotation", async () => {
+  await withModelLogEnv(
+    "fx: error: AI Gateway: rate limit exceeded for the free model",
+    async (modelsLog) => {
+      const root = await Deno.makeTempDir();
+      await seedGateCleanWiki(root);
+      const { code, out } = await runCli([...ROTATING, "--root", root]);
+
+      assertEquals(code, 1, "a cap is not a verdict on the material, so the fold is not done");
+      const models = (await Deno.readTextFile(modelsLog)).trim().split("\n");
+      assertEquals(models, [GATEWAY_DEFAULT_MODEL, GATEWAY_FALLBACK_MODELS[0]]);
+      assert(
+        out.some((line) => line.startsWith("fallback: ")),
+        `the run names the rotation before the first attempt: ${out.join(" | ")}`,
+      );
+      assert(
+        out.some((line) => line.includes(`moving to ${GATEWAY_FALLBACK_MODELS[0]}`)),
+        `the run says which model it moved to: ${out.join(" | ")}`,
+      );
+    },
+  );
+});
+
+Deno.test("a pass that failed on its own work stays on the model it started with", async () => {
+  await withModelLogEnv("fx: error: the agent gave up after 24 steps", async (modelsLog) => {
+    const root = await Deno.makeTempDir();
+    await seedGateCleanWiki(root);
+    const { code } = await runCli([...ROTATING, "--root", root]);
+
+    assertEquals(code, 1);
+    const models = (await Deno.readTextFile(modelsLog)).trim().split("\n");
+    assertEquals(
+      models,
+      [GATEWAY_DEFAULT_MODEL, GATEWAY_DEFAULT_MODEL],
+      "a different model is a different experiment, not a retry of this one",
+    );
+  });
 });
