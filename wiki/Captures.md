@@ -31,14 +31,19 @@ The repository is public, so these files are readable in place. The same files a
 
 ## What is derived from them
 
+- [Benchmarking dodo](Dodo_Benchmarks.md): The 2026-10-13
 - [Deno](Deno.md): A JavaScript, TypeScript, and WebAssembly runtime built on V8 and Rust, created by Ryan Dahl and Bert Belder, whose own development ends about a year after Cloudflare acquired Deno Land Inc. on 2026-10-09.
 - [Deno Core Working Group](Deno_Core_Working_Group.md): An informal group of Deno users organizing on Discord to keep the runtime alive after Cloudflare acquired Deno Land Inc. and Deno ended its own runtime development.
 - [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md): The Discord handles visible in the group's #talk capture, with the public identity behind each handle where one could be confirmed.
 - [Deno fork options and naming](Deno_Fork_Options.md): The two-fork thesis, the naming candidates weighed on 2026-10-11 (Ende, dodo, endo, noend, Pteryx), and what the group agreed a fork must preserve.
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): What a community handoff of the Deno runtime, std, and rusty_v8 would have to transfer, split into what is possible, what needs negotiation, and what is not on the table.
+- [Deno versus Node features](Deno_vs_Node_Features.md): The 2026-10-16
 - [Ende](Ende_Runtime.md): A planned drop-in Deno fork by Paul Anthony Webb that keeps the namespace for compatibility and drops Node compatibility, Deno Deploy, KV, and Jupyter; not public yet, soft launch planned for December 2026.
 - [Ende vs Dodo](Ende_vs_Dodo.md): Why Ende and Dodo are not competing runtimes. Ende is a fork with an owner, a registered namespace, and a published roadmap; Dodo is a name the group liked for a compatibility fork that nobody has started.
 - [Fresh framework migration](Fresh_Framework_Migration.md): Fresh, Deno's full-stack web framework, moved out of the denoland GitHub organization into freshframework. The verified facts of that move, and which of them transfer to a runtime handoff.
 - [Luca Casonato](Luca_Casonato.md): Creator of the Fresh web framework and former Deno core team member, now at Railway; named in the group as the person who has already done a Deno-project handoff.
 - [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): The projects that already implement a minimal core with opt-in extensions, checked against live repositories on 2026-10-11, covering Andromeda and Nova, LLRT, WinterJS, workerd, Bun, and the C# hosting precedent.
 - [Runtime architecture proposals](Runtime_Architecture_Proposals.md): The 2026-10-11 architecture thread on a minimal core with opt-in extensions, the host-language question (C#, Go, Rust), extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
+- [Rust core rewrite proposal](Rust_Core_Proposal.md): The 2026-10-12
+- [Rust upskilling for the fork](Rust_Upskilling.md): The 2026-10-12
+- [Sustaining the fork](Fork_Sustainability.md): The 2026-10-12

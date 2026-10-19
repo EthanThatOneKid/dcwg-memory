@@ -71,6 +71,8 @@ Only two things: that extensions should be authorable in TypeScript and Rust, an
 - [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): the existing runtimes that already implement this design.
 - [Deno fork options and naming](Deno_Fork_Options.md): the fork scope and naming thread from the same day.
 - [Deno Core Working Group](Deno_Core_Working_Group.md): who is in the room.
+- [Rust core rewrite proposal](Rust_Core_Proposal.md): the rewrite that got formalized on 2026-10-12, prototyped in zig first.
+- [Rust upskilling](Rust_Upskilling.md): the skill survey that followed, and what to learn before contributing to either.
 
 ## Sources
 
