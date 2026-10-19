@@ -60,7 +60,7 @@ The structural point is worth separating from the funding question: the group's 
 - [Deno Core Working Group](Deno_Core_Working_Group.md): who is in the room, and how informal the group is.
 - [Ende](Ende_Runtime.md): a fork with a single owner, which is the arrangement this thread is worried about.
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): the alternative to a fork, and what a transfer would require.
-- [Deno versus Node features](Deno_vs_Node_Features.md): the other thread about who the project is for, which is the same question as who would pay for it.
+- [Deno versus Node features](Deno_vs_Node_Features.md): the other thread about who the project is for, which is the same question as who would pay for it.- [Dodo's identity and the economic reality](Dodo_Identity_And_Economics.md): the later #propose thread that asked the money question again, with four routes weighed and a warning about what taking investment does to a project.
 
 ## Sources
 

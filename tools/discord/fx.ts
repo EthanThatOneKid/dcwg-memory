@@ -267,22 +267,35 @@ export function fxUsage(result: FxResult | undefined): FxUsage {
   };
 }
 
-/** Anything a run's own output might say about a spent or throttled provider budget. */
-const RATE_LIMIT = /(\b429\b|rate.?limit|too many requests|throttl|quota)/i;
+/**
+ * Anything a run's own output might say about a provider that would not serve the request,
+ * whether that is a spent rate limit or a model this account cannot reach at all.
+ *
+ * What matters is the line between a provider that refused and material the model could not
+ * fold. A refusal is not a verdict on the capture, so it is a reason to ask a different
+ * model and, if none answers, to report availability rather than a stall. Measured
+ * 2026-10-19, the refusal that actually happened named no rate limit: the Gateway answered
+ * `API access denied · HTTP 403 · no_providers_available: Free tier users do not have
+ * access to this model`, and a detector that knew only `429` treated it as material the
+ * model could not fold and spent both attempts on a model the account cannot use.
+ */
+const PROVIDER_REFUSAL =
+  /(\b429\b|\b403\b|rate.?limit|too many requests|throttl|quota|access denied|no_providers_available|do not have access)/i;
 
 /**
- * The provider's own rate-limit message, when a pass died on one.
+ * The provider's own refusal, when a pass died on one rather than on its own work.
  *
- * A spent budget has to be told apart from material the model could not fold: the
- * connector reports the first as a budget condition and the second as a stall, because a
- * pass the provider refused judged nothing. fx folds a retried response into `recovery`
- * in the envelope and writes its diagnostics to stderr, so both are read, and stderr is
- * what a failure before the first request leaves behind.
+ * fx folds a retried response into `recovery` in the envelope and writes its diagnostics to
+ * stderr, so both are read, and stderr is what a failure before the first request leaves
+ * behind.
  */
-export function parseFxRateLimit(result: FxResult | undefined, stderr: string): string | undefined {
+export function parseProviderRefusal(
+  result: FxResult | undefined,
+  stderr: string,
+): string | undefined {
   const recovery = result?.recovery ? JSON.stringify(result.recovery) : "";
   for (const line of `${recovery}\n${stderr}`.split("\n")) {
-    if (RATE_LIMIT.test(line)) return line.trim().slice(0, 300);
+    if (PROVIDER_REFUSAL.test(line)) return line.trim().slice(0, 300);
   }
   return undefined;
 }
@@ -297,11 +310,11 @@ export interface FxRunResult {
   stderr: string;
   stdout: string;
   /**
-   * The provider's rate-limit message when the pass died on one, so a spent budget is
-   * reported as a budget condition rather than as material the model could not fold.
-   * `undefined` for every other failure.
+   * The provider's refusal when the pass died on one, so a provider that would not serve
+   * the request is reported as an availability condition rather than as material the model
+   * could not fold. `undefined` for every other failure.
    */
-  rateLimited: string | undefined;
+  providerRefused: string | undefined;
 }
 
 export interface FxRunInput {
@@ -398,7 +411,7 @@ export async function runFx(input: FxRunInput): Promise<FxRunResult> {
       usage: fxUsage(result),
       stderr: stderr.trim().split("\n").slice(-20).join("\n"),
       stdout,
-      rateLimited: parseFxRateLimit(result, stderr),
+      providerRefused: parseProviderRefusal(result, stderr),
     };
   } finally {
     clearTimeout(timer);

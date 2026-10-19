@@ -1,7 +1,12 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   describeProvider,
+  describeRotation,
   fxProviderProblems,
+  GATEWAY_DEFAULT_MODEL,
+  GATEWAY_FALLBACK_MODELS,
+  GEMINI_DEFAULT_MODEL,
+  modelRotation,
   parseProviderName,
   PROVIDERS,
   resolveApiKey,
@@ -117,11 +122,48 @@ Deno.test("a settings file pointing somewhere else is refused, and a matching on
 
 Deno.test("the run report says which provider paid for the pass", () => {
   assertEquals(
-    describeProvider(PROVIDERS.gateway, "nvidia/nemotron-3.5-lightning-free"),
-    "gateway (nvidia/nemotron-3.5-lightning-free), metered",
+    describeProvider(PROVIDERS.gateway, GATEWAY_DEFAULT_MODEL),
+    `gateway (${GATEWAY_DEFAULT_MODEL}), metered`,
   );
   assertEquals(
     describeProvider(PROVIDERS.gemini, "gemini-2.5-flash"),
     "gemini (gemini-2.5-flash), unmetered",
   );
+});
+
+Deno.test("the Gateway default is the free model that was measured on this pass", () => {
+  // Pinned rather than derived: the whole point of the default is which model it is, and a
+  // silent change to it is what put a model that cannot honour the schema in the cron.
+  assertEquals(GATEWAY_DEFAULT_MODEL, "minimax/minimax-m3.1-flash");
+  assertEquals(GATEWAY_FALLBACK_MODELS, ["stealth/cat-jam"]);
+});
+
+Deno.test("the rotation starts at the model the run named and keeps its order", () => {
+  assertEquals(modelRotation(PROVIDERS.gateway, GATEWAY_DEFAULT_MODEL), [
+    GATEWAY_DEFAULT_MODEL,
+    ...GATEWAY_FALLBACK_MODELS,
+  ]);
+  // A run pointed at a fallback directly does not then repeat it.
+  assertEquals(modelRotation(PROVIDERS.gateway, "stealth/cat-jam"), ["stealth/cat-jam"]);
+  // A run pointed at something outside the free list keeps its own choice and adds the
+  // free models behind it, because a paid model that is rate-limited is the same problem.
+  assertEquals(modelRotation(PROVIDERS.gateway, "alibaba/qwen3.7-flash"), [
+    "alibaba/qwen3.7-flash",
+    ...GATEWAY_FALLBACK_MODELS,
+  ]);
+});
+
+Deno.test("a provider with nowhere to go has a rotation of one", () => {
+  assertEquals(modelRotation(PROVIDERS.gemini, GEMINI_DEFAULT_MODEL), [GEMINI_DEFAULT_MODEL]);
+});
+
+Deno.test("the run report names every model a pass may reach", () => {
+  assertEquals(describeRotation([GATEWAY_DEFAULT_MODEL]), GATEWAY_DEFAULT_MODEL);
+  assertEquals(
+    describeRotation([GATEWAY_DEFAULT_MODEL, "stealth/cat-jam"]),
+    `${GATEWAY_DEFAULT_MODEL}, then stealth/cat-jam`,
+  );
+  // The list is read as prose, so it has to stay readable when a provider ever has more
+  // than one model behind it.
+  assertEquals(describeRotation(["a", "b", "c"]), "a, then b, c");
 });

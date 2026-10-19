@@ -17,7 +17,7 @@ import {
   fxSteps,
   fxUsage,
   outsideWiki,
-  parseFxRateLimit,
+  parseProviderRefusal,
   parseFxResult,
   readFxSteps,
   readStandingInstructions,
@@ -210,7 +210,7 @@ Deno.test("fxUsage reports the spend and the model, and zero when there is no en
   });
 });
 
-Deno.test("parseFxRateLimit lifts a rate limit out of the recovery block", () => {
+Deno.test("parseProviderRefusal lifts a rate limit out of the recovery block", () => {
   const envelope = {
     ...MEASURED_ENVELOPE,
     exit_code: 1,
@@ -222,29 +222,47 @@ Deno.test("parseFxRateLimit lifts a rate limit out of the recovery block", () =>
     },
   };
   assertStringIncludes(
-    String(parseFxRateLimit(envelope, "")),
+    String(parseProviderRefusal(envelope, "")),
     "429 Too Many Requests from the AI Gateway",
   );
 });
 
-Deno.test("parseFxRateLimit reads stderr, which is where a failure before any request lands", () => {
+Deno.test("parseProviderRefusal reads stderr, which is where a failure before any request lands", () => {
   // fx writes diagnostics to stderr, so a pass rejected at the gateway has no envelope
   // to read and only this to go on.
   const stderr =
-    "fx: error: AI Gateway: rate limit exceeded for nvidia/nemotron-3.5-lightning-free";
-  assertStringIncludes(String(parseFxRateLimit(undefined, stderr)), "rate limit exceeded");
+    "fx: error: AI Gateway: rate limit exceeded for minimax/minimax-m3.1-flash";
+  assertStringIncludes(String(parseProviderRefusal(undefined, stderr)), "rate limit exceeded");
 });
 
-Deno.test("parseFxRateLimit is undefined for a pass that failed on its own work", () => {
-  // A gate rejection, a timeout, a refused edit: none of them is a provider cap, and
-  // every one of them must keep counting as a stall rather than as a budget condition.
-  assertEquals(parseFxRateLimit(undefined, ""), undefined);
-  assertEquals(parseFxRateLimit({ exit_code: 1, steps: 6 }, ""), undefined);
-  assertEquals(parseFxRateLimit(undefined, "error: no wiki page was written"), undefined);
+Deno.test("parseProviderRefusal counts a model this account cannot reach as a refusal", () => {
+  // The refusal that actually happened on 2026-10-19 named no rate limit at all: the
+  // Gateway answered 403 no_providers_available, and a detector that knew only 429 read
+  // it as material the model could not fold, so both attempts went to a model the
+  // account cannot use and the fold was reported as a stall.
+  const stderr =
+    'fx: error: API access denied · HTTP 403 · {"error":{"type":"no_providers_available",' +
+    '"message":"Free tier users do not have access to this model"}}';
+  const refusal = String(parseProviderRefusal(undefined, stderr));
+  assertStringIncludes(refusal, "403");
+  assertStringIncludes(refusal, "no_providers_available");
+});
+
+Deno.test("parseProviderRefusal is undefined for a pass that failed on its own work", () => {
+  // A gate rejection, a timeout, a refused edit: none of them is a provider refusal, and
+  // every one of them must keep counting as a stall rather than as an availability
+  // condition.
+  assertEquals(parseProviderRefusal(undefined, ""), undefined);
+  assertEquals(parseProviderRefusal({ exit_code: 1, steps: 6 }, ""), undefined);
+  assertEquals(parseProviderRefusal(undefined, "error: no wiki page was written"), undefined);
   assertEquals(
-    parseFxRateLimit(MEASURED_ENVELOPE, "info: recovered after 13 attempts"),
+    parseProviderRefusal(MEASURED_ENVELOPE, "info: recovered after 13 attempts"),
     undefined,
   );
+  // A count is not a refusal. `403` and `429` are read as words, so a token count or a
+  // step number that happens to contain those digits must not move the rotation.
+  assertEquals(parseProviderRefusal({ steps: 429 }, ""), undefined);
+  assertEquals(parseProviderRefusal(undefined, "wrote 4032 bytes to wiki/Thing.md"), undefined);
 });
 
 Deno.test("fxSteps reads the ceiling, and refuses a value that is not one", () => {

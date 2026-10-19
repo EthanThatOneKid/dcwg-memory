@@ -98,6 +98,12 @@ export interface PassCallArgs {
   temperature: number;
   maxOutputTokens: number;
   maxRetries: number;
+  /**
+   * Provider routing for this call, narrowed to nothing so the seam stays injectable.
+   * The Gateway reads `gateway.models` here as the list of models it fails over to
+   * inside this one request.
+   */
+  providerOptions?: unknown;
 }
 
 export interface PassCallResult {
@@ -197,6 +203,11 @@ export interface WikiPassInput {
    */
   offset?: number;
   model?: string;
+  /**
+   * The models to fall back to, in order, when `model` cannot answer. The Gateway fails
+   * over inside the request; a provider without that support is driven by the caller.
+   */
+  fallbacks?: string[];
   /** Which provider this pass runs on. Defaults to the Gateway. */
   provider?: ProviderSpec;
   apiKey?: string;
@@ -534,7 +545,18 @@ export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult>
   // The AI SDK's generateText is heavily overloaded; narrow it once, here, to
   // the shape the pass actually reads.
   const generate = (input.generate ?? generateText) as unknown as PassGenerate;
-
+  /**
+   * Hand the Gateway the rest of the rotation so it fails over without a second request.
+   *
+   * This is the api editor's whole fallback story, and it is deliberately not the fx one:
+   * fx is a pinned binary that accepts a single `--model`, so the connector moves down the
+   * same list between attempts instead. Only the Gateway understands this option, and only
+   * a provider that can be told is given it.
+   */
+  const fallbacks = (input.fallbacks ?? []).filter((fallback) => fallback !== modelId);
+  const providerOptions = spec.protocol === "gateway" && fallbacks.length
+    ? { gateway: { models: fallbacks } }
+    : undefined;
   let result: PassCallResult;
   try {
     result = await generate({
@@ -544,6 +566,7 @@ export async function runWikiPass(input: WikiPassInput): Promise<WikiPassResult>
       output: Output.object({ schema: PageEditsSchema }),
       temperature: 0.2,
       maxOutputTokens: MAX_OUTPUT_TOKENS,
+      ...(providerOptions ? { providerOptions } : {}),
       // Retrying is the connector's job, and it feeds the reason back to the
       // model. An SDK retry here would be invisible and would multiply the
       // wall-clock cost of a call that is failing slowly.

@@ -47,6 +47,12 @@ export interface ProviderSpec {
   baseUrl: string;
   /** The model a pass runs when `--model` names none. */
   defaultModel: string;
+  /**
+   * The models a pass may move on to, in order, when the one it started on cannot answer.
+   * Empty for a provider with nowhere to go: Gemini's free tier is one model family behind
+   * one rate limit, so a fallback there would only restate the limit.
+   */
+  fallbacks: string[];
   /** Whether a pass is billed, so the Gateway credit probe and its share apply. */
   metered: boolean;
 }
@@ -55,8 +61,34 @@ export interface ProviderSpec {
  * The default model on the Gateway is free, and it is free deliberately: a pass spends
  * about a million input tokens, so a model with a price would make the daily run a
  * monthly bill.
+ *
+ * Which free model is not a matter of taste. Measured 2026-10-19 against this repo's own
+ * prompt, capture, and schema, `nvidia/nemotron-3.5-lightning-free` was the worst of the
+ * three reachable free models: it returned content that used `page` where the schema
+ * requires `path`, mangled a page's frontmatter into `---@type schema:TechArticle`, and
+ * twice spent the whole 32,000-token budget on reasoning and returned nothing. That is
+ * the 2026-10-18 no-op pass on record, where a nemotron fold spent 174,449 input tokens,
+ * wrote no page, and still reported `OK`. `minimax/minimax-m3.1-flash` answered in 87
+ * seconds with valid JSON, frontmatter copied verbatim, claims attributed to handles, and
+ * no fence text, so it is the default. Price plus a live call is the only trustworthy
+ * test here: the catalogue's `free` tag is not one, because three zero-priced models
+ * return 403 on this account and one priced zero with the tag returns 503 when streamed.
  */
-export const GATEWAY_DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning-free";
+export const GATEWAY_DEFAULT_MODEL = "minimax/minimax-m3.1-flash";
+
+/**
+ * The free models a Gateway pass falls back to, in order, when the one it started on is
+ * rate-limited or withdrawn.
+ *
+ * A free model is what makes this automation affordable, and a free model is also what
+ * makes it fragile: the tier is bounded by rate rather than by credits, and a launch price
+ * of zero can end without notice. `stealth/cat-jam` is here because it was measured clean
+ * on the same pass and five times faster than the default, which is what a fallback wants.
+ * `nvidia/nemotron-3.5-lightning-free` is deliberately absent: it is reachable and it is
+ * free, but a fallback that cannot honour the schema turns a rate limit into a failed pass,
+ * which is worse than reporting the rate limit.
+ */
+export const GATEWAY_FALLBACK_MODELS = ["stealth/cat-jam"];
 
 /**
  * The default model on Gemini is a flash model: the pass is long, tool-driven, and read
@@ -74,6 +106,7 @@ export const PROVIDERS: Record<ProviderName, ProviderSpec> = {
     keyEnv: "AI_GATEWAY_API_KEY",
     baseUrl: "https://ai-gateway.vercel.sh/v1",
     defaultModel: GATEWAY_DEFAULT_MODEL,
+    fallbacks: GATEWAY_FALLBACK_MODELS,
     metered: true,
   },
   gemini: {
@@ -83,6 +116,7 @@ export const PROVIDERS: Record<ProviderName, ProviderSpec> = {
     keyEnv: "GEMINI_API_KEY",
     baseUrl: `http://127.0.0.1:${DEFAULT_SHIM_PORT}/v1`,
     defaultModel: GEMINI_DEFAULT_MODEL,
+    fallbacks: [],
     metered: false,
   },
 };
@@ -197,4 +231,28 @@ export function fxProviderProblems(
 /** One line for the run report, so a log says which provider paid for the pass. */
 export function describeProvider(spec: ProviderSpec, modelId: string): string {
   return `${spec.name} (${modelId}), ${spec.metered ? "metered" : "unmetered"}`;
+}
+/**
+ * The models a pass will try, in order: the one it was pointed at, then that provider's
+ * fallbacks.
+ *
+ * Two editors need this list for two different reasons, which is why it is built here
+ * rather than inside either of them. The `api` editor hands the whole tail to the Gateway
+ * as `providerOptions.gateway.models`, and the Gateway itself fails over inside the one
+ * request. The `fx` editor cannot: fx takes a single `--model` and is a pinned binary, so
+ * the connector moves down the list between attempts. Both read the same order, so a run's
+ * report names the same sequence whichever editor it used.
+ *
+ * A duplicate is dropped rather than repeated, because a rotation that named the primary
+ * twice would spend an attempt re-asking the model that just refused.
+ */
+export function modelRotation(spec: ProviderSpec, primary: string): string[] {
+  return [primary, ...spec.fallbacks.filter((model) => model !== primary)];
+}
+
+/** The rotation as the run report prints it, so a log names every model a pass may reach. */
+export function describeRotation(rotation: string[]): string {
+  return rotation.length === 1
+    ? rotation[0]
+    : `${rotation[0]}, then ${rotation.slice(1).join(", ")}`;
 }

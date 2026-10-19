@@ -146,9 +146,11 @@ edits while leaving the capture committed. It needs two repository secrets,
 `DISCORD_BOT_TOKEN` and `AI_GATEWAY_API_KEY`. Inference runs on the Vercel AI
 Gateway by default, which is the one provider a pass runs on unless `--provider`
 says otherwise: one key, one catalogue, and one budget probe. It runs the free
-model `nvidia/nemotron-3.5-lightning-free` by
-default, which costs nothing and is metered by rate rather than by the day; any
-model id the Gateway publishes works with `--model`. A reasoning model is the
+model `minimax/minimax-m3.1-flash` by default, which costs nothing and is metered by
+rate rather than by the day; any model id the Gateway publishes works with `--model`.
+A free model is also the fragile part, so a pass does not depend on one: it starts on
+the model it was pointed at and falls through `stealth/cat-jam` when that model is
+refused (see "Providers"). A reasoning model is the
 trade: the first real run, a 593-message backfill, cost ~25k input and ~24k
 output tokens and took about three minutes, at no charge. That run used the `api`
 editor; the default is now `fx`, described next.
@@ -253,8 +255,9 @@ keeps a run from exfiltrating the Gateway key it is handed or running a command
 nobody reviewed.
 
 `--model` takes a Gateway model id (`vendor/model`, e.g.
-`nvidia/nemotron-3.5-lightning-free` or `alibaba/qwen3.7-flash`), and both editors
-read it the same way. `--pass-timeout` (default 900 seconds) kills an fx pass that
+`minimax/minimax-m3.1-flash` or `alibaba/qwen3.7-flash`), and both editors read it
+the same way: it names the model a pass starts on, and the provider's fallbacks
+follow it. `--pass-timeout` (default 900 seconds) kills an fx pass that
 overruns. The agent's own step ceiling is `max_agent_steps` in the repo's
 `.fx.json` (24), which fx enforces; measured 2026-10-18 on 0.0.14, a workspace
 capped at 3 reported four steps and exited with the task unfinished, so it bounds
@@ -272,6 +275,27 @@ editor, the same write surface, the same six gates, the same queue.
   by credits, so the credit probe is skipped and the provider's own rate limit is what
   bounds a pass. Measured 2026-10-18: a full fx pass that read two pages and wrote a
   third completed on `gemini-2.5-flash` with no charge and no paid key.
+Within the Gateway, a pass runs a rotation rather than one model, because a free tier is
+bounded by rate and a zero price can end without notice. `modelRotation` in `providers.ts`
+is the order: the model the run was pointed at first, then that provider's `fallbacks`.
+The two editors consume it differently, and that difference is the whole reason it is
+built in one place. The `api` editor hands the tail to the Gateway as
+`providerOptions.gateway.models`, so the Gateway itself fails over inside the one request.
+The `fx` editor cannot: fx accepts a single `--model` and is a pinned binary, so the
+connector moves down the same list between attempts, and only when the provider refused
+the request rather than the material defeating the model. A gate or guard rejection is a
+verdict on the material, so it re-asks the same model with the failure fed back; a
+refusal is a verdict on the model, so re-asking it spends an attempt to learn nothing.
+`parseProviderRefusal` in `fx.ts` is what draws that line, and it reads a spent rate limit
+and a model this account cannot reach alike, because both are reasons to ask a different
+model. That breadth is not hypothetical: measured 2026-10-19 the refusal that actually
+happened was a `403 no_providers_available` naming no rate limit at all, which a
+detector that knew only `429` would have recorded as a venue with bad content and
+re-asked the same unusable model for both attempts. A run logs the rotation before the
+first attempt (`fallback: <primary>, then <next>`), because a rotation that moved
+silently would make the log disagree with what the run spent. `gemini` has no fallbacks:
+its free tier is one model family behind one rate limit, so a fallback there would only
+restate the limit.
 
 The two are not interchangeable at the wire level, and that is why gemini has a shim.
 Gemini publishes an OpenAI-compatible endpoint, but it is not consistently
@@ -340,11 +364,17 @@ status stays `NEEDS_ATTENTION` either way, since `VALID_STATUSES` mirrors the hu
 contract. A free model is never deferred: its pass costs zero, so the share buys
 every attempt `--attempts` asks for.
 
-The default is `nvidia/nemotron-3.5-lightning-free`, by Ethan's call on 2026-10-18
-to move forward on a free model. A paid model is bounded by the same arithmetic
-against the credits, so pinning one at dispatch (`--model alibaba/qwen3.7-flash`,
-about 3.2 cents a pass, or roughly 140 passes on a $4.51 balance) is a matter of
-what the material needs rather than of what the connector can afford.
+The default is `minimax/minimax-m3.1-flash`, by Ethan's call on 2026-10-19, when the
+nine free models on the Gateway were measured against this repo's own prompt, capture,
+and schema: the model it replaced (`nvidia/nemotron-3.5-lightning-free`) was free and
+reachable and could not honour the schema, which is the 2026-10-18 pass that spent
+174,449 input tokens, wrote no page, and still reported `OK`. A paid model is bounded
+by the same arithmetic against the credits, so pinning one at dispatch
+(`--model alibaba/qwen3.7-flash`, about 3.2 cents a pass, or roughly 140 passes on a
+$4.51 balance) is a matter of what the material needs rather than of what the
+connector can afford. The price a fold is measured against is always the primary's:
+a fallback is free by construction, and a fold that moved down the rotation has
+already spent its share on the model it named.
 
 ## Maintaining the wiki: the self-healing pass
 

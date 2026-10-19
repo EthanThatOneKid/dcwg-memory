@@ -73,8 +73,10 @@ import {
 } from "./wiki.ts";
 import {
   describeProvider,
+  describeRotation,
   fxProviderProblems,
   missingKeyMessage,
+  modelRotation,
   parseProviderName,
   resolveApiKey,
   resolveProvider,
@@ -120,8 +122,10 @@ Options:
                         (tools/discord/gemini_proxy.ts), so the shim has to be listening
                         and ~/.fx/settings.json has to name that provider
   --model <id>          model id for the wiki pass on that provider, e.g.
-                        nvidia/nemotron-3.5-lightning-free on gateway (the default) or
-                        gemini-2.5-flash on gemini (the default)
+                        minimax/minimax-m3.1-flash on gateway (the default) or
+                        gemini-2.5-flash on gemini (the default). Naming one makes it the
+                        first the pass tries, not the only one: a Gateway pass falls back
+                        to the free models in providers.ts when it cannot answer
   --skip-wiki           capture only; do not touch wiki pages
   --editor <name>       how the page pass edits pages. fx (default) runs an agentic
                         CLI that reads the capture and edits wiki/ files itself;
@@ -372,6 +376,8 @@ async function passBudget(
   if (!apiKey) return undefined;
   const credits = await probeGatewayCredits({ apiKey });
   if (credits === undefined) return undefined;
+  // The primary is what gets priced. A fallback is free by construction, and a run that
+  // moved down the rotation mid-fold has already spent its share on the model it named.
   const modelId = args.model ?? args.provider.defaultModel;
   return { credits, passCostUsd: estimatePassCostUsd(await probeModelPrice({ apiKey, modelId })) };
 }
@@ -808,9 +814,18 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     const budget = await passBudget(args);
     const credits = budget?.credits;
     const passCostUsd = budget?.passCostUsd;
-    const modelId = args.model ?? args.provider.defaultModel;
+    const rotation = modelRotation(args.provider, args.model ?? args.provider.defaultModel);
+    const modelId = rotation[0];
     if (credits) console.log(describeGatewayCredits(credits));
     console.log(`provider: ${describeProvider(args.provider, modelId)}`);
+    /**
+     * The models this fold may reach, in order, said out loud before the first attempt.
+     *
+     * A rotation that moved between attempts silently would make the run's own log
+     * disagree with what it spent, which is the failure `--provider` already guards
+     * against: a run names what it is about to use, or it does not use it.
+     */
+    if (rotation.length > 1) console.log(`fallback: ${describeRotation(rotation)}`);
     /**
      * What this run may spend on this fold, and how many attempts that buys.
      *
@@ -852,9 +867,19 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     let changedThisFold: string[] = [];
     let feedback: string | undefined;
     let passed = false;
-    /** Attempts this fold lost to the provider's own cap rather than to its own work. */
-    let rateLimitedAttempts = 0;
-    let rateLimitNote = "";
+    /** Attempts this fold lost to the provider's own refusal rather than to its own work. */
+    let refusedAttempts = 0;
+    let refusalNote = "";
+    /**
+     * How far down `rotation` this fold has moved, and the reason it moved.
+     *
+     * Only a provider's own refusal moves it: a gate or guard rejection is a verdict on
+     * the material, and re-asking a different model the same question is a different
+     * experiment rather than a retry. The fx editor needs this because fx takes one
+     * `--model`; the api editor is handed the tail of the same list in one request and
+     * the Gateway fails over inside it.
+     */
+    let modelIndex = 0;
 
     /**
      * What an fx pass is measured against, and what a failed attempt is
@@ -907,9 +932,10 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
           root,
           briefPath,
           system: standingInstructions,
-          // The resolved id rather than `args.model`: the run report names this model, so
-          // the pass has to run the model it named, on either provider.
-          model: modelId,
+          // The model this attempt runs. `args.model` is the head of the rotation and the
+          // run has already named it, so this is the same model unless an earlier attempt
+          // was refused by the provider.
+          model: rotation[modelIndex],
           provider: args.provider,
           apiKey: passKey,
           timeoutMs: args.passTimeoutSec * 1000,
@@ -946,13 +972,23 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
                 : `wrote outside wiki/ (${stray.length} path(s))`
             }`,
           );
-          // A provider cap is not a verdict on the material. Noted per attempt so a
-          // fold whose attempts were *all* rate-limited can be told apart from one
-          // that reached the model and wrote something the gates rejected.
-          if (run.rateLimited) {
-            rateLimitedAttempts += 1;
-            rateLimitNote = run.rateLimited;
-            console.log(`attempt ${attempt}/${attempts} was rate-limited: ${run.rateLimited}`);
+          // A provider refusal is not a verdict on the material. Noted per attempt so a
+          // fold whose attempts were *all* refused can be told apart from one that reached
+          // the model and wrote something the gates rejected.
+          if (run.providerRefused) {
+            refusedAttempts += 1;
+            refusalNote = run.providerRefused;
+            console.log(`attempt ${attempt}/${attempts} was refused: ${run.providerRefused}`);
+            /**
+             * A refusal belongs to the model rather than to the material, so the next
+             * attempt asks a different one: the same capture to the same refused model
+             * only spends another attempt. With nothing left to move to, the run reports
+             * the refusal instead, which is what an unavailable provider is.
+             */
+            if (modelIndex < rotation.length - 1) {
+              modelIndex += 1;
+              console.log(`attempt ${attempt}/${attempts} moving to ${rotation[modelIndex]}`);
+            }
           }
           continue;
         }
@@ -975,6 +1011,10 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
           model: modelId,
           provider: args.provider,
           apiKey: passKey,
+          // The rest of the rotation rides along in this one request: the Gateway tries
+          // each in turn when the model it was given cannot answer, so the api editor
+          // gets the fx editor's fallback behaviour without a second call.
+          fallbacks: rotation.slice(1),
           feedback,
         });
 
@@ -1097,19 +1137,19 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     // capture over an older one that was never absorbed.
     if (!passed) {
       /**
-       * A spent budget is not a stall.
+       * A refused provider is not a stall.
        *
        * `stalls` counts runs that failed to fold a capture, a diagnostic for material
        * the model could not integrate. A pass the provider refused judged nothing, so
-       * counting it would make a spent budget look like a venue with bad content and
-       * send the next run looking at the wrong problem. The status stays
+       * counting it would make an unavailable model look like a venue with bad content
+       * and send the next run looking at the wrong problem. The status stays
        * NEEDS_ATTENTION either way: `VALID_STATUSES` mirrors the hub's contract, so a
        * new status value would be a cross-repo change.
        */
-      if (rateLimitedAttempts > 0 && rateLimitedAttempts === attempts) {
+      if (refusedAttempts > 0 && refusedAttempts === attempts) {
         budgetBlocked = true;
         budgetBlockedCapture = foldPath;
-        budgetBlockedReason = `every attempt was rate-limited by the provider: ${rateLimitNote}`;
+        budgetBlockedReason = `every attempt was refused by the provider: ${refusalNote}`;
         console.log(`fold deferred: ${budgetBlockedReason}`);
         break;
       }

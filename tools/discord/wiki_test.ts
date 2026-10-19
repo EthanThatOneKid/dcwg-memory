@@ -18,6 +18,13 @@ import {
   runWikiPass,
   snapshotPages,
 } from "./wiki.ts";
+import {
+  GATEWAY_DEFAULT_MODEL,
+  GATEWAY_FALLBACK_MODELS,
+  GEMINI_DEFAULT_MODEL,
+  PROVIDERS,
+} from "./providers.ts";
+import type { PassCallArgs, PassGenerate } from "./wiki.ts";
 import { MAX_PAGE_BYTES } from "./guard.ts";
 import type { PageEdit, WikiPassInput } from "./wiki.ts";
 
@@ -246,4 +253,62 @@ Deno.test("runWikiPass refuses to run without a key instead of guessing", async 
     Error,
     "needs an API key",
   );
+});
+/**
+ * A pass that records the routing options it was handed, so a test can see the fallback
+ * without a network call. An empty proposal is enough: this test is about what the
+ * request carried, not what came back.
+ */
+function recordingPass(seen: { options?: unknown }): PassGenerate {
+  return (args) => {
+    seen.options = args.providerOptions;
+    return Promise.resolve({ output: { edits: [], notes: "" } });
+  };
+}
+
+Deno.test("the api editor hands the Gateway the rest of the rotation", async () => {
+  const seen: { options?: unknown } = {};
+  await runWikiPass(input({
+    model: GATEWAY_DEFAULT_MODEL,
+    fallbacks: GATEWAY_FALLBACK_MODELS,
+    provider: PROVIDERS.gateway,
+    apiKey: "test-key-not-real",
+    captureText: "NEW MESSAGE TEXT",
+    pages: [],
+    lastUpdated: "2026-10-19T00:00:00Z",
+    generate: recordingPass(seen),
+  }));
+  assertEquals(seen.options, { gateway: { models: GATEWAY_FALLBACK_MODELS } });
+});
+
+Deno.test("a provider that cannot be told gets no routing option", async () => {
+  const seen: { options?: unknown } = {};
+  await runWikiPass(input({
+    model: GEMINI_DEFAULT_MODEL,
+    fallbacks: GATEWAY_FALLBACK_MODELS,
+    provider: PROVIDERS.gemini,
+    apiKey: "test-key-not-real",
+    captureText: "NEW MESSAGE TEXT",
+    pages: [],
+    lastUpdated: "2026-10-19T00:00:00Z",
+    generate: recordingPass(seen),
+  }));
+  // The Gemini path is driven by the caller, so a `gateway` block here would be an
+  // option the shim drops on the floor while the run believed it had a fallback.
+  assertEquals(seen.options, undefined);
+});
+
+Deno.test("a fallback that is the model already in hand is dropped", async () => {
+  const seen: { options?: unknown } = {};
+  await runWikiPass(input({
+    model: "stealth/cat-jam",
+    fallbacks: ["stealth/cat-jam"],
+    provider: PROVIDERS.gateway,
+    apiKey: "test-key-not-real",
+    captureText: "NEW MESSAGE TEXT",
+    pages: [],
+    lastUpdated: "2026-10-19T00:00:00Z",
+    generate: recordingPass(seen),
+  }));
+  assertEquals(seen.options, undefined);
 });
