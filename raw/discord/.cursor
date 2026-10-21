@@ -1,7 +1,7 @@
 {
   "1558888938842624093": "1560326306858668165",
-  "_lastRun": "2026-10-20T18:14:39Z",
-  "1558965777850302546": "1562112271973617797",
+  "_lastRun": "2026-10-21T18:05:49Z",
+  "1558965777850302546": "1562201618152169633",
   "1559302572974538843": "1559349752905072641",
   "_pending": [
     {
@@ -57,6 +57,13 @@
       "capture": "raw/discord/2026-10-19_dcwg-propose.md",
       "venue": "dcwg-propose",
       "messages": 49,
+      "offset": 0,
+      "stalls": 0
+    },
+    {
+      "capture": "raw/discord/2026-10-20_dcwg-brainstorm-2.md",
+      "venue": "dcwg-brainstorm",
+      "messages": 5,
       "offset": 0,
       "stalls": 0
     }
