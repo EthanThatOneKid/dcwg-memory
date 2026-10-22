@@ -556,6 +556,26 @@ Deno.test("a flag passed with no value fails the run", async () => {
   assert(errors.join("\n").includes("--model needs a value"), "the message names the flag");
 });
 
+Deno.test("the anthropic provider and the anthropic editor are refused apart", async () => {
+  // Either half alone would run something that cannot work: the Anthropic API reached
+  // through fx's OpenAI-compatible path, or the staged pass pointed at the Gateway.
+  const providerOnly = await runCliErrors([...BASE, "--provider", "anthropic", "--editor", "fx"]);
+  assertEquals(providerOnly.code, 2);
+  assert(providerOnly.errors.join("\n").includes("go together"), "the message says why");
+
+  const editorOnly = await runCliErrors([...BASE, "--editor", "anthropic"]);
+  assertEquals(editorOnly.code, 2);
+  assert(editorOnly.errors.join("\n").includes("go together"));
+});
+
+Deno.test("--provider alone selects the anthropic editor, and --max-usd must be positive", async () => {
+  // Accepted: no flag error, the run proceeds to the token check.
+  const paired = await runCliErrors([...BASE, "--provider", "anthropic", "--max-usd", "0"]);
+  assertEquals(paired.code, 2);
+  assert(paired.errors.join("\n").includes("--max-usd must be a positive number"));
+  assert(!paired.errors.join("\n").includes("go together"));
+});
+
 Deno.test("--tag replaces the default tags instead of adding to them", async () => {
   await withEnv(async () => {
     const root = await Deno.makeTempDir();

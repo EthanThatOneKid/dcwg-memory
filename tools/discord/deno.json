@@ -11,6 +11,8 @@
     "@std/cli": "jsr:@std/cli@^1",
     "@std/yaml": "jsr:@std/yaml@^1",
     "ai": "npm:ai@^7.0.0",
+    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.136.0",
+    "@anthropic-ai/sdk/": "npm:/@anthropic-ai/sdk@^0.136.0/",
     "@ai-sdk/gateway": "npm:@ai-sdk/gateway@^4.0.0",
     "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^3.0.0",
     "zod": "npm:zod@^4.0.0",

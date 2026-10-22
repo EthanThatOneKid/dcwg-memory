@@ -26,7 +26,7 @@
  */
 
 /** The providers a pass can run on. */
-export type ProviderName = "gateway" | "gemini";
+export type ProviderName = "gateway" | "gemini" | "anthropic";
 
 export interface ProviderSpec {
   name: ProviderName;
@@ -38,7 +38,7 @@ export interface ProviderSpec {
    * pointed at the provider by `fxProvider` and reads `baseUrl` and the key variable from
    * its own `~/.fx/settings.json`.
    */
-  protocol: "gateway" | "openai-compatible";
+  protocol: "gateway" | "openai-compatible" | "anthropic";
   /** The provider id fx selects, through `FX_PROVIDER` and settings `provider`. */
   fxProvider: string;
   /** The environment variable this provider's key is read from, by default. */
@@ -66,6 +66,12 @@ export const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
 
 export const DEFAULT_SHIM_PORT = 8787;
 
+/**
+ * The default model on Anthropic is Claude Opus 5.5. It lives here, beside the other
+ * providers' defaults, so this module needs no SDK; `anthropic.ts` re-exports it.
+ */
+export const ANTHROPIC_DEFAULT_MODEL = "claude-opus-5-5";
+
 export const PROVIDERS: Record<ProviderName, ProviderSpec> = {
   gateway: {
     name: "gateway",
@@ -85,9 +91,21 @@ export const PROVIDERS: Record<ProviderName, ProviderSpec> = {
     defaultModel: GEMINI_DEFAULT_MODEL,
     metered: false,
   },
+  // The Anthropic Messages API, driven by `anthropic.ts` rather than fx or the AI SDK. It
+  // is billed in money, but the Gateway's credit probe does not apply: the pass bounds
+  // itself with `--max-usd` against the usage it measures.
+  anthropic: {
+    name: "anthropic",
+    protocol: "anthropic",
+    fxProvider: "anthropic",
+    keyEnv: "ANTHROPIC_API_KEY",
+    baseUrl: "https://api.anthropic.com",
+    defaultModel: ANTHROPIC_DEFAULT_MODEL,
+    metered: true,
+  },
 };
 
-export const PROVIDER_NAMES: ProviderName[] = ["gateway", "gemini"];
+export const PROVIDER_NAMES: ProviderName[] = ["gateway", "gemini", "anthropic"];
 
 /**
  * Read a provider name from a flag, refusing anything else by name.

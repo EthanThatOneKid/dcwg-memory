@@ -304,6 +304,58 @@ The repository variable `DCWG_PROVIDER` repoints the daily schedule without edit
 workflow, the same way `DCWG_MODEL` repoints the model. One caveat: `DCWG_MODEL` holds a
 Gateway model id, so setting both would send a Gateway id to Gemini. Pick one.
 
+## The staged Anthropic pass
+
+`--provider anthropic` (which selects `--editor anthropic`; the two are refused apart) runs
+`tools/discord/anthropic.ts` on the Anthropic Messages API. It is a pipeline the connector
+drives, not an agent: `fx` was handed a toolbox and a step ceiling, and the failures in this
+file (24 steps and 174,449 input tokens for no page; ~967k input tokens re-reading one
+capture) were the agent exploring. The wiki is 148 KB over 17 pages and the largest capture
+is 125 KB (~32k tokens), measured 2026-10-22, so the whole working set fits in one request.
+
+1. **Plan.** One call reads the capture and an index of the wiki (path, name, description,
+   forum anchor) and answers which pages change. The answer is a structured output, not
+   edits. `validatePlan` checks it in code before anything is written: every path passes
+   `checkEditablePath`, creates are creates and updates are updates, every create names an
+   existing page to be linked from, and each forum post owns exactly one page. One repair
+   call is allowed, with the problems quoted; a second failure fails the attempt.
+2. **Write.** One call per page, handed that page's current body and its instructions. The
+   model returns a body. The connector composes the file: an update keeps the page's own
+   frontmatter (`carryFrontmatterForward`, so a model that returns its own block does not
+   replace it), and a create gets a frontmatter the connector builds, including the
+   `wazoo:thread` anchor. A create's inbound link is added to the linking page's
+   instructions by `expandPlan` rather than left to the model to remember.
+3. **Gates.** Unchanged and shared with `fx`: the tree is snapshotted first, anything outside
+   `wiki/` reverts the attempt, the six gates run, and a failure's text goes back as feedback.
+
+The capture is the first block of every call and carries the cache breakpoint, so the plan
+and every page write read it once at the full rate and the rest at the cache-read rate. A
+capture past `DEFAULT_CHUNK_CHARS` (400,000, about 100k tokens) is split at thread and
+message boundaries and each part is planned and written in turn, so a later part sees the
+pages an earlier one wrote; this is a safety valve, not the normal path. Structured outputs
+carry the data and forced tool use is never used, because Claude Opus 5.5 returns a 400 for
+`tool_choice` `any`/`tool`.
+
+Spend is bounded by the pass itself: `--max-usd` (default $2, repository variable
+`DCWG_MAX_USD` for the schedule) against a cost estimated from the usage the API reports,
+and a token ceiling for a model with no listed price. It is checked before every call, and
+a pass over its cap stops and fails the attempt, which reverts. The default model is
+`claude-opus-5-5`; `--model claude-sonnet-5-5` or `claude-haiku-5-5` are cheaper and priced
+in `anthropic.ts`. The prices are the claude-api skill's table as of 2026-10-06 and are an
+estimate, not a quote. A 429 after the SDK's five retries is reported as a rate limit, and a
+400 that names the credit balance is reported as billing, not as a verdict on the material.
+
+The key is `ANTHROPIC_API_KEY` (the workflow's repository secret; `DCWG_ANTHROPIC_API_KEY` on
+the Zo host). It is a Console API key billed per token. A Claude chat subscription does not
+pay for API calls, and a subscription token is not used here. The standing instructions are
+`tools/discord/prompt/dcwg-pass.md`, written for the staged pass: it says the model returns
+data and never touches a file.
+
+Not yet verified live: the unit tests drive the stages against a stubbed model, and nothing
+here has called the real API. The first dispatch should be `--dry-run` off with
+`--max-usd 0.50` against one venue before the schedule is repointed. Server-side refusal
+`fallbacks` are not enabled: a refusal is reported as `refusal` and fails the attempt.
+
 ## The budget
 
 Metering is settled, and on the Gateway it is counted in money rather than

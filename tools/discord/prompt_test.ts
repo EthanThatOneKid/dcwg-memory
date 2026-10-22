@@ -24,6 +24,20 @@ Deno.test("the fx prompt instructs the link form the orphan gate counts", () => 
   assert(!FX_PROMPT.includes(FORBIDS_MD_LINKS));
 });
 
+const PASS_PROMPT = await Deno.readTextFile(new URL("./prompt/dcwg-pass.md", import.meta.url));
+
+Deno.test("the anthropic pass prompt instructs the link form the orphan gate counts", () => {
+  assertStringIncludes(PASS_PROMPT, "(Deno_Fork_Options.md)");
+  assert(!PASS_PROMPT.includes(FORBIDS_MD_LINKS));
+});
+
+Deno.test("the anthropic pass prompt tells the model its framing tags are not page text", () => {
+  // The staged prompts wrap the capture and pages in tags, and a model copying a block
+  // would otherwise carry the tag into a page, where no gate sees it.
+  assertStringIncludes(PASS_PROMPT, "<capture>");
+  assertStringIncludes(PASS_PROMPT, "never copy one into a page");
+});
+
 Deno.test("the api prompt instructs the link form the orphan gate counts", () => {
   assertStringIncludes(SYSTEM_PROMPT, "(Deno_Fork_Options.md)");
   assert(!SYSTEM_PROMPT.includes(FORBIDS_MD_LINKS));

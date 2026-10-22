@@ -38,10 +38,20 @@ name: Discord ingest
 # calls arrive without an `index`, `arguments` arrives as a JSON string), and fx is a
 # pinned binary, so a gemini run reaches Google through the local shim in
 # tools/discord/gemini_proxy.ts: the job starts it below and points fx at it through
-# ~/.fx/settings.json. Required repository secrets:
+# ~/.fx/settings.json.
+#
+# `--provider anthropic` replaces all of that with the Anthropic API and no agent at all:
+# the connector asks the model for a plan, then for one page at a time, and writes and
+# checks every page itself (tools/discord/anthropic.ts). It needs neither the fx binary nor
+# the shim, so those steps are skipped, and it bounds its own spend with --max-usd instead
+# of reading a Gateway balance. The Anthropic API is billed per token against a Console
+# account's credit; a Claude chat subscription does not pay for it.
+#
+# Required repository secrets:
 #   DISCORD_BOT_TOKEN       the capture bot's token (its own application)
 #   AI_GATEWAY_API_KEY      inference for the wiki pass on the Gateway (the default)
 #   GEMINI_API_KEY          inference for the wiki pass on --provider gemini
+#   ANTHROPIC_API_KEY       inference for the wiki pass on --provider anthropic
 # A pass costs money rather than requests here, and the free models cost
 # nothing: the connector asks the Gateway for the team's credit balance and for
 # the catalogue price of the model this run was pointed at, and refuses to start
@@ -75,11 +85,15 @@ on:
         type: string
         default: ""
       provider:
-        description: "Who pays for the wiki pass: gateway or gemini (blank = the connector's default, gateway)"
+        description: "Who pays for the wiki pass: gateway, gemini or anthropic (blank = the connector's default, gateway)"
         type: string
         default: ""
       editor:
-        description: "fx or api (blank = the connector's default)"
+        description: "fx, api or anthropic (blank = the connector's default; anthropic follows --provider anthropic)"
+        type: string
+        default: ""
+      max_usd:
+        description: "Spend cap for one anthropic pass, in USD. Blank = the connector's default"
         type: string
         default: ""
 
@@ -113,6 +127,8 @@ jobs:
       # defaults to the Gateway.
       PROVIDER: ${{ github.event.inputs.provider || vars.DCWG_PROVIDER }}
       EDITOR: ${{ github.event.inputs.editor }}
+      # Same shape again: the repository variable DCWG_MAX_USD tunes the schedule's cap.
+      MAX_USD: ${{ github.event.inputs.max_usd || vars.DCWG_MAX_USD }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       SKIP_WIKI: ${{ github.event.inputs.skip_wiki }}
     steps:
@@ -126,6 +142,7 @@ jobs:
       # its agent loop: a silent upgrade would change both. The version is asserted
       # so the pin cannot drift into a lie.
       - name: Install the page-pass CLI
+        if: env.PROVIDER != 'anthropic'
         run: |
           curl -fsSL https://fx.sh/setup.sh | bash -s -- v0.0.14
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -137,6 +154,7 @@ jobs:
       # form `wiki/**`: a bare `wiki/*` matches an edit to an existing page but
       # denies creating a new one, because a create is matched against its parent.
       - name: Write the pass's permission rules
+        if: env.PROVIDER != 'anthropic'
         run: |
           mkdir -p "$HOME/.fx"
           cat > "$HOME/.fx/settings.json" <<'JSON'
@@ -212,6 +230,8 @@ jobs:
           # Only read when the pass runs on gemini; the connector resolves a provider's
           # key from its own variable and refuses the run by name when it is absent.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Only read when the pass runs on anthropic, the same way.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # Per-venue commits, inside the loop. The runner is ephemeral and one venue must
           # not be able to discard another venue's work: each venue commits and pushes its
@@ -262,6 +282,8 @@ jobs:
             # gemini pass also requires the shim started above and the settings block
             # written above, both of which key off the same variable.
             if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
+            # An anthropic pass's own spend cap; ignored by the other providers' editors.
+            if [ -n "${MAX_USD:-}" ]; then args+=(--max-usd "$MAX_USD"); fi
             [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
             [ "${SKIP_WIKI:-false}" = "true" ] && args+=(--skip-wiki)
             if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then

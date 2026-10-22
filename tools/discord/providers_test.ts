@@ -14,8 +14,19 @@ Deno.test("a provider name is taken as written and anything else is refused by n
   assertThrows(
     () => parseProviderName("openrouter"),
     Error,
-    "--provider must be one of gateway, gemini, not 'openrouter'",
+    "--provider must be one of gateway, gemini, anthropic, not 'openrouter'",
   );
+});
+
+Deno.test("anthropic is billed, speaks its own protocol, and reads ANTHROPIC_API_KEY", () => {
+  assertEquals(parseProviderName("anthropic"), "anthropic");
+  assertEquals(PROVIDERS.anthropic.protocol, "anthropic");
+  assertEquals(PROVIDERS.anthropic.keyEnv, "ANTHROPIC_API_KEY");
+  assertEquals(PROVIDERS.anthropic.metered, true);
+  assertEquals(PROVIDERS.anthropic.defaultModel, "claude-opus-5-5");
+  // The host's account-wide name is tried second, as for every other provider.
+  const env = (name: string) => name === "DCWG_ANTHROPIC_API_KEY" ? "prefixed" : undefined;
+  assertEquals(resolveApiKey(PROVIDERS.anthropic, env)?.name, "DCWG_ANTHROPIC_API_KEY");
 });
 
 Deno.test("no provider named means the Gateway, which is the shipped default", () => {
