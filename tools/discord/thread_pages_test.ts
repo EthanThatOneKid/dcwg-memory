@@ -8,12 +8,7 @@
  */
 
 import { assert, assertEquals } from "@std/assert";
-import {
-  findForumThreads,
-  findThreadProblems,
-  threadAnchors,
-  threadHeadings,
-} from "./thread_pages.ts";
+import { findForumThreads, findThreadProblems, threadAnchors, threadHeadings } from "./thread_pages.ts";
 
 const FORUM = "1559218298128695386";
 

@@ -39,9 +39,7 @@ function stubFetch(requests: string[]): () => void {
     }
     if (url.pathname === `/api/v10/channels/${CHANNEL}/messages`) {
       // One short page answers the anchor and ends the walk.
-      const page = url.searchParams.get("after") === "0"
-        ? [message("1000", "2026-08-01T10:00:00.000Z")]
-        : [];
+      const page = url.searchParams.get("after") === "0" ? [message("1000", "2026-08-01T10:00:00.000Z")] : [];
       return Promise.resolve(new Response(JSON.stringify(page), { status: 200 }));
     }
     return Promise.resolve(new Response(JSON.stringify({ code: 10003 }), { status: 404 }));

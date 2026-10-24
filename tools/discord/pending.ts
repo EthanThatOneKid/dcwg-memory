@@ -70,9 +70,7 @@ export function readPending(store: Record<string, unknown>): PendingFold[] {
     folds.push({
       capture,
       venue,
-      messages: typeof messages === "number" && Number.isInteger(messages) && messages >= 0
-        ? messages
-        : 0,
+      messages: typeof messages === "number" && Number.isInteger(messages) && messages >= 0 ? messages : 0,
       offset: typeof offset === "number" && Number.isInteger(offset) && offset >= 0 ? offset : 0,
       stalls: typeof stalls === "number" && Number.isInteger(stalls) && stalls >= 0 ? stalls : 0,
     });
@@ -127,9 +125,7 @@ export function advance(
  * the next run has to retry this material rather than skip it.
  */
 export function stall(folds: PendingFold[], capture: string): PendingFold[] {
-  return folds.map((fold) =>
-    fold.capture === capture ? { ...fold, stalls: fold.stalls + 1 } : fold
-  );
+  return folds.map((fold) => fold.capture === capture ? { ...fold, stalls: fold.stalls + 1 } : fold);
 }
 
 /** Forget an entry, for a capture that is no longer on disk. */

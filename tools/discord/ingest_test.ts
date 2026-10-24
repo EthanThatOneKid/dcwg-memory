@@ -15,6 +15,7 @@ import type { DiscordMessage } from "./discord.ts";
 
 const CHANNEL = "1558888938842624093";
 const TOKEN_ENV = "DCWG_DISCORD_BOT_TOKEN";
+const KEY_ENV = "ANTHROPIC_API_KEY";
 
 /** Three messages, one of them a bot's, newest-first as Discord returns them. */
 function apiMessages(): DiscordMessage[] {
@@ -43,23 +44,61 @@ function apiMessages(): DiscordMessage[] {
   ];
 }
 
+/** How the stubbed Anthropic API answers a pass. */
+type ModelStub =
+  /** A refused request, which is what a dead provider looks like from the connector. */
+  | "down"
+  /** A well-formed plan that changes no page. */
+  | "empty-plan";
+
+/** A Messages API reply carrying `text` as the model's whole answer. */
+function messageReply(text: string): Response {
+  return Response.json({
+    id: "msg_stub",
+    type: "message",
+    role: "assistant",
+    model: "claude-opus-5-5",
+    content: [{ type: "text", text }],
+    stop_reason: "end_turn",
+    stop_sequence: null,
+    usage: { input_tokens: 1200, output_tokens: 40 },
+  });
+}
+
 /**
- * The API, stubbed: Discord answers, and the Gateway answers whatever balance and
- * catalogue the caller wants a run to see.
- *
- * The balance body is part of the stub because the connector's governance reads it
- * before every fold, so a test of what a run does with a spent balance has to be able
- * to tell it the balance is spent.
+ * The APIs, stubbed: Discord answers, and the Anthropic Messages API answers the way the
+ * caller wants a pass to see it.
  */
-function stubFetch(keyBody?: unknown, modelsBody?: unknown): () => void {
+function stubFetch(model: ModelStub = "down"): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = ((input: string | URL | Request) => {
-    const url = new URL(String(input));
-    if (url.hostname === "ai-gateway.vercel.sh") {
-      if (url.pathname === "/v1/models") {
-        return Promise.resolve(Response.json(modelsBody ?? MODEL_CATALOGUE));
+    const url = new URL(typeof input === "object" && "url" in input ? input.url : String(input));
+    if (url.hostname === "generativelanguage.googleapis.com") {
+      if (model === "empty-plan") {
+        const answer = JSON.stringify({ summary: "nothing durable", pages: [] });
+        return Promise.resolve(Response.json({
+          candidates: [{ finishReason: "STOP", content: { parts: [{ text: answer }] } }],
+          usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 40 },
+        }));
       }
-      return Promise.resolve(Response.json(keyBody ?? {}));
+      return Promise.resolve(
+        Response.json({ error: { code: 400, status: "INVALID_ARGUMENT", message: "stubbed provider is down" } }, {
+          status: 400,
+        }),
+      );
+    }
+    if (url.hostname === "api.anthropic.com") {
+      if (model === "empty-plan") {
+        return Promise.resolve(
+          messageReply(JSON.stringify({ summary: "nothing durable", pages: [] })),
+        );
+      }
+      return Promise.resolve(
+        Response.json({
+          type: "error",
+          error: { type: "invalid_request_error", message: "stubbed provider is down" },
+        }, { status: 400 }),
+      );
     }
     if (url.pathname === `/api/v10/channels/${CHANNEL}`) {
       return Promise.resolve(
@@ -102,58 +141,49 @@ async function runCliErrors(argv: string[]): Promise<{ code: number; errors: str
   }
 }
 
-async function withEnv(fn: () => Promise<void>): Promise<void> {
-  const restoreFetch = stubFetch();
-  const prior = Deno.env.get(TOKEN_ENV);
-  Deno.env.set(TOKEN_ENV, "test-token-not-real");
+/** Set environment variables for the length of `fn`, then put them back. */
+async function withVars(
+  vars: Record<string, string | undefined>,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const prior = Object.keys(vars).map((name) => [name, Deno.env.get(name)] as const);
+  for (const [name, value] of Object.entries(vars)) {
+    if (value === undefined) Deno.env.delete(name);
+    else Deno.env.set(name, value);
+  }
   try {
     await fn();
   } finally {
-    restoreFetch();
-    if (prior === undefined) Deno.env.delete(TOKEN_ENV);
-    else Deno.env.set(TOKEN_ENV, prior);
-  }
-}
-/**
- * Run a test with a stubbed API that reports a free-model budget, and a stand-in for
- * the page-pass CLI that records being started.
- *
- * Both halves matter. The budget decides whether the connector starts a pass at all,
- * and the stand-in is how "it did not start one" becomes an observation instead of an
- * assumption: a run that never spawns it never writes the marker.
- */
-async function withBudgetEnv(
-  keyBody: unknown,
-  fn: (bin: string, marker: string) => Promise<void>,
-  /** What the stand-in pass exits with. 0 is a pass that ran and wrote nothing. */
-  exitCode = 1,
-) {
-  const restoreFetch = stubFetch(keyBody);
-  const dir = await Deno.makeTempDir();
-  const bin = `${dir}/fx-stand-in`;
-  const marker = `${dir}/started`;
-  await Deno.writeTextFile(bin, `#!/bin/sh\ntouch '${marker}'\nexit ${exitCode}\n`);
-  await Deno.chmod(bin, 0o755);
-  const priorToken = Deno.env.get(TOKEN_ENV);
-  const priorKey = Deno.env.get("AI_GATEWAY_API_KEY");
-  const priorBin = Deno.env.get("DCWG_FX_BIN");
-  Deno.env.set(TOKEN_ENV, "test-token-not-real");
-  Deno.env.set("AI_GATEWAY_API_KEY", "test-key-not-real");
-  Deno.env.set("DCWG_FX_BIN", bin);
-  try {
-    await fn(bin, marker);
-  } finally {
-    restoreFetch();
-    const prior: Array<[string, string | undefined]> = [
-      [TOKEN_ENV, priorToken],
-      ["AI_GATEWAY_API_KEY", priorKey],
-      ["DCWG_FX_BIN", priorBin],
-    ];
     for (const [name, value] of prior) {
       if (value === undefined) Deno.env.delete(name);
       else Deno.env.set(name, value);
     }
-    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+/** A capture-only run: Discord stubbed, a token in place, no model key. */
+async function withEnv(fn: () => Promise<void>): Promise<void> {
+  const restoreFetch = stubFetch();
+  try {
+    await withVars({ [TOKEN_ENV]: "test-token-not-real" }, fn);
+  } finally {
+    restoreFetch();
+  }
+}
+
+/**
+ * A run whose page pass is attempted, against a stubbed model.
+ *
+ * A run whose page pass cannot succeed must still commit the archive. This is the whole
+ * point of the queue: `raw/` and `wiki/` fail differently, and a model call, a gate, or a
+ * rate limit must not be able to hold the record hostage.
+ */
+async function withFoldEnv(fn: () => Promise<void>, model: ModelStub = "down"): Promise<void> {
+  const restoreFetch = stubFetch(model);
+  try {
+    await withVars({ [TOKEN_ENV]: "test-token-not-real", [KEY_ENV]: "test-key-not-real" }, fn);
+  } finally {
+    restoreFetch();
   }
 }
 
@@ -167,51 +197,9 @@ function exists(path: string): boolean {
   }
 }
 
-/** The balance body the Gateway returned on 2026-10-18, spent. */
-const SPENT_KEY_BODY = { balance: "0.00", total_used: "5.000000000" };
-
 const BASE = ["--channel", CHANNEL, "--venue", "dcwg-talk", "--skip-wiki", "--all"];
 /** The same run, but with the page pass left on, so the fold is attempted. */
-const FOLDING = [
-  "--channel",
-  CHANNEL,
-  "--venue",
-  "dcwg-talk",
-  "--all",
-  "--attempts",
-  "1",
-  "--editor",
-  "api",
-];
-
-/**
- * A run whose page pass cannot succeed must still commit the archive.
- *
- * This is the whole point of the queue: `raw/` and `wiki/` fail differently, and a
- * model call, a gate, or a rate limit must not be able to hold the record hostage.
- * The stub answers Discord and fails everything else, which is what a dead
- * provider looks like from the connector's side.
- */
-async function withFoldEnv(fn: () => Promise<void>): Promise<void> {
-  const restoreFetch = stubFetch();
-  const priorToken = Deno.env.get(TOKEN_ENV);
-  const priorKey = Deno.env.get("AI_GATEWAY_API_KEY");
-  Deno.env.set(TOKEN_ENV, "test-token-not-real");
-  Deno.env.set("AI_GATEWAY_API_KEY", "test-key-not-real");
-  try {
-    await fn();
-  } finally {
-    restoreFetch();
-    const prior: Array<[string, string | undefined]> = [
-      [TOKEN_ENV, priorToken],
-      ["AI_GATEWAY_API_KEY", priorKey],
-    ];
-    for (const [name, value] of prior) {
-      if (value === undefined) Deno.env.delete(name);
-      else Deno.env.set(name, value);
-    }
-  }
-}
+const FOLDING = ["--channel", CHANNEL, "--venue", "dcwg-talk", "--all", "--attempts", "1"];
 
 /**
  * The minimum a fold needs to find.
@@ -234,7 +222,7 @@ async function seedWiki(root: string): Promise<void> {
 /** The repository root, so a fixture can copy the real wiki into a temp checkout. */
 const REPO_ROOT = fromFileUrl(new URL("../..", import.meta.url));
 /**
- * The standing instructions the fx pass is handed.
+ * The standing instructions the pass is handed.
  *
  * The connector reads them out of the checkout rather than shipping a copy of its own,
  * so a fixture checkout has to carry them or the pass cannot start at all.
@@ -242,7 +230,7 @@ const REPO_ROOT = fromFileUrl(new URL("../..", import.meta.url));
 async function seedPrompt(root: string): Promise<void> {
   const target = `${root}/tools/discord/prompt`;
   await Deno.mkdir(target, { recursive: true });
-  await Deno.copyFile(`${REPO_ROOT}/tools/discord/prompt/dcwg.md`, `${target}/dcwg.md`);
+  await Deno.copyFile(`${REPO_ROOT}/tools/discord/prompt/dcwg-pass.md`, `${target}/dcwg-pass.md`);
 }
 
 async function copyTree(from: string, to: string): Promise<void> {
@@ -440,13 +428,12 @@ Deno.test("a queued capture is retried before anything newer, and stays queued",
  * capture stayed on disk and the wiki never carried it.
  */
 Deno.test("a pass that changes no page keeps the capture queued instead of folding it", async () => {
-  await withBudgetEnv(FRESH_KEY_BODY, async (_bin, marker) => {
+  await withFoldEnv(async () => {
     const root = await Deno.makeTempDir();
     await seedGateCleanWiki(root);
-    const { code, out } = await runCli([...AGENTIC, "--budget-share", "1/1", "--root", root]);
+    const { code, out } = await runCli([...FOLDING, "--root", root]);
 
     assertEquals(code, 1, "material the wiki did not absorb is a run that needs attention");
-    assertEquals(exists(marker), true, "the pass ran; it wrote nothing");
 
     const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
     assertEquals(
@@ -474,7 +461,111 @@ Deno.test("a pass that changes no page keeps the capture queued instead of foldi
       "the log says the pass ran and wrote nothing, not that the model failed",
     );
     assertEquals(payload.budget, undefined, "this was not a budget condition");
-  }, 0);
+  }, "empty-plan");
+});
+
+Deno.test("a pass reports which model it runs, so a log says what it spent", async () => {
+  await withFoldEnv(async () => {
+    const root = await Deno.makeTempDir();
+    await seedWiki(root);
+    const { out } = await runCli([...FOLDING, "--model", "claude-haiku-5-5", "--root", root]);
+    assert(
+      out.includes("provider: anthropic (claude-haiku-5-5), billed per token"),
+      `the run report names the model: ${out.join(" | ")}`,
+    );
+  });
+});
+
+Deno.test("a pass with no API key names both variables instead of fetching anything", async () => {
+  const restoreFetch = stubFetch();
+  try {
+    await withVars(
+      {
+        [TOKEN_ENV]: "test-token-not-real",
+        [KEY_ENV]: undefined,
+        DCWG_ANTHROPIC_API_KEY: undefined,
+      },
+      async () => {
+        const root = await Deno.makeTempDir();
+        const { code, errors } = await runCliErrors([...FOLDING, "--root", root]);
+        assertEquals(code, 2, "a missing key is configuration, not a fold to retry");
+        assert(errors[0].includes("ANTHROPIC_API_KEY"));
+        assert(
+          errors[0].includes("DCWG_ANTHROPIC_API_KEY"),
+          "the host's prefixed name is the other fix",
+        );
+        assertEquals(exists(`${root}/raw`), false, "nothing was fetched: the check runs first");
+      },
+    );
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("a flag for a removed editor or provider is refused by name", async () => {
+  for (const flag of ["--editor", "--budget-share"]) {
+    const { code, errors } = await runCliErrors([...BASE, flag, "x"]);
+    assertEquals(code, 2, `${flag} is gone`);
+    assert(errors.join("\n").includes(`unknown flag: ${flag}`), `the message names ${flag}`);
+  }
+});
+
+Deno.test("a provider the connector does not have is refused by name", async () => {
+  const { code, errors } = await runCliErrors([...BASE, "--provider", "openrouter"]);
+  assertEquals(code, 2);
+  assert(errors.join("\n").includes("--provider must be one of anthropic, gemini"));
+});
+
+Deno.test("a gemini pass with no gemini key names that variable, not the Anthropic one", async () => {
+  const restoreFetch = stubFetch();
+  try {
+    await withVars(
+      {
+        [TOKEN_ENV]: "test-token-not-real",
+        GEMINI_API_KEY: undefined,
+        DCWG_GEMINI_API_KEY: undefined,
+        [KEY_ENV]: "an-anthropic-key-is-not-a-gemini-key",
+      },
+      async () => {
+        const root = await Deno.makeTempDir();
+        const { code, errors } = await runCliErrors([...FOLDING, "--provider", "gemini", "--root", root]);
+        assertEquals(code, 2);
+        assert(errors[0].includes("GEMINI_API_KEY"));
+        assertEquals(exists(`${root}/raw`), false, "nothing was fetched: the check runs first");
+      },
+    );
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("a gemini pass reaches the Gemini API, and an empty plan is a no-op fold like any other", async () => {
+  const restoreFetch = stubFetch("empty-plan");
+  try {
+    await withVars(
+      { [TOKEN_ENV]: "test-token-not-real", GEMINI_API_KEY: "test-key-not-real", [KEY_ENV]: undefined },
+      async () => {
+        const root = await Deno.makeTempDir();
+        await seedGateCleanWiki(root);
+        const { code, out } = await runCli([...FOLDING, "--provider", "gemini", "--root", root]);
+        assertEquals(code, 1, "a plan that changes no page did not fold the capture");
+        assert(
+          out.includes("provider: gemini (gemini-2.5-flash), free tier unless the key's project is billed"),
+          `the report names who answered: ${out.join(" | ")}`,
+        );
+        const payload = JSON.parse(out.find((line) => line.startsWith("RESULT "))!.slice("RESULT ".length));
+        assertEquals(payload.noop, "raw/discord/2026-08-01_dcwg-talk.md");
+      },
+    );
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("--max-usd must be a positive number", async () => {
+  const { code, errors } = await runCliErrors([...BASE, "--max-usd", "0"]);
+  assertEquals(code, 2);
+  assert(errors.join("\n").includes("--max-usd must be a positive number"));
 });
 
 Deno.test("a missing token fails loudly instead of half-running", async () => {
@@ -569,250 +660,4 @@ Deno.test("--tag replaces the default tags instead of adding to them", async () 
       "the first explicit --tag replaces the defaults rather than adding to them",
     );
   });
-});
-
-/** A balance with room in it, as the Gateway reports one. */
-const FRESH_KEY_BODY = { balance: "0.04", total_used: "1.69" };
-
-/**
- * A model the Gateway charges for, and the catalogue entry that prices it.
- *
- * A free model is not governed by the balance at all: it costs nothing, so its share buys
- * every attempt the caller asked for. These tests are about the arithmetic that does
- * apply, which needs a pass that costs something, so they pin this model.
- */
-const PAID_MODEL = "alibaba/qwen3.7-flash";
-const MODEL_CATALOGUE = {
-  data: [{ id: PAID_MODEL, pricing: { input: "0.00000003", output: "0.00000013" } }],
-};
-
-/**
- * The folding invocation on the agentic editor, which is the one the budget governs.
- *
- * `--attempts 2` is deliberate: it is the configuration whose worst case the balance
- * cannot pay for at a priced model, so the assertions below are about the run cutting
- * that ceiling down to what the balance actually buys.
- */
-const AGENTIC = [
-  "--channel",
-  CHANNEL,
-  "--venue",
-  "dcwg-talk",
-  "--all",
-  "--editor",
-  "fx",
-  "--model",
-  PAID_MODEL,
-  "--attempts",
-  "2",
-];
-
-Deno.test("a spent day defers the fold without starting a pass", async () => {
-  await withBudgetEnv(SPENT_KEY_BODY, async (_bin, marker) => {
-    const root = await Deno.makeTempDir();
-    await seedWiki(root);
-    const { code, out } = await runCli([...AGENTIC, "--budget-share", "1/2", "--root", root]);
-
-    assertEquals(code, 1, "the wiki is still behind, so the run needs attention");
-    assertEquals(exists(marker), false, "a pass the day cannot pay for is never started");
-    assert(
-      out.some((line) => line.includes("fold deferred")),
-      "the run names the deferral rather than reporting a fold failure",
-    );
-
-    const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
-    assertEquals(
-      cursor._pending[0].stalls,
-      0,
-      "a budget condition is not a stall: no attempt judged the material",
-    );
-
-    const result = out.find((line) => line.startsWith("RESULT "));
-    assert(result, "the CLI still prints a machine-readable RESULT line");
-    const payload = JSON.parse(result.slice("RESULT ".length));
-    assertEquals(payload.status, "NEEDS_ATTENTION");
-    assertEquals(payload.attempts, 0, "the report says no attempt ran");
-    assert(
-      String(payload.budget).includes("cannot pay for one pass"),
-      "the payload says which constraint was hit",
-    );
-    assertEquals(payload.stalled, undefined, "a deferred fold is not reported as a stall");
-  });
-});
-
-Deno.test("a share that can pay for one pass starts it, and its failure is a stall", async () => {
-  await withBudgetEnv(FRESH_KEY_BODY, async (_bin, marker) => {
-    const root = await Deno.makeTempDir();
-    await seedWiki(root);
-    const { code, out } = await runCli([...AGENTIC, "--budget-share", "1/1", "--root", root]);
-
-    assertEquals(code, 1, "the stand-in pass fails, so the run needs attention");
-    assertEquals(exists(marker), true, "a pass the day can pay for is started");
-
-    const cursor = JSON.parse(await Deno.readTextFile(`${root}/raw/discord/.cursor`));
-    assertEquals(
-      cursor._pending[0].stalls,
-      1,
-      "this pass reached the model and failed, which is what a stall counts",
-    );
-
-    const result = out.find((line) => line.startsWith("RESULT "));
-    const payload = JSON.parse(result!.slice("RESULT ".length));
-    assertEquals(
-      payload.attempts,
-      1,
-      "a $0.04 share buys one $0.03 pass, not the two --attempts asked for",
-    );
-    assertEquals(payload.budget, undefined, "this run was not budget-blocked");
-    assertEquals(payload.stalled, "raw/discord/2026-08-01_dcwg-talk.md");
-  });
-});
-
-/**
- * The provider is a precondition rather than a hope.
- *
- * A run that reached a model on a provider this machine cannot serve would spend its
- * whole time budget to learn what one line of checking says first, so the connector
- * resolves the provider, its key, and fx's own settings before it fetches anything.
- */
-async function withProviderEnv(
-  provider: string,
-  fn: () => Promise<void>,
-  options: { settings?: unknown; key?: string | undefined; gatewayKey?: string | undefined } = {},
-): Promise<void> {
-  const prior: Array<[string, string | undefined]> = [];
-  const remember = (name: string) => prior.push([name, Deno.env.get(name)]);
-  const settingsPath = `${await Deno.makeTempDir()}/settings.json`;
-  if (options.settings !== undefined) {
-    await Deno.writeTextFile(settingsPath, JSON.stringify(options.settings));
-  }
-  for (
-    const name of [
-      TOKEN_ENV,
-      "GEMINI_API_KEY",
-      "DCWG_GEMINI_API_KEY",
-      "AI_GATEWAY_API_KEY",
-      "DCWG_FX_SETTINGS",
-    ]
-  ) remember(name);
-  Deno.env.set(TOKEN_ENV, "test-token-not-real");
-  Deno.env.set("DCWG_FX_SETTINGS", settingsPath);
-  for (
-    const [name, value] of [
-      ["GEMINI_API_KEY", options.key],
-      ["AI_GATEWAY_API_KEY", options.gatewayKey],
-    ] as const
-  ) {
-    if (value === undefined) Deno.env.delete(name);
-    else Deno.env.set(name, value);
-  }
-  try {
-    await fn();
-  } finally {
-    for (const [name, value] of prior) {
-      if (value === undefined) Deno.env.delete(name);
-      else Deno.env.set(name, value);
-    }
-  }
-}
-
-Deno.test("a provider the connector does not have is refused by name", async () => {
-  const root = await Deno.makeTempDir();
-  const { code, errors } = await runCliErrors([
-    ...AGENTIC,
-    "--provider",
-    "openrouter",
-    "--root",
-    root,
-  ]);
-
-  assertEquals(code, 2);
-  assert(errors[0].includes("--provider must be one of gateway, gemini"));
-});
-
-Deno.test("a gemini run with no gemini key names the variable instead of borrowing the Gateway's", async () => {
-  await withProviderEnv("gemini", async () => {
-    const root = await Deno.makeTempDir();
-    const { code, errors } = await runCliErrors([
-      ...AGENTIC,
-      "--provider",
-      "gemini",
-      "--root",
-      root,
-    ]);
-
-    assertEquals(code, 2, "a missing key is configuration, not a fold to retry");
-    assert(errors[0].includes("GEMINI_API_KEY"));
-    assert(errors[0].includes("DCWG_GEMINI_API_KEY"), "the host's prefixed name is the other fix");
-    assertEquals(exists(`${root}/raw`), false, "nothing was fetched: the check runs first");
-  }, { gatewayKey: "test-key-not-real" });
-});
-
-Deno.test("a gemini run whose fx settings name no such provider names the file and the block", async () => {
-  await withProviderEnv("gemini", async () => {
-    const root = await Deno.makeTempDir();
-    const { code, errors } = await runCliErrors([
-      ...AGENTIC,
-      "--provider",
-      "gemini",
-      "--root",
-      root,
-    ]);
-
-    assertEquals(code, 2);
-    assert(errors[0].includes("providers.gemini"), "the fix names the block to add");
-    assertEquals(exists(`${root}/raw`), false);
-  }, { key: "test-key-not-real", settings: { provider: "gateway" } });
-});
-
-Deno.test("an unmetered provider is never asked what it has left", async () => {
-  const hits: string[] = [];
-  const original = globalThis.fetch;
-  globalThis.fetch = ((input: string | URL | Request) => {
-    const url = new URL(String(input));
-    hits.push(url.href);
-    if (url.pathname === `/api/v10/channels/${CHANNEL}`) {
-      return Promise.resolve(
-        new Response(JSON.stringify({ id: CHANNEL, name: "talk" }), { status: 200 }),
-      );
-    }
-    if (url.pathname === `/api/v10/channels/${CHANNEL}/messages`) {
-      return Promise.resolve(
-        new Response(JSON.stringify([...apiMessages()].reverse()), { status: 200 }),
-      );
-    }
-    return Promise.resolve(new Response(JSON.stringify({}), { status: 404 }));
-  }) as typeof fetch;
-  try {
-    await withProviderEnv("gemini", async () => {
-      const root = await Deno.makeTempDir();
-      await seedWiki(root);
-      const { code, out } = await runCli([
-        "--channel",
-        CHANNEL,
-        "--venue",
-        "dcwg-talk",
-        "--all",
-        "--provider",
-        "gemini",
-        "--editor",
-        "api",
-        "--root",
-        root,
-      ]);
-
-      assertEquals(code, 1, "the shim is not listening here, so the fold stalls");
-      assertEquals(
-        hits.filter((hit) => hit.includes("/credits")).length,
-        0,
-        "a free tier is bounded by its own rate limit, not by credits a share could divide",
-      );
-      assert(
-        out.some((line) => line === "provider: gemini (gemini-2.5-flash), unmetered"),
-        `the run report names who paid: ${out.join(" | ")}`,
-      );
-    }, { key: "test-key-not-real" });
-  } finally {
-    globalThis.fetch = original;
-  }
 });

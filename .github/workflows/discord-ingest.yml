@@ -23,38 +23,24 @@ name: Discord ingest
 # run can now commit, the Pages deploy no longer waits for the ingest workflow to
 # report success.
 #
-# The page pass runs `fx`, the Vercel Labs coding agent, against the Vercel AI
-# Gateway, which edits the wiki files itself instead of returning one JSON list
-# of rewrites. It is installed below as a pinned binary: the version decides the
-# agent loop, the tool set, and the JSON envelope the connector parses, so an
-# unpinned install would let the automation change underneath a run. `--editor
-# api` selects the older one-shot path, which needs no CLI.
+# The wiki pass is a pipeline the connector drives, not an agent: one model call plans
+# which pages change, then one call per page returns its body, and the connector writes
+# and checks every page itself (tools/discord/anthropic.ts). It bounds its own spend with
+# --max-usd, and the gates above are still the arbiter. The Anthropic API is billed per
+# token against a Console account's credit; a Claude chat subscription does not pay for it.
 #
-# `--provider` picks who pays. The default, `gateway`, is the Vercel AI Gateway: one
-# key, one catalogue, and one credit probe. `gemini` runs the same fx pass against
-# Google's free tier, which is metered by request rather than by credits, so a gemini
-# run skips the credit probe entirely and is bounded by the provider's own rate limit.
-# Gemini's OpenAI-compatible endpoint is not consistently compatible (streamed tool
-# calls arrive without an `index`, `arguments` arrives as a JSON string), and fx is a
-# pinned binary, so a gemini run reaches Google through the local shim in
-# tools/discord/gemini_proxy.ts: the job starts it below and points fx at it through
-# ~/.fx/settings.json. Required repository secrets:
+# `--provider` picks who answers: `anthropic` (the default) or `gemini`, Google's free tier.
+# The repository variable DCWG_PROVIDER repoints the daily schedule without editing this
+# file, the same way DCWG_MODEL repoints the model.
+#
+# Required repository secrets:
 #   DISCORD_BOT_TOKEN       the capture bot's token (its own application)
-#   AI_GATEWAY_API_KEY      inference for the wiki pass on the Gateway (the default)
+#   ANTHROPIC_API_KEY       inference for the wiki pass on --provider anthropic
 #   GEMINI_API_KEY          inference for the wiki pass on --provider gemini
-# A pass costs money rather than requests here, and the free models cost
-# nothing: the connector asks the Gateway for the team's credit balance and for
-# the catalogue price of the model this run was pointed at, and refuses to start
-# a pass the balance cannot pay for. Each venue runs with --budget-share <i>/<n>,
-# so the balance is divided between the venues that share it rather than spent by
-# whichever runs first. See "The budget" in AGENTS.md for the arithmetic.
+# When the chosen provider's key is unset the venues are still archived and their folds
+# stay queued.
 # The bot token is never echoed: the connector reads it from the environment and
 # never accepts a token as a command-line argument.
-#
-# The pass's permission rules are written below rather than committed, because fx
-# keeps them in `~/.fx/settings.json`, which is per-machine and not per-repo. They
-# are a second control, not the boundary: the connector compares the tree either
-# side of a pass and reverts anything outside `wiki/`.
 
 on:
   schedule:
@@ -70,16 +56,16 @@ on:
         description: "Capture only; do not touch the wiki pages"
         type: boolean
         default: false
-      model:
-        description: "Model for the wiki pass. Blank = the default. A Gateway id, vendor/model, e.g. nvidia/nemotron-3.5-lightning-free"
-        type: string
-        default: ""
       provider:
-        description: "Who pays for the wiki pass: gateway or gemini (blank = the connector's default, gateway)"
+        description: "Who answers the wiki pass: anthropic or gemini. Blank = the repository variable DCWG_PROVIDER, else anthropic"
         type: string
         default: ""
-      editor:
-        description: "fx or api (blank = the connector's default)"
+      model:
+        description: "Model for the wiki pass, for that provider. Blank = its default (claude-opus-5-5 on anthropic, gemini-2.5-flash on gemini)"
+        type: string
+        default: ""
+      max_usd:
+        description: "Spend cap for one wiki pass, in USD. Blank = the connector's default"
         type: string
         default: ""
 
@@ -102,17 +88,13 @@ jobs:
         dcwg-propose=1559218298128695386
       # github.event.inputs is a string map that is empty on a scheduled run, so
       # every one of these falls back in the shell rather than in an expression.
-      # MODEL falls back in the expression on purpose: a scheduled run cannot
-      # take an input, so the repository variable DCWG_MODEL is how the schedule
-      # is repointed at another model (e.g. alibaba/qwen3.7-flash) without editing
-      # this file. Unset, the connector uses the default wiki.ts names.
       MODEL: ${{ github.event.inputs.model || vars.DCWG_MODEL }}
-      # Same shape as MODEL: a scheduled run cannot take an input, so the repository
-      # variable DCWG_PROVIDER is how the daily run is repointed at the free Gemini
-      # tier (set it to `gemini`) without editing this file. Unset, the connector
-      # defaults to the Gateway.
+      # Same shape: the repository variable DCWG_PROVIDER repoints the schedule. Unset, the
+      # connector uses anthropic. DCWG_MODEL names a model for one provider, so change both
+      # together.
       PROVIDER: ${{ github.event.inputs.provider || vars.DCWG_PROVIDER }}
-      EDITOR: ${{ github.event.inputs.editor }}
+      # Same shape as MODEL: the repository variable DCWG_MAX_USD tunes the schedule's cap.
+      MAX_USD: ${{ github.event.inputs.max_usd || vars.DCWG_MAX_USD }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       SKIP_WIKI: ${{ github.event.inputs.skip_wiki }}
     steps:
@@ -121,81 +103,6 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: "2.x"
-
-      # Pinned, because the connector parses this binary's JSON envelope and drives
-      # its agent loop: a silent upgrade would change both. The version is asserted
-      # so the pin cannot drift into a lie.
-      - name: Install the page-pass CLI
-        run: |
-          curl -fsSL https://fx.sh/setup.sh | bash -s -- v0.0.14
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          test "$("$HOME/.local/bin/fx" --version)" = "0.0.14"
-
-      # fx reads its permission rules from a per-machine file that cannot be
-      # committed, so the workflow writes them. `edit` is the permission name for
-      # both `write_file` and `edit_file`, and the allow pattern has to be the tree
-      # form `wiki/**`: a bare `wiki/*` matches an edit to an existing page but
-      # denies creating a new one, because a create is matched against its parent.
-      - name: Write the pass's permission rules
-        run: |
-          mkdir -p "$HOME/.fx"
-          cat > "$HOME/.fx/settings.json" <<'JSON'
-          {
-            "provider": "gateway",
-            "permission_mode": "auto",
-            "permission": {
-              "*": "deny",
-              "read": "allow",
-              "glob": "allow",
-              "grep": "allow",
-              "list": "allow",
-              "bash": "deny",
-              "edit": { "*": "deny", "wiki/**": "allow" }
-            }
-          }
-          JSON
-
-
-      # A gemini pass runs through the shim, and fx reads the provider it was pointed at
-      # out of a per-machine file, so the job writes that block rather than committing it.
-      # `auth.env` has to name the variable the ingest step exports: the connector checks
-      # this file before a pass and refuses a mismatch by name instead of letting it
-      # surface as an unauthenticated request.
-      - name: Point fx at the shim when the pass runs on gemini
-        if: env.PROVIDER == 'gemini'
-        run: |
-          jq '.provider = "gemini" | .providers.gemini = {
-                "protocol": "openai-chat-completions",
-                "base_url": "http://127.0.0.1:8787/v1",
-                "auth": { "type": "bearer", "env": "GEMINI_API_KEY" },
-                "model_metadata": {
-                  "gemini-2.5-flash": {
-                    "context_window": 1048576,
-                    "max_output_tokens": 65536,
-                    "supports_tool_use": true
-                  }
-                }
-              }' "$HOME/.fx/settings.json" > "$HOME/.fx/settings.tmp"
-          mv "$HOME/.fx/settings.tmp" "$HOME/.fx/settings.json"
-          cat "$HOME/.fx/settings.json"
-
-      # The shim repairs the four ways Gemini's OpenAI-compatible endpoint is not
-      # OpenAI-compatible. It holds no credential: it forwards the caller's own
-      # Authorization header upstream and logs neither the header nor a body.
-      - name: Start the Gemini shim
-        if: env.PROVIDER == 'gemini'
-        run: |
-          deno run -A tools/discord/gemini_proxy.ts --port 8787 > /tmp/gemini-shim.log 2>&1 &
-          for _ in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8787/health > /dev/null; then
-              echo "shim listening on 127.0.0.1:8787"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "the shim never answered on 127.0.0.1:8787"
-          cat /tmp/gemini-shim.log
-          exit 1
 
       - name: Unit-test the connector before trusting it
         run: deno test -A
@@ -208,9 +115,7 @@ jobs:
           # secrets are account-wide and a bare DISCORD_BOT_TOKEN on this host
           # is another project's bot.
           DCWG_DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          # Only read when the pass runs on gemini; the connector resolves a provider's
-          # key from its own variable and refuses the run by name when it is absent.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           # Per-venue commits, inside the loop. The runner is ephemeral and one venue must
@@ -220,10 +125,6 @@ jobs:
           git config user.name "dcwg-ingest"
           git config user.email "dcwg-ingest@users.noreply.github.com"
           status=0
-          # How many venues share today's free-model budget. The connector divides what
-          # the provider reports left by the runs still to come, so a venue with a
-          # backlog cannot spend a later venue's allowance. It is counted from the same
-          # VENUES block the loop reads, so a line added there is counted too.
           venue_total=$(grep -c . <<< "$VENUES")
           venue_index=0
           # Push a venue's commit, rebasing if `main` moved while the model was running.
@@ -252,16 +153,20 @@ jobs:
             rm -rf .dcwg
             # --limit 0 drains the backlog, so a daily run cannot leave a gap
             # behind a message cap.
-            args=(--channel "$channel" --venue "$venue" --root . --limit 0 \
-              --budget-share "$venue_index/$venue_total")
-            # Only pin a model when one was asked for: passing the connector's
-            # default id would send a model nobody chose to the Gateway.
+            args=(--channel "$channel" --venue "$venue" --root . --limit 0)
+            # Only pin a model when one was asked for: the connector names its own default.
             if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
-            if [ -n "${EDITOR:-}" ]; then args+=(--editor "$EDITOR"); fi
-            # Who pays for the pass. Unset means the connector's own default, and a
-            # gemini pass also requires the shim started above and the settings block
-            # written above, both of which key off the same variable.
+            # The pass's own spend cap; unset means the connector's default.
+            if [ -n "${MAX_USD:-}" ]; then args+=(--max-usd "$MAX_USD"); fi
+            # Without a key the wiki pass cannot run. The capture is the record and must not
+            # wait on one, so the venue is archived and its fold stays queued for a run
+            # that has the key.
             if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
+            if [ "${PROVIDER:-anthropic}" = "gemini" ]; then key_name=GEMINI_API_KEY; else key_name=ANTHROPIC_API_KEY; fi
+            if [ -z "${!key_name:-}" ]; then
+              echo "::warning::$key_name is not set; archiving $venue without a wiki pass"
+              args+=(--skip-wiki)
+            fi
             [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
             [ "${SKIP_WIKI:-false}" = "true" ] && args+=(--skip-wiki)
             if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then
