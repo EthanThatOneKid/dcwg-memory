@@ -39,6 +39,12 @@ import { z } from "zod";
 import { yamlStr } from "./capture.ts";
 import { carryFrontmatterForward, checkEditablePath, CODE_OWNED, PROMPT_FENCE, WIKI_PREFIX } from "./guard.ts";
 import { frontmatterBlock, postsInCapture, threadAnchors } from "./thread_pages.ts";
+import { emptyUsage } from "./model.ts";
+import type { CallRequest, Complete, Effort, FailureKind, Reply, Usage } from "./model.ts";
+
+// The seam moved to model.ts so a provider that is not Anthropic needs none of this file's SDK.
+export { emptyUsage };
+export type { CallRequest, Complete, Effort, FailureKind, Reply, Usage };
 
 /** The standing instructions for this pass, relative to the repo root. */
 export const PASS_INSTRUCTIONS_PATH = "tools/discord/prompt/dcwg-pass.md";
@@ -69,19 +75,6 @@ const WRITE_MAX_TOKENS = 16_000;
 
 // ---------------------------------------------------------------------------------------
 // Spend
-
-export interface Usage {
-  /** Fresh input tokens, billed at the full input rate. */
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  calls: number;
-}
-
-export function emptyUsage(): Usage {
-  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 };
-}
 
 function addUsage(a: Usage, b: Usage): Usage {
   return {
@@ -115,6 +108,13 @@ const PRICES: Record<string, Price> = {
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
   "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
+  // Gemini's paid list prices as of 2026-10-23 (ai.google.dev/gemini-api/docs/pricing). On the
+  // free tier nothing is charged, so this is an upper bound there. Cached input is priced at
+  // the full input rate because no cached rate was read, and Gemini 2.5 Pro's rate holds only
+  // up to 200K tokens of prompt, so its estimate is a floor above that.
+  "gemini-2.5-flash": { input: 0.3, output: 2.5, cacheRead: 0.3, cacheWrite: 0 },
+  "gemini-2.5-flash-lite": { input: 0.1, output: 0.4, cacheRead: 0.1, cacheWrite: 0 },
+  "gemini-2.5-pro": { input: 1.25, output: 10, cacheRead: 1.25, cacheWrite: 0 },
 };
 
 /** An estimate of what the usage cost, or `undefined` for a model with no listed price. */
@@ -131,36 +131,6 @@ export function estimateCostUsd(model: string, usage: Usage): number | undefined
 
 // ---------------------------------------------------------------------------------------
 // The model seam
-
-export type Effort = "low" | "medium" | "high";
-
-export interface CallRequest<T> {
-  /** The standing instructions. Identical on every call, so it sits inside the cache prefix. */
-  system: string;
-  /** The capture, the first user block, and the cache breakpoint. Identical across calls. */
-  prefix: string;
-  /** What this call asks for. Differs per call and is never cached. */
-  task: string;
-  schema: z.ZodType<T>;
-  maxTokens: number;
-  effort: Effort;
-  signal?: AbortSignal;
-}
-
-export type FailureKind =
-  | "refusal"
-  | "truncated"
-  | "invalid"
-  | "rate_limit"
-  | "billing"
-  | "auth"
-  | "error";
-
-export type Reply<T> =
-  | { ok: true; value: T; usage: Usage }
-  | { ok: false; kind: FailureKind; message: string; usage: Usage };
-
-export type Complete = <T>(request: CallRequest<T>) => Promise<Reply<T>>;
 
 /** A client with the retry count a nightly run wants: the API's own 429s are common. */
 export function makeClient(apiKey: string): Anthropic {

@@ -29,10 +29,16 @@ name: Discord ingest
 # --max-usd, and the gates above are still the arbiter. The Anthropic API is billed per
 # token against a Console account's credit; a Claude chat subscription does not pay for it.
 #
+# `--provider` picks who answers: `anthropic` (the default) or `gemini`, Google's free tier.
+# The repository variable DCWG_PROVIDER repoints the daily schedule without editing this
+# file, the same way DCWG_MODEL repoints the model.
+#
 # Required repository secrets:
 #   DISCORD_BOT_TOKEN       the capture bot's token (its own application)
-#   ANTHROPIC_API_KEY       inference for the wiki pass. When it is unset the venues are
-#                           still archived and their folds stay queued
+#   ANTHROPIC_API_KEY       inference for the wiki pass on --provider anthropic
+#   GEMINI_API_KEY          inference for the wiki pass on --provider gemini
+# When the chosen provider's key is unset the venues are still archived and their folds
+# stay queued.
 # The bot token is never echoed: the connector reads it from the environment and
 # never accepts a token as a command-line argument.
 
@@ -50,8 +56,12 @@ on:
         description: "Capture only; do not touch the wiki pages"
         type: boolean
         default: false
+      provider:
+        description: "Who answers the wiki pass: anthropic or gemini. Blank = the repository variable DCWG_PROVIDER, else anthropic"
+        type: string
+        default: ""
       model:
-        description: "Model for the wiki pass. Blank = the default (claude-opus-5-5); claude-sonnet-5-5 and claude-haiku-5-5 are cheaper"
+        description: "Model for the wiki pass, for that provider. Blank = its default (claude-opus-5-5 on anthropic, gemini-2.5-flash on gemini)"
         type: string
         default: ""
       max_usd:
@@ -79,6 +89,10 @@ jobs:
       # github.event.inputs is a string map that is empty on a scheduled run, so
       # every one of these falls back in the shell rather than in an expression.
       MODEL: ${{ github.event.inputs.model || vars.DCWG_MODEL }}
+      # Same shape: the repository variable DCWG_PROVIDER repoints the schedule. Unset, the
+      # connector uses anthropic. DCWG_MODEL names a model for one provider, so change both
+      # together.
+      PROVIDER: ${{ github.event.inputs.provider || vars.DCWG_PROVIDER }}
       # Same shape as MODEL: the repository variable DCWG_MAX_USD tunes the schedule's cap.
       MAX_USD: ${{ github.event.inputs.max_usd || vars.DCWG_MAX_USD }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
@@ -102,6 +116,7 @@ jobs:
           # is another project's bot.
           DCWG_DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           # Per-venue commits, inside the loop. The runner is ephemeral and one venue must
           # not be able to discard another venue's work: each venue commits and pushes its
@@ -146,8 +161,10 @@ jobs:
             # Without a key the wiki pass cannot run. The capture is the record and must not
             # wait on one, so the venue is archived and its fold stays queued for a run
             # that has the key.
-            if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-              echo "::warning::ANTHROPIC_API_KEY is not set; archiving $venue without a wiki pass"
+            if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
+            if [ "${PROVIDER:-anthropic}" = "gemini" ]; then key_name=GEMINI_API_KEY; else key_name=ANTHROPIC_API_KEY; fi
+            if [ -z "${!key_name:-}" ]; then
+              echo "::warning::$key_name is not set; archiving $venue without a wiki pass"
               args+=(--skip-wiki)
             fi
             [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)

@@ -12,7 +12,8 @@
  *
  * Credentials (never passed as arguments, never logged):
  *   DCWG_DISCORD_BOT_TOKEN   the capture bot's token
- *   ANTHROPIC_API_KEY        the wiki pass, a Console API key billed per token
+ *   ANTHROPIC_API_KEY        the wiki pass on --provider anthropic (the default), a Console API key
+ *   GEMINI_API_KEY           the wiki pass on --provider gemini, a Google AI Studio key
  *
  * The wiki pass is the staged pipeline in `anthropic.ts`: one plan call, then one write
  * call per page, bounded by `--max-usd`. See "The staged Anthropic pass" in AGENTS.md.
@@ -32,8 +33,11 @@ import {
 import { captureDay, DEFAULT_SERVER_LABEL, DEFAULT_TAGS, nextCapturePath, renderCapture } from "./capture.ts";
 import { validateSummary } from "./guard.ts";
 import { anthropicComplete, DEFAULT_MAX_USD, makeClient, readPassInstructions, runAnthropicPass } from "./anthropic.ts";
+import { geminiComplete } from "./gemini.ts";
+import type { Complete } from "./model.ts";
 import { diffTree, outsideWiki, restoreTree, snapshotTree, writePagesOk } from "./tree.ts";
-import { ANTHROPIC_DEFAULT_MODEL, describeModel, missingKeyMessage, resolveApiKey } from "./providers.ts";
+import { describeModel, missingKeyMessage, parseProviderName, resolveApiKey, resolveProvider } from "./providers.ts";
+import type { ProviderSpec } from "./providers.ts";
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
 import { captureKind, findThreadProblems, POST_SHAPED, postsInCapture } from "./thread_pages.ts";
@@ -70,8 +74,10 @@ Options:
   --all                 ignore the cursor and pull from the channel's first message
   --since <iso>         ISO-8601 UTC lower bound (overrides the cursor)
   --token-env <name>    env var holding the bot token (default: DCWG_DISCORD_BOT_TOKEN)
-  --model <id>          model id for the wiki pass (default claude-opus-5-5); claude-sonnet-5-5
-                        and claude-haiku-5-5 are cheaper
+  --provider <name>     who answers the wiki pass: anthropic (default, billed per token) or
+                        gemini (Google AI Studio; free tier unless the key's project is billed)
+  --model <id>          model id for the wiki pass on that provider (default claude-opus-5-5 on
+                        anthropic, gemini-2.5-flash on gemini)
   --skip-wiki           capture only; do not touch wiki pages
   --max-usd <n>         spend cap for one wiki pass, in USD, estimated from the usage the
                         API reports (default ${DEFAULT_MAX_USD})
@@ -102,7 +108,9 @@ interface Args {
   all: boolean;
   since?: string;
   tokenEnv: string;
-  /** Unset means the model the pass itself defaults to. */
+  /** Who answers the pass, and so which key and which default model it uses. */
+  provider: ProviderSpec;
+  /** Unset means the provider's default model. */
   model?: string;
   skipWiki: boolean;
   /** Wall-clock cap on one wiki pass, in seconds. */
@@ -140,6 +148,7 @@ function parseCliArgs(argv: string[]): Args {
         "since",
         "token-env",
         "model",
+        "provider",
         "pass-timeout",
         "max-usd",
         "attempts",
@@ -198,6 +207,8 @@ function parseCliArgs(argv: string[]): Args {
   const venue = str("venue");
   const since = str("since");
   const model = str("model");
+  const providerFlag = str("provider");
+  const provider = resolveProvider(providerFlag === undefined ? undefined : parseProviderName(providerFlag));
   const tags = tagList();
   return {
     ...(channel === undefined ? {} : { channel }),
@@ -210,6 +221,7 @@ function parseCliArgs(argv: string[]): Args {
     all: parsed.all === true,
     ...(since === undefined ? {} : { since }),
     tokenEnv: str("token-env") ?? "DCWG_DISCORD_BOT_TOKEN",
+    provider,
     ...(model === undefined ? {} : { model }),
     skipWiki: parsed["skip-wiki"] === true,
     passTimeoutSec: num("pass-timeout", 900),
@@ -313,9 +325,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
    */
   let passKey: string | undefined;
   if (!args.skipWiki && !args.dryRun) {
-    const resolved = resolveApiKey((name) => Deno.env.get(name));
+    const resolved = resolveApiKey(args.provider, (name) => Deno.env.get(name));
     if (!resolved) {
-      console.error(`error: ${missingKeyMessage()}`);
+      console.error(`error: ${missingKeyMessage(args.provider)}`);
       return 2;
     }
     passKey = resolved.value;
@@ -442,7 +454,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       const target = queued[0];
       console.error(
         `\n[dry-run] the wiki pass would fold ${target?.capture ?? "(not written)"} with ` +
-          `${args.model ?? ANTHROPIC_DEFAULT_MODEL}; no model call is made`,
+          `${args.model ?? args.provider.defaultModel} on ${args.provider.name}; no model call is made`,
       );
     }
     return report(
@@ -569,9 +581,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
    * wiki pass is not skipped past this point, so the key is present.
    */
   const standingInstructions = await readPassInstructions(root);
-  const anthropicClient = makeClient(passKey!);
-  const modelId = args.model ?? ANTHROPIC_DEFAULT_MODEL;
-  console.log(`provider: ${describeModel(modelId)}`);
+  const modelId = args.model ?? args.provider.defaultModel;
+  const complete: Complete = args.provider.name === "gemini"
+    ? geminiComplete(passKey!, modelId)
+    : anthropicComplete(makeClient(passKey!), modelId);
+  console.log(`provider: ${describeModel(args.provider, modelId)}`);
 
   /** Attempts the last fold was allowed, so the report names what actually ran. */
   let foldAttempts = args.attempts;
@@ -698,7 +712,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         captureText,
         system: standingInstructions,
         model: modelId,
-        complete: anthropicComplete(anthropicClient, modelId),
+        complete,
         task: {
           capturePath: foldPath,
           channelName,

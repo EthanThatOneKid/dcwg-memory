@@ -142,12 +142,13 @@ when they pass. It pushes rather than opening a pull request because the cursor 
 `raw/discord/.cursor` has to advance for the next run to know where to resume; a
 cursor parked in an unmerged pull request would make every run re-fetch the same
 range. The gates are the review step, and a failing gate reverts the pass's page
-edits while leaving the capture committed. It needs two repository secrets,
-`DISCORD_BOT_TOKEN` and `ANTHROPIC_API_KEY`. When the second is unset the workflow still
-archives every venue (it passes `--skip-wiki` and warns), so the record never waits on a
-key and the folds stay queued until one is added. Inference is the staged pass described
-below; `DCWG_MODEL` and `DCWG_MAX_USD` repoint the schedule's model and spend cap without
-editing the workflow.
+edits while leaving the capture committed. It needs `DISCORD_BOT_TOKEN` plus the key for the
+provider the pass runs on: `ANTHROPIC_API_KEY` (the default) or `GEMINI_API_KEY`. When that key is
+unset the workflow still archives every venue (it passes `--skip-wiki` and warns), so the record
+never waits on a key and the folds stay queued until one is added. Inference is the staged pass
+described below; the repository variables `DCWG_PROVIDER`, `DCWG_MODEL` and `DCWG_MAX_USD` repoint
+the schedule's provider, model and spend cap without editing the workflow. `DCWG_MODEL` names a
+model for one provider, so change it together with `DCWG_PROVIDER`.
 
 If the pass or a gate fails, the page edits are reverted, so a bad inference never
 commits prose that does not pass the repo's own checks. The capture is committed
@@ -242,14 +243,32 @@ in `anthropic.ts`. The prices are the claude-api skill's table as of 2026-10-06 
 estimate, not a quote. A 429 after the SDK's five retries is reported as a rate limit, and a
 400 that names the credit balance is reported as billing, not as a verdict on the material.
 
-The key is `ANTHROPIC_API_KEY` (the workflow's repository secret; `DCWG_ANTHROPIC_API_KEY` on
-the Zo host). It is a Console API key billed per token. A Claude chat subscription does not
-pay for API calls, and a subscription token is not used here. The standing instructions are
+`--provider` picks who answers the model calls, and it is the only thing that changes between
+providers: the plan, the page writes, the gates and the queue are the same code, because the pass
+asks for structured data through one `Complete` function (`model.ts`) that each provider implements.
+
+- **`anthropic`** (the default) uses `ANTHROPIC_API_KEY` (the workflow's repository secret;
+  `DCWG_ANTHROPIC_API_KEY` on the Zo host). It is a Console API key billed per token. A Claude chat
+  subscription does not pay for API calls, and a subscription token is not used here.
+- **`gemini`** (`gemini.ts`) uses `GEMINI_API_KEY` (`DCWG_GEMINI_API_KEY` on the host), a Google AI
+  Studio key, and defaults to `gemini-2.5-flash`. It speaks the native `generateContent` API with a
+  response schema, not the OpenAI-compatible endpoint that needed a shim, and it retries a 429 or 5xx
+  itself, waiting the delay the API names. A wait over 60 seconds (a daily quota) fails the call as a
+  rate limit at once instead of holding the runner. A key from a project without billing is on the
+  free tier: no charge, rate-limited, and its prompts are used to improve Google's products, which
+  is no loss for this public repo. `--max-usd` is checked against Gemini's paid list price, so on the
+  free tier it is an upper bound rather than a charge.
+
+The key is never borrowed across providers: a Gemini run with only `ANTHROPIC_API_KEY` set fails
+naming `GEMINI_API_KEY`. The standing instructions are
 `tools/discord/prompt/dcwg-pass.md`, written for the staged pass: it says the model returns
 data and never touches a file.
 
 Not yet verified live: the unit tests drive the stages against a stubbed model, and nothing
-here has called the real API. The first dispatch should be a manual one with
+here has called the real Anthropic or Gemini API. For Gemini, what the first run settles is whether
+`responseJsonSchema` accepts the plan schema (it has nullable fields), what the free tier's per-minute and
+per-day limits allow (the pass makes one plan call plus one call per page, each carrying the whole
+capture), and what the cached-token count looks like. The first dispatch should be a manual one with
 `max_usd` 0.50 against one venue, before the next scheduled run spends anything. Server-side refusal
 `fallbacks` are not enabled: a refusal is reported as `refusal` and fails the attempt.
 

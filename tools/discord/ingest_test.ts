@@ -73,6 +73,20 @@ function stubFetch(model: ModelStub = "down"): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = ((input: string | URL | Request) => {
     const url = new URL(typeof input === "object" && "url" in input ? input.url : String(input));
+    if (url.hostname === "generativelanguage.googleapis.com") {
+      if (model === "empty-plan") {
+        const answer = JSON.stringify({ summary: "nothing durable", pages: [] });
+        return Promise.resolve(Response.json({
+          candidates: [{ finishReason: "STOP", content: { parts: [{ text: answer }] } }],
+          usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 40 },
+        }));
+      }
+      return Promise.resolve(
+        Response.json({ error: { code: 400, status: "INVALID_ARGUMENT", message: "stubbed provider is down" } }, {
+          status: 400,
+        }),
+      );
+    }
     if (url.hostname === "api.anthropic.com") {
       if (model === "empty-plan") {
         return Promise.resolve(
@@ -456,7 +470,7 @@ Deno.test("a pass reports which model it runs, so a log says what it spent", asy
     await seedWiki(root);
     const { out } = await runCli([...FOLDING, "--model", "claude-haiku-5-5", "--root", root]);
     assert(
-      out.includes("provider: anthropic (claude-haiku-5-5), metered"),
+      out.includes("provider: anthropic (claude-haiku-5-5), billed per token"),
       `the run report names the model: ${out.join(" | ")}`,
     );
   });
@@ -489,10 +503,62 @@ Deno.test("a pass with no API key names both variables instead of fetching anyth
 });
 
 Deno.test("a flag for a removed editor or provider is refused by name", async () => {
-  for (const flag of ["--editor", "--provider", "--budget-share"]) {
+  for (const flag of ["--editor", "--budget-share"]) {
     const { code, errors } = await runCliErrors([...BASE, flag, "x"]);
     assertEquals(code, 2, `${flag} is gone`);
     assert(errors.join("\n").includes(`unknown flag: ${flag}`), `the message names ${flag}`);
+  }
+});
+
+Deno.test("a provider the connector does not have is refused by name", async () => {
+  const { code, errors } = await runCliErrors([...BASE, "--provider", "openrouter"]);
+  assertEquals(code, 2);
+  assert(errors.join("\n").includes("--provider must be one of anthropic, gemini"));
+});
+
+Deno.test("a gemini pass with no gemini key names that variable, not the Anthropic one", async () => {
+  const restoreFetch = stubFetch();
+  try {
+    await withVars(
+      {
+        [TOKEN_ENV]: "test-token-not-real",
+        GEMINI_API_KEY: undefined,
+        DCWG_GEMINI_API_KEY: undefined,
+        [KEY_ENV]: "an-anthropic-key-is-not-a-gemini-key",
+      },
+      async () => {
+        const root = await Deno.makeTempDir();
+        const { code, errors } = await runCliErrors([...FOLDING, "--provider", "gemini", "--root", root]);
+        assertEquals(code, 2);
+        assert(errors[0].includes("GEMINI_API_KEY"));
+        assertEquals(exists(`${root}/raw`), false, "nothing was fetched: the check runs first");
+      },
+    );
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("a gemini pass reaches the Gemini API, and an empty plan is a no-op fold like any other", async () => {
+  const restoreFetch = stubFetch("empty-plan");
+  try {
+    await withVars(
+      { [TOKEN_ENV]: "test-token-not-real", GEMINI_API_KEY: "test-key-not-real", [KEY_ENV]: undefined },
+      async () => {
+        const root = await Deno.makeTempDir();
+        await seedGateCleanWiki(root);
+        const { code, out } = await runCli([...FOLDING, "--provider", "gemini", "--root", root]);
+        assertEquals(code, 1, "a plan that changes no page did not fold the capture");
+        assert(
+          out.includes("provider: gemini (gemini-2.5-flash), free tier unless the key's project is billed"),
+          `the report names who answered: ${out.join(" | ")}`,
+        );
+        const payload = JSON.parse(out.find((line) => line.startsWith("RESULT "))!.slice("RESULT ".length));
+        assertEquals(payload.noop, "raw/discord/2026-08-01_dcwg-talk.md");
+      },
+    );
+  } finally {
+    restoreFetch();
   }
 });
 
