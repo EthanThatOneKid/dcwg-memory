@@ -58,8 +58,7 @@ interface Api {
 
 function stubFetch(api: Api): () => void {
   const original = globalThis.fetch;
-  const json = (body: unknown, status = 200) =>
-    Promise.resolve(new Response(JSON.stringify(body), { status }));
+  const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
 
   globalThis.fetch = ((input: string | URL | Request) => {
     const url = new URL(String(input));

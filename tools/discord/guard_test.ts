@@ -7,13 +7,7 @@
  */
 
 import { assert, assertEquals } from "@std/assert";
-import {
-  checkEditablePath,
-  CODE_OWNED,
-  MAX_PAGE_BYTES,
-  validateSummary,
-  WIKI_FILENAME,
-} from "./guard.ts";
+import { checkEditablePath, CODE_OWNED, MAX_PAGE_BYTES, validateSummary, WIKI_FILENAME } from "./guard.ts";
 
 Deno.test("checkEditablePath allows wiki pages with conforming names", () => {
   for (const path of ["wiki/Deno_Core_Working_Group.md", "wiki/A-1_(x).md"]) {

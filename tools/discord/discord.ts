@@ -309,9 +309,7 @@ export async function fetchMessages(
     // Branch on the direction of travel, not on whether an anchor exists: a
     // backward walk sets an anchor after its first page and must keep going
     // `before`, or it turns around and re-reads the newest messages forever.
-    const params = after
-      ? `?limit=100&after=${anchor}`
-      : `?limit=100${anchor ? `&before=${anchor}` : ""}`;
+    const params = after ? `?limit=100&after=${anchor}` : `?limit=100${anchor ? `&before=${anchor}` : ""}`;
     const page = await apiGet<DiscordMessage[]>(
       `/channels/${channelId}/messages${params}`,
       token,

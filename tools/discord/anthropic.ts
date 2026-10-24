@@ -37,13 +37,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { yamlStr } from "./capture.ts";
-import {
-  carryFrontmatterForward,
-  checkEditablePath,
-  CODE_OWNED,
-  PROMPT_FENCE,
-  WIKI_PREFIX,
-} from "./guard.ts";
+import { carryFrontmatterForward, checkEditablePath, CODE_OWNED, PROMPT_FENCE, WIKI_PREFIX } from "./guard.ts";
 import { frontmatterBlock, postsInCapture, threadAnchors } from "./thread_pages.ts";
 
 /** The standing instructions for this pass, relative to the repo root. */
@@ -377,9 +371,7 @@ export function renderIndex(pages: WikiPage[]): string {
   if (pages.length === 0) return "(the wiki has no pages yet)";
   return pages.map((page) => {
     const anchor = page.anchors.length ? ` [forum post ${page.anchors.join(", ")}]` : "";
-    const description = page.description.length > 200
-      ? `${page.description.slice(0, 200)}…`
-      : page.description;
+    const description = page.description.length > 200 ? `${page.description.slice(0, 200)}…` : page.description;
     return `- ${page.path} — ${page.name}${anchor}${description ? `: ${description}` : ""}`;
   }).join("\n");
 }

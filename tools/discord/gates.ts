@@ -48,9 +48,7 @@ export async function runGates(root: string): Promise<string[]> {
     name: "threads",
     ok: threadProblems.length === 0,
     output: threadProblems.length === 0
-      ? (postCount
-        ? `every one of ${postCount} forum post(s) has its own page`
-        : "no post-shaped captures yet")
+      ? (postCount ? `every one of ${postCount} forum post(s) has its own page` : "no post-shaped captures yet")
       : `a forum post is missing its own page:\n  - ${threadProblems.join("\n  - ")}`,
   });
 

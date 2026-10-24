@@ -65,9 +65,7 @@ function stubApi(calls: Call[], opts: { rateLimitFirst?: boolean } = {}) {
     let page: DiscordMessage[];
     if (after) {
       // The 100 messages immediately after the anchor.
-      const rest = ALL.filter((m) => BigInt(m.id) > BigInt(after)).sort((a, b) =>
-        BigInt(a.id) < BigInt(b.id) ? -1 : 1
-      );
+      const rest = ALL.filter((m) => BigInt(m.id) > BigInt(after)).sort((a, b) => BigInt(a.id) < BigInt(b.id) ? -1 : 1);
       page = rest.slice(0, limit);
     } else if (before) {
       const rest = ALL.filter((m) => BigInt(m.id) < BigInt(before)).sort((a, b) =>
@@ -377,8 +375,7 @@ Deno.test("a thread sharing the boundary second survives pagination", async () =
   const all = [
     ...Array.from(
       { length: 99 },
-      (_, i) =>
-        thread(`2${String(i).padStart(2, "0")}`, `t${i}`, VENUE, iso(base + i * 86_400_000)),
+      (_, i) => thread(`2${String(i).padStart(2, "0")}`, `t${i}`, VENUE, iso(base + i * 86_400_000)),
     ),
     thread("100", "tie a", VENUE, tie),
     thread("101", "tie b", VENUE, tie),

@@ -29,28 +29,11 @@ import {
   snowflakeFromIso,
   threadTitle,
 } from "./discord.ts";
-import {
-  captureDay,
-  DEFAULT_SERVER_LABEL,
-  DEFAULT_TAGS,
-  nextCapturePath,
-  renderCapture,
-} from "./capture.ts";
+import { captureDay, DEFAULT_SERVER_LABEL, DEFAULT_TAGS, nextCapturePath, renderCapture } from "./capture.ts";
 import { validateSummary } from "./guard.ts";
-import {
-  anthropicComplete,
-  DEFAULT_MAX_USD,
-  makeClient,
-  readPassInstructions,
-  runAnthropicPass,
-} from "./anthropic.ts";
+import { anthropicComplete, DEFAULT_MAX_USD, makeClient, readPassInstructions, runAnthropicPass } from "./anthropic.ts";
 import { diffTree, outsideWiki, restoreTree, snapshotTree, writePagesOk } from "./tree.ts";
-import {
-  ANTHROPIC_DEFAULT_MODEL,
-  describeModel,
-  missingKeyMessage,
-  resolveApiKey,
-} from "./providers.ts";
+import { ANTHROPIC_DEFAULT_MODEL, describeModel, missingKeyMessage, resolveApiKey } from "./providers.ts";
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
 import { captureKind, findThreadProblems, POST_SHAPED, postsInCapture } from "./thread_pages.ts";
@@ -741,19 +724,15 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       if (!run.ok || stray.length) {
         await revert();
         lastFailure = !run.ok
-          ? `the pass did not finish: ${
-            run.timedOut ? `killed after ${args.passTimeoutSec}s` : `exit ${run.code}`
-          }${run.stderr ? `\n${run.stderr}` : ""}`
-          : `the pass changed files outside wiki/, so the whole attempt was reverted:\n  - ${
-            stray.join("\n  - ")
-          }`;
+          ? `the pass did not finish: ${run.timedOut ? `killed after ${args.passTimeoutSec}s` : `exit ${run.code}`}${
+            run.stderr ? `\n${run.stderr}` : ""
+          }`
+          : `the pass changed files outside wiki/, so the whole attempt was reverted:\n  - ${stray.join("\n  - ")}`;
         feedback = lastFailure;
         console.log(
           `attempt ${attempt}/${attempts} ${
             !run.ok
-              ? run.timedOut
-                ? `timed out after ${args.passTimeoutSec}s`
-                : `failed (exit ${run.code})`
+              ? run.timedOut ? `timed out after ${args.passTimeoutSec}s` : `failed (exit ${run.code})`
               : `wrote outside wiki/ (${stray.length} path(s))`
           }`,
         );
@@ -770,9 +749,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
 
       changedThisFold = changed;
       notes = `${run.usage.steps} call(s), ${run.usage.inputTokens} in / ` +
-        `${run.usage.outputTokens} out${
-          run.usage.costUsd === undefined ? "" : `, ~$${run.usage.costUsd.toFixed(3)}`
-        }`;
+        `${run.usage.outputTokens} out${run.usage.costUsd === undefined ? "" : `, ~$${run.usage.costUsd.toFixed(3)}`}`;
       console.log(
         `attempt ${attempt}/${attempts}: ${changedThisFold.length} page file(s) changed: ${
           changedThisFold.join(", ") || "none"

@@ -19,6 +19,6 @@
     "@std/path": "jsr:@std/path@^1"
   },
   "fmt": {
-    "lineWidth": 100
+    "lineWidth": 120
   }
 }

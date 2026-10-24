@@ -115,9 +115,7 @@ export interface CaptureInput {
 export function renderBlocks(sections: CaptureSection[]): string {
   return sections
     .map((section) =>
-      section.title
-        ? `## ${section.title}\n\n${renderBody(section.messages)}`
-        : renderBody(section.messages)
+      section.title ? `## ${section.title}\n\n${renderBody(section.messages)}` : renderBody(section.messages)
     )
     .join("\n---\n\n");
 }

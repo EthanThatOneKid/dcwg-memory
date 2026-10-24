@@ -14,11 +14,7 @@ Deno.test("the key is read from ANTHROPIC_API_KEY and the model defaults to Opus
 
 Deno.test("the canonical key name is tried before the host's prefixed one", () => {
   const env = (name: string) =>
-    name === "ANTHROPIC_API_KEY"
-      ? "canonical"
-      : name === "DCWG_ANTHROPIC_API_KEY"
-      ? "prefixed"
-      : undefined;
+    name === "ANTHROPIC_API_KEY" ? "canonical" : name === "DCWG_ANTHROPIC_API_KEY" ? "prefixed" : undefined;
   assertEquals(resolveApiKey(env), { name: "ANTHROPIC_API_KEY", value: "canonical" });
 });
 
