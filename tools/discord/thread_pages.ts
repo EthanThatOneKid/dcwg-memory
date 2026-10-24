@@ -136,15 +136,22 @@ export async function findThreadPages(root: string): Promise<Map<string, string[
  *
  * A thread anchored by two pages is not a problem: two pages can both describe one
  * post, and the failure this exists to catch is the opposite one.
+ *
+ * `skipCaptures` names captures whose posts are not yet owed a page. A fold absorbs one
+ * capture at a time, oldest first, so judging it against posts in captures still queued
+ * behind it could never pass: the whole-tree check (CI, `gates.ts`) leaves it empty.
  */
-export async function findThreadProblems(root: string): Promise<string[]> {
+export async function findThreadProblems(
+  root: string,
+  skipCaptures: ReadonlySet<string> = new Set(),
+): Promise<string[]> {
   const threads = await findForumThreads(root);
   if (!threads.length) return [];
   const byThread = await findThreadPages(root);
   const problems: string[] = [];
 
   for (const thread of threads) {
-    if (byThread.has(thread.id)) continue;
+    if (byThread.has(thread.id) || skipCaptures.has(thread.capture)) continue;
     problems.push(`${thread.capture}: thread ${thread.id} (${thread.name}) has no page`);
   }
 
