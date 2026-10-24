@@ -50,6 +50,9 @@ import type { PendingFold } from "./pending.ts";
 /** What the staged pass answers with, as far as the fold reads it. */
 type PassRun = Awaited<ReturnType<typeof runAnthropicPass>>;
 
+/** Small queued captures are folded together up to this many characters (about 10k tokens). */
+const DEFAULT_BATCH_CHARS = 40_000;
+
 const USAGE = `dcwg-memory Discord connector
 
 Usage:
@@ -90,6 +93,10 @@ Options:
   --drain-max <n>       how many folds one --drain run may attempt (default 6). Each
                         fold is a whole page pass, and a capture too long for one
                         prompt takes several, so this is the cap on one job's work
+  --batch-chars <n>     fold several small queued captures in one pass while their total stays
+                        under n characters (default 40000; 0 folds one capture at a time). Each
+                        fold costs model calls whatever its size, so a queue of tiny captures
+                        is cheaper folded together
   --no-gates            skip the repo validation commands (local iteration only)
   --dry-run             fetch and render, but write nothing and call no model
   -h, --help            show this help
@@ -124,6 +131,8 @@ interface Args {
   drain: boolean;
   /** How many folds one --drain run may attempt, so a backlog cannot overrun the job. */
   drainMax: number;
+  /** Small queued captures are folded together while their text stays under this many characters. */
+  batchChars: number;
   dryRun: boolean;
 }
 
@@ -153,6 +162,7 @@ function parseCliArgs(argv: string[]): Args {
         "max-usd",
         "attempts",
         "drain-max",
+        "batch-chars",
       ],
       boolean: ["all", "drain", "skip-wiki", "no-gates", "dry-run", "help"],
       collect: ["tag"],
@@ -203,6 +213,14 @@ function parseCliArgs(argv: string[]): Args {
     drainMax = n;
   }
 
+  const batchCharsRaw = str("batch-chars");
+  let batchChars = DEFAULT_BATCH_CHARS;
+  if (batchCharsRaw !== undefined) {
+    const n = Number(batchCharsRaw);
+    if (!Number.isInteger(n) || n < 0) throw new Error("--batch-chars must be a non-negative integer");
+    batchChars = n;
+  }
+
   const channel = str("channel");
   const venue = str("venue");
   const since = str("since");
@@ -230,6 +248,7 @@ function parseCliArgs(argv: string[]): Args {
     attempts: num("attempts", 2),
     drain: parsed.drain === true,
     drainMax,
+    batchChars,
     dryRun: parsed["dry-run"] === true,
   };
 }
@@ -654,14 +673,42 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       continue;
     }
 
+    // Several small captures are cheaper folded together: a fold costs a plan call and a call
+    // per page whatever its size. Only fresh entries join (a stalled or part-folded head goes
+    // alone, so a poisoned batch cannot keep dragging its neighbours down), and each keeps its
+    // own queue entry, advanced together when the batch lands.
+    const batch: Array<{ path: string; text: string; messages: number }> = [{
+      path: foldPath,
+      text: captureText,
+      messages: fold.messages,
+    }];
+    if (args.batchChars > 0 && fold.stalls === 0 && fold.offset === 0 && captureText.length < args.batchChars) {
+      let total = captureText.length;
+      for (const next of pendingFor(pending, args.venue).slice(1)) {
+        if (next.stalls !== 0 || next.offset !== 0) break;
+        let text: string;
+        try {
+          text = await Deno.readTextFile(`${root}/${next.capture}`);
+        } catch {
+          break;
+        }
+        if (total + text.length > args.batchChars) break;
+        total += text.length;
+        batch.push({ path: next.capture, text, messages: next.messages });
+      }
+    }
+    if (batch.length > 1) {
+      captureText = batch.map((b) => `=== capture file: ${b.path} ===\n${b.text}`).join("\n\n");
+      console.log(`batching ${batch.length} small captures into one fold: ${batch.map((b) => b.path).join(", ")}`);
+    }
+    const batchPaths = new Set(batch.map((b) => b.path));
+
     // The venue's shape, read out of the capture rather than off the live channel: a
     // queued capture may be days old, and describing it with this run's channel would
     // name one venue while the agent reads another venue's file.
     const kind = captureKind(captureText);
     const posts = postsInCapture(captureText);
     const foldForum = kind ? POST_SHAPED.has(kind) : forum;
-    // The pass reads the whole capture, so one fold absorbs all of it.
-    const absorbed = captureText.length;
 
     const attempts = args.attempts;
     foldAttempts = attempts;
@@ -689,7 +736,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
       // A fold that landed supersedes an earlier attempt that wrote nothing: the
       // material is in the wiki now, so the run is not reporting a no-op fold.
       noopFold = false;
-      pending = advance(pending, foldPath, absorbed, captureText.length);
+      for (const member of batch) pending = advance(pending, member.path, member.text.length, member.text.length);
       allWritten = [...allWritten, ...changedThisFold];
       folded++;
       await persistQueue();
@@ -716,7 +763,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         task: {
           capturePath: foldPath,
           channelName,
-          messageCount: fold.messages,
+          messageCount: batch.reduce((sum, b) => sum + b.messages, 0),
           lastUpdated: previousRun,
           queued,
           forum: foldForum,
@@ -813,7 +860,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         });
       }
       // Only the posts this fold is answerable for: captures queued behind it are later folds' work.
-      const behind = new Set(pending.filter((entry) => entry.capture !== foldPath).map((entry) => entry.capture));
+      const behind = new Set(pending.filter((entry) => !batchPaths.has(entry.capture)).map((entry) => entry.capture));
       const threadProblems = await findThreadProblems(root, behind);
       if (threadProblems.length) {
         outcomes.push({
