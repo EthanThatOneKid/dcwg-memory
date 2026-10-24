@@ -8,16 +8,7 @@
  */
 
 import { assert, assertEquals } from "@std/assert";
-import {
-  advance,
-  drop,
-  enqueue,
-  PENDING_KEY,
-  pendingFor,
-  readPending,
-  setPending,
-  stall,
-} from "./pending.ts";
+import { advance, drop, enqueue, PENDING_KEY, pendingFor, readPending, setPending, stall } from "./pending.ts";
 import type { PendingFold } from "./pending.ts";
 
 const CAPTURE = "raw/discord/2026-10-11_dcwg-brainstorm.md";

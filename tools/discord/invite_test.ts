@@ -6,15 +6,7 @@
  */
 
 import { assert, assertEquals } from "@std/assert";
-import {
-  DEFAULT_GUILD,
-  FORBIDDEN,
-  inviteUrl,
-  main,
-  PERMISSIONS,
-  READ_ONLY_BITS,
-  selfCheck,
-} from "./invite.ts";
+import { DEFAULT_GUILD, FORBIDDEN, inviteUrl, main, PERMISSIONS, READ_ONLY_BITS, selfCheck } from "./invite.ts";
 
 Deno.test("the invite grants read access and nothing else", () => {
   assertEquals(PERMISSIONS, 66560);

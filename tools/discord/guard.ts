@@ -161,3 +161,20 @@ export function validateSummary(summary: unknown): string[] {
   }
   return errors;
 }
+
+/**
+ * The fences the staged prompts wrap their own input in.
+ *
+ * The prompts delimit the capture and every page they hand the model with
+ * `--- BEGIN page wiki/X.md ---` ... `--- END page wiki/X.md ---`, and a model asked for a
+ * page body has echoed that framing into the content it returned. Measured 2026-10-18 on
+ * the free tier: one pass wrote `## --- BEGIN page wiki/Deno_Fork_Options.md ---` into the
+ * body, echoed the page's frontmatter as a body line under it, and closed with an END
+ * fence, and all six gates passed, because a page is not required to be free of the
+ * prompt's own framing.
+ *
+ * Only the fence is matched, and only in this exact form: a horizontal rule, a markdown
+ * table's `| --- |` separator, and a page's own YAML frontmatter block are all legitimate
+ * page text, and a guard that refused a bare `---` would refuse every page.
+ */
+export const PROMPT_FENCE = /^---[ \t]+(?:BEGIN|END)[ \t]+(?:page|capture)\b/m;

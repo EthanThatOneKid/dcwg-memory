@@ -10,6 +10,5 @@ _site/
 secrets/
 .ruff_cache/
 
-# The wiki pass: fx keeps its own workspace and the connector its brief
-.fx/
+# The wiki pass: the connector's scratch space and gate marker
 .dcwg/
