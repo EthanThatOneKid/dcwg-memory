@@ -812,7 +812,9 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
           output: `no inbound link from another page:\n  - ${orphans.join("\n  - ")}`,
         });
       }
-      const threadProblems = await findThreadProblems(root);
+      // Only the posts this fold is answerable for: captures queued behind it are later folds' work.
+      const behind = new Set(pending.filter((entry) => entry.capture !== foldPath).map((entry) => entry.capture));
+      const threadProblems = await findThreadProblems(root, behind);
       if (threadProblems.length) {
         outcomes.push({
           name: "threads",

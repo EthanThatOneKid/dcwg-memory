@@ -110,3 +110,13 @@ Deno.test("a media channel is post-shaped too, and no captures means nothing to 
   const empty = await tree({ "wiki/Deno.md": page("Deno", []) });
   assertEquals(await findThreadProblems(empty), []);
 });
+
+Deno.test("posts in captures still queued behind a fold are not owed a page yet", async () => {
+  const root = await tree({
+    "raw/discord/2026-10-16_dcwg-propose.md": capture("forum", [["20", "Rust Academy?"]]),
+    "raw/discord/2026-10-17_dcwg-propose.md": capture("forum", [["21", "Killer app"]]),
+    "wiki/Rust_Academy.md": page("Rust Academy", ["20"]),
+  });
+  assertEquals((await findThreadProblems(root)).length, 1);
+  assertEquals(await findThreadProblems(root, new Set(["raw/discord/2026-10-17_dcwg-propose.md"])), []);
+});
