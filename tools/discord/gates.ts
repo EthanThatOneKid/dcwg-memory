@@ -13,7 +13,7 @@
  *   deno task gates
  */
 
-import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
+import { runWikiGates } from "./wiki_gates.ts";
 import { findOrphans } from "./orphans.ts";
 import { findForumThreads, findThreadProblems } from "./thread_pages.ts";
 

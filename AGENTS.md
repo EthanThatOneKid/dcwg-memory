@@ -143,15 +143,11 @@ when they pass. It pushes rather than opening a pull request because the cursor 
 cursor parked in an unmerged pull request would make every run re-fetch the same
 range. The gates are the review step, and a failing gate reverts the pass's page
 edits while leaving the capture committed. It needs two repository secrets,
-`DISCORD_BOT_TOKEN` and `AI_GATEWAY_API_KEY`. Inference runs on the Vercel AI
-Gateway by default, which is the one provider a pass runs on unless `--provider`
-says otherwise: one key, one catalogue, and one budget probe. It runs the free
-model `nvidia/nemotron-3.5-lightning-free` by
-default, which costs nothing and is metered by rate rather than by the day; any
-model id the Gateway publishes works with `--model`. A reasoning model is the
-trade: the first real run, a 593-message backfill, cost ~25k input and ~24k
-output tokens and took about three minutes, at no charge. That run used the `api`
-editor; the default is now `fx`, described next.
+`DISCORD_BOT_TOKEN` and `ANTHROPIC_API_KEY`. When the second is unset the workflow still
+archives every venue (it passes `--skip-wiki` and warns), so the record never waits on a
+key and the folds stay queued until one is added. Inference is the staged pass described
+below; `DCWG_MODEL` and `DCWG_MAX_USD` repoint the schedule's model and spend cap without
+editing the workflow.
 
 If the pass or a gate fails, the page edits are reverted, so a bad inference never
 commits prose that does not pass the repo's own checks. The capture is committed
@@ -180,30 +176,23 @@ already reverted its own page edits in-process, so `wiki/` in that commit holds 
 edits that passed the gates. `deploy.yml` no longer skips the redeploy when an ingest
 run's conclusion is not success, because a failed ingest run now commits a capture.
 
-The two failures the model reliably produced are handled in code
-before the guard sees the proposal (`adjustProposal` in `tools/discord/wiki.ts`):
-an edit to `wiki/Captures.md` is dropped, because the connector rebuilds that index
-from the tree right after applying a pass, and a page that had frontmatter keeps it,
-because carrying the block forward is what the prompt already asked for. Both are
-reported as `adjusted:` lines in the run. A proposal that still breaks a rule after
-that is refused and the pass is retried.
+Two things the model reliably gets wrong are handled in code rather than left to the
+prompt. An edit to `wiki/Captures.md` is impossible: `validatePlan` refuses the path
+(`CODE_OWNED`), because the connector rebuilds that index from the tree right after a
+pass. And a page that had frontmatter keeps it: `composePage` calls
+`carryFrontmatterForward`, so a model that returns its own block does not replace the page's.
+The second matters because one failure the gates cannot catch is an edit that flattens a
+page's YAML frontmatter into body text: `wiki check` and `wiki lint` do not require
+frontmatter, so they pass on the flattened page.
 
-One failure the gates cannot catch is an edit that flattens a page's YAML frontmatter
-into body text: `wiki check` and `wiki lint` do not require frontmatter, so they pass
-on the flattened page. The write guard refuses that edit as the backstop, and the
-connector's frontmatter carry-forward is what keeps it from sinking the run. To see
-what the model actually returned when a pass is refused, set `DCWG_DUMP_PROPOSAL` to
-a path; the guard's message names the page and never the content, and the content is
-the part a prompt fix depends on.
-
-A second gate-blind failure is the prompt's own framing coming back as page text. The api
-prompt hands the model the capture and every page wrapped in `--- BEGIN page <path> ---`
-... `--- END page <path> ---` fences, and the 2026-10-18 pass returned the page it had been
-handed with the fence still around it, plus the page's frontmatter echoed as a body line.
-`wiki check` and `wiki lint` pass on that, and the frontmatter carry-forward restores the
-real block above the copy, so nothing caught it. `guardProposal` now refuses content
-carrying a `--- BEGIN|END page|capture` fence, and both prompt surfaces say the fences are
-not page text. The match is deliberately that narrow: a horizontal rule, a table's `| --- |`
+A second gate-blind failure is the prompt's own framing coming back as page text. The
+prompts hand the model the capture and the pages wrapped in tags and `--- BEGIN page <path>
+---` ... `--- END page <path> ---` fences, and the 2026-10-18 pass (on the one-shot editor
+this replaced) returned the page it had been handed with the fence still around it, plus
+the page's frontmatter echoed as a body line. `wiki check` and `wiki lint` pass on that, and
+nothing else caught it. `composePage` now refuses a body carrying a `--- BEGIN|END
+page|capture` fence (`PROMPT_FENCE` in `guard.ts`), and the pass prompt says the tags are not
+page text. The match is deliberately that narrow: a horizontal rule, a table's `| --- |`
 separator, and a page's own frontmatter block are legitimate page text, and a guard that
 refused a bare `---` would refuse every page.
 
@@ -212,103 +201,11 @@ installed in the server, and a full backfill of `#talk` read 593 messages in abo
 four seconds. The manual steps above remain the fallback for a venue the bot cannot
 see.
 
-## The page pass runs fx
-
-`ingest.ts` folds a capture into the wiki in one of two ways, chosen with
-`--editor` (default `fx`):
-
-- **`fx`** runs `fx`, the Vercel Labs coding agent, against the Vercel AI
-  Gateway. Its standing instructions are `tools/discord/prompt/dcwg.md`, handed
-  in with `--system`; fx reads the repository's own `AGENTS.md` itself. The
-  connector writes a per-run brief to `.dcwg/brief.md` (gitignored, removed after
-  the run) and tells the agent to read it; the agent then reads the capture and
-  whichever pages it wants to change with its own tools, and edits `wiki/`
-  itself. The workflow installs the binary pinned to `0.0.14` and asserts the
-  version, because the version decides the tool set and the shape of the JSON
-  envelope the connector parses.
-- **`api`** asks the model for one JSON list of complete page rewrites, one
-  request per attempt, through the AI SDK on the same Gateway key.
-
-The agentic path exists because the one-shot one reads a long capture in pieces.
-The `api` editor gets `captureSlice`, at most `CAPTURE_CHAR_CAP` (24,000)
-characters of capture per attempt, and where it resumes is the queue entry's
-`offset`: measured 2026-10-16, the pending `#brainstorm` backfill at 115,516 bytes
-takes five slices, so the wiki is whole only after the last one. An agent that reads
-the capture off disk reads all of it in one pass, and it can grep for how a concept
-is already named rather than reasoning only from the pages it was handed.
-
-The write surface is enforced by the connector, not by the agent's own
-permission rules. `snapshotTree`, `diffTree`, and `restoreTree` in
-`tools/discord/fx.ts` compare the whole tree either side of a run and revert the
-attempt when anything outside `wiki/` changed. fx's rules are a second control
-rather than the boundary, and they do work at the tool layer: measured 2026-10-18
-on 0.0.14, with `{"*": "deny", "edit": {"*": "deny", "wiki/**": "allow"}}`, a
-`write_file` to `wiki/New.md` was allowed and one to `other/Bad.md` was denied.
-Two details are load-bearing: the allow pattern must be the tree form (`wiki/**`,
-not `wiki/*`), because a create is matched against the new file's parent, and
-`edit` is the permission name for both `write_file` and `edit_file`. Those rules
-live in `~/.fx/settings.json`, which is per-machine rather than per-repo, so the
-workflow writes them before the pass runs; `bash` is denied there, which is what
-keeps a run from exfiltrating the Gateway key it is handed or running a command
-nobody reviewed.
-
-`--model` takes a Gateway model id (`vendor/model`, e.g.
-`nvidia/nemotron-3.5-lightning-free` or `alibaba/qwen3.7-flash`), and both editors
-read it the same way. `--pass-timeout` (default 900 seconds) kills an fx pass that
-overruns. The agent's own step ceiling is `max_agent_steps` in the repo's
-`.fx.json` (24), which fx enforces; measured 2026-10-18 on 0.0.14, a workspace
-capped at 3 reported four steps and exited with the task unfinished, so it bounds
-an agentic request without being an exact count of the requests a pass makes.
-
-## Providers
-
-`--provider` picks who pays for the inference, and it is the only axis that changes
-between providers. Everything downstream of the model call is the same code: the same
-editor, the same write surface, the same six gates, the same queue.
-
-- **`gateway`** (default) is the Vercel AI Gateway: `AI_GATEWAY_API_KEY`, one
-  catalogue, one credit probe. A pass is metered in money.
-- **`gemini`** is Google's free tier: `GEMINI_API_KEY`, metered by request rather than
-  by credits, so the credit probe is skipped and the provider's own rate limit is what
-  bounds a pass. Measured 2026-10-18: a full fx pass that read two pages and wrote a
-  third completed on `gemini-2.5-flash` with no charge and no paid key.
-
-The two are not interchangeable at the wire level, and that is why gemini has a shim.
-Gemini publishes an OpenAI-compatible endpoint, but it is not consistently
-compatible, and fx is a pinned binary that cannot be taught to tolerate it. Four
-defects were reproduced on 2026-10-18 and `tools/discord/gemini_proxy.ts` repairs all
-four in flight: streamed tool calls arrive without an `index`, non-streamed tool calls
-do too, `arguments` arrives as a JSON string rather than an object, and a usage total
-counts thinking tokens its own other fields exclude. The shim holds no credential, logs
-neither a header nor a body, and forwards the caller's own key upstream. A gemini pass
-is pointed at it by `baseUrl` in `providers.ts`, so the connector and the shim agree on
-one loopback address rather than two.
-
-What a gemini run needs that a gateway run does not:
-
-1. The shim listening on that address. The workflow starts it and waits for `/health`.
-2. A `providers.gemini` block in `~/.fx/settings.json` naming the shim's `base_url` and
-   the variable the key rides in. That file is per-machine and cannot be committed, so
-   the workflow writes it and the connector checks it: `fxProviderProblems` refuses the
-   run, by name, when the block is missing or reads the key from a variable this run does
-   not export. Checked rather than written, because a connector that edited a user's
-   global settings would be doing something a run should never do.
-
-The default model per provider lives in `providers.ts` and nowhere else, so a run's
-report names what it will actually spend (`provider: gemini (gemini-2.5-flash),
-unmetered`). On the host the key is `DCWG_GEMINI_API_KEY`, because Zo secrets are
-account-wide; in the workflow it is the bare `GEMINI_API_KEY`, because repository
-secrets are already scoped. Both names are tried, canonical first.
-
-The repository variable `DCWG_PROVIDER` repoints the daily schedule without editing the
-workflow, the same way `DCWG_MODEL` repoints the model. One caveat: `DCWG_MODEL` holds a
-Gateway model id, so setting both would send a Gateway id to Gemini. Pick one.
-
 ## The staged Anthropic pass
 
-`--provider anthropic` (which selects `--editor anthropic`; the two are refused apart) runs
-`tools/discord/anthropic.ts` on the Anthropic Messages API. It is a pipeline the connector
-drives, not an agent: `fx` was handed a toolbox and a step ceiling, and the failures in this
+The wiki pass is `tools/discord/anthropic.ts`, on the Anthropic Messages API. It is a
+pipeline the connector drives, not an agent: the `fx` agent it replaced was handed a toolbox
+and a step ceiling, and the failures in this
 file (24 steps and 174,449 input tokens for no page; ~967k input tokens re-reading one
 capture) were the agent exploring. The wiki is 148 KB over 17 pages and the largest capture
 is 125 KB (~32k tokens), measured 2026-10-22, so the whole working set fits in one request.
@@ -325,7 +222,7 @@ is 125 KB (~32k tokens), measured 2026-10-22, so the whole working set fits in o
    replace it), and a create gets a frontmatter the connector builds, including the
    `wazoo:thread` anchor. A create's inbound link is added to the linking page's
    instructions by `expandPlan` rather than left to the model to remember.
-3. **Gates.** Unchanged and shared with `fx`: the tree is snapshotted first, anything outside
+3. **Gates.** The same checks as always: the tree is snapshotted first, anything outside
    `wiki/` reverts the attempt, the six gates run, and a failure's text goes back as feedback.
 
 The capture is the first block of every call and carries the cache breakpoint, so the plan
@@ -352,51 +249,9 @@ pay for API calls, and a subscription token is not used here. The standing instr
 data and never touches a file.
 
 Not yet verified live: the unit tests drive the stages against a stubbed model, and nothing
-here has called the real API. The first dispatch should be `--dry-run` off with
-`--max-usd 0.50` against one venue before the schedule is repointed. Server-side refusal
+here has called the real API. The first dispatch should be a manual one with
+`max_usd` 0.50 against one venue, before the next scheduled run spends anything. Server-side refusal
 `fallbacks` are not enabled: a refusal is reported as `refusal` and fails the attempt.
-
-## The budget
-
-Metering is settled, and on the Gateway it is counted in money rather than
-requests. The Gateway bills tokens at the provider's list price and every team gets
-$5 of credits a month, so the question a run has to answer is not "how many
-requests do I have" but "can these credits pay for a pass". Measured 2026-10-18
-against the connector's own key, `GET /v1/credits` answers
-`{"balance": "4.513395538", "total_used": "1.692157662"}`.
-
-This probe is the Gateway's. A provider that is not metered has no balance to read, so
-a gemini run skips both probes and is bounded by Google's rate limit instead, which the
-pass retries through (see "Providers").
-That replaces the ceiling this automation used to run against. On OpenRouter's free
-tier, 50 requests a day was spendable in two runs of the 594-message backfill, and
-one venue's two attempts spent a whole day on 2026-10-17, which left the next run
-answering 429 to its first request and made a healthy venue look like a venue with
-bad content. A free model on the Gateway costs nothing, so the balance does not
-bound it at all: what bounds a free pass is the provider's own rate limit, which fx
-retries through and the connector reports when it gives up.
-
-`tools/discord/budget.ts` is how a run learns what it can afford, and it asks two
-things: what is left of the balance, and what one pass costs at the model this run
-was pointed at. The second is the Gateway's own catalogue price for that model
-multiplied by this connector's measurement of what a pass spends (966,946 input and
-19,488 output tokens for the 594-message backfill), which is why it is an estimate
-rather than a quote. The balance is shared rather than first come: the workflow runs
-each venue with `--budget-share <i>/<n>`, and a venue's share is what the Gateway
-reports left divided by the runs still to come, so a venue holding a backlog cannot
-spend a later venue's allowance. A share that cannot pay for one pass defers the
-fold without calling the model at all, and a fold that never reached the model is
-reported as a budget condition rather than a stall, because `stalls` counts runs
-that failed to fold material and a pass the provider refused judged nothing; the
-status stays `NEEDS_ATTENTION` either way, since `VALID_STATUSES` mirrors the hub's
-contract. A free model is never deferred: its pass costs zero, so the share buys
-every attempt `--attempts` asks for.
-
-The default is `nvidia/nemotron-3.5-lightning-free`, by Ethan's call on 2026-10-18
-to move forward on a free model. A paid model is bounded by the same arithmetic
-against the credits, so pinning one at dispatch (`--model alibaba/qwen3.7-flash`,
-about 3.2 cents a pass, or roughly 140 passes on a $4.51 balance) is a matter of
-what the material needs rather than of what the connector can afford.
 
 ## Maintaining the wiki: the self-healing pass
 
@@ -454,7 +309,7 @@ Bound to this repo, the three instructions mean:
   `wiki/Captures.md` is still an orphan. The link is a relative markdown link to the
   page's filename, for example `[Deno fork options and naming](Deno_Fork_Options.md)`,
   because that is the only form the gate counts: naming a page in backticks reads as a
-  connection to a human and is invisible to the check. Both prompts have to instruct
+  connection to a human and is invisible to the check. The prompt has to instruct
   that form, and `tools/discord/prompt_test.ts` pins it, because a prompt that forbids
   `.md` links makes every pass that adds a page unsatisfiable, which is what stalled the
   fold of the 594-message `#brainstorm` capture on 2026-10-17. A forum post is verified

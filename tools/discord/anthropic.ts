@@ -19,7 +19,7 @@
  *    a new page), so the failure the write guard exists for, a flattened block, cannot
  *    happen.
  * 3. **Gates.** Unchanged. The caller snapshots the tree before and restores it after, and
- *    runs the six gates, exactly as it does for `fx`. Nothing here is the write boundary.
+ *    runs the six gates, exactly as before. Nothing here is the write boundary.
  *
  * The capture is the first block of every call and carries a cache breakpoint, so a plan
  * and a dozen page writes read it once at full price and the rest at the cache-read rate.
@@ -37,9 +37,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { yamlStr } from "./capture.ts";
-import { carryFrontmatterForward, checkEditablePath, CODE_OWNED, WIKI_PREFIX } from "./guard.ts";
+import {
+  carryFrontmatterForward,
+  checkEditablePath,
+  CODE_OWNED,
+  PROMPT_FENCE,
+  WIKI_PREFIX,
+} from "./guard.ts";
 import { frontmatterBlock, postsInCapture, threadAnchors } from "./thread_pages.ts";
-import { PROMPT_FENCE } from "./wiki.ts";
 
 /** The standing instructions for this pass, relative to the repo root. */
 export const PASS_INSTRUCTIONS_PATH = "tools/discord/prompt/dcwg-pass.md";
@@ -52,7 +57,7 @@ export function readPassInstructions(root: string): Promise<string> {
   return Deno.readTextFile(`${root}/${PASS_INSTRUCTIONS_PATH}`);
 }
 
-/** The model a pass runs when `--model` names none. Defined with the other providers' defaults. */
+/** The model a pass runs when `--model` names none. */
 export { ANTHROPIC_DEFAULT_MODEL } from "./providers.ts";
 
 /**

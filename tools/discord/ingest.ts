@@ -12,13 +12,10 @@
  *
  * Credentials (never passed as arguments, never logged):
  *   DCWG_DISCORD_BOT_TOKEN   the capture bot's token
- *   AI_GATEWAY_API_KEY       the wiki pass on the default provider, the Vercel AI Gateway
- *   DCWG_GEMINI_API_KEY      the wiki pass on --provider gemini, Google's free tier
+ *   ANTHROPIC_API_KEY        the wiki pass, a Console API key billed per token
  *
- * `--provider` picks who pays for the inference and `--editor` picks how the pass edits
- * pages: an agentic CLI (`fx`) or one JSON list of rewrites (`api`). The Gateway meters
- * money and Gemini's free tier meters requests, so the credit probe in `budget.ts` applies
- * to the former only. See "Providers" and "The budget" in AGENTS.md.
+ * The wiki pass is the staged pipeline in `anthropic.ts`: one plan call, then one write
+ * call per page, bounded by `--max-usd`. See "The staged Anthropic pass" in AGENTS.md.
  */
 
 import { parseArgs } from "@std/cli/parse-args";
@@ -39,17 +36,7 @@ import {
   nextCapturePath,
   renderCapture,
 } from "./capture.ts";
-import {
-  affordableAttempts,
-  creditAllowance,
-  describeGatewayCredits,
-  describePassCost,
-  estimatePassCostUsd,
-  parseBudgetShare,
-  probeGatewayCredits,
-  probeModelPrice,
-} from "./budget.ts";
-import { checkEditablePath, validateSummary } from "./guard.ts";
+import { validateSummary } from "./guard.ts";
 import {
   anthropicComplete,
   DEFAULT_MAX_USD,
@@ -57,34 +44,12 @@ import {
   readPassInstructions,
   runAnthropicPass,
 } from "./anthropic.ts";
+import { diffTree, outsideWiki, restoreTree, snapshotTree, writePagesOk } from "./tree.ts";
 import {
-  cleanBrief,
-  diffTree,
-  outsideWiki,
-  readFxSteps,
-  readStandingInstructions,
-  renderBrief,
-  restoreTree,
-  runFx,
-  snapshotTree,
-  writeBrief,
-  writePagesOk,
-} from "./fx.ts";
-import {
-  buildPrompt,
-  CAPTURE_CHAR_CAP,
-  captureSlice,
-  readPages,
-  runWikiPass,
-  writePage,
-} from "./wiki.ts";
-import {
-  describeProvider,
-  fxProviderProblems,
+  ANTHROPIC_DEFAULT_MODEL,
+  describeModel,
   missingKeyMessage,
-  parseProviderName,
   resolveApiKey,
-  resolveProvider,
 } from "./providers.ts";
 import { writeCapturesIndex } from "./index_page.ts";
 import { findOrphans } from "./orphans.ts";
@@ -93,19 +58,10 @@ import { advance, drop, enqueue, pendingFor, readPending, setPending, stall } fr
 import { gateFeedback, runWikiGates } from "./wiki_gates.ts";
 import type { CaptureSection } from "./capture.ts";
 import type { DiscordMessage } from "./discord.ts";
-import type { PageEdit } from "./wiki.ts";
-import type { BudgetShare, GatewayCredits, ModelPrice } from "./budget.ts";
-import type { ProviderSpec } from "./providers.ts";
-import type { FxRunResult } from "./fx.ts";
-
-/**
- * What the two tree-snapshot editors answer with, as far as the fold reads it. `runFx`
- * returns more; the anthropic pass adds the estimated cost.
- */
-type PassRun =
-  & Pick<FxRunResult, "ok" | "code" | "timedOut" | "stderr" | "rateLimited">
-  & { usage: { steps: number; inputTokens: number; outputTokens: number; costUsd?: number } };
 import type { PendingFold } from "./pending.ts";
+
+/** What the staged pass answers with, as far as the fold reads it. */
+type PassRun = Awaited<ReturnType<typeof runAnthropicPass>>;
 
 const USAGE = `dcwg-memory Discord connector
 
@@ -131,32 +87,14 @@ Options:
   --all                 ignore the cursor and pull from the channel's first message
   --since <iso>         ISO-8601 UTC lower bound (overrides the cursor)
   --token-env <name>    env var holding the bot token (default: DCWG_DISCORD_BOT_TOKEN)
-  --provider <name>     who pays for the wiki pass: gateway (default), gemini, or
-                        anthropic. A gemini pass reaches Google's free tier through the
-                        local shim (tools/discord/gemini_proxy.ts), so the shim has to be
-                        listening and ~/.fx/settings.json has to name that provider. An
-                        anthropic pass uses ANTHROPIC_API_KEY and the anthropic editor
-  --model <id>          model id for the wiki pass on that provider, e.g.
-                        nvidia/nemotron-3.5-lightning-free on gateway (the default) or
-                        gemini-2.5-flash on gemini (the default)
+  --model <id>          model id for the wiki pass (default claude-opus-5-5); claude-sonnet-5-5
+                        and claude-haiku-5-5 are cheaper
   --skip-wiki           capture only; do not touch wiki pages
-  --editor <name>       how the page pass edits pages. fx (default) runs an agentic
-                        CLI that reads the capture and edits wiki/ files itself;
-                        api asks the model for a JSON list of complete page
-                        rewrites, one request per attempt; anthropic runs the
-                        staged pass in anthropic.ts (plan, then one call per page)
-                        and is the editor --provider anthropic selects
-  --max-usd <n>         spend cap for one anthropic pass, in USD, estimated from the
-                        usage the API reports (default ${DEFAULT_MAX_USD})
-  --pass-timeout <sec>  kill an fx or anthropic pass that runs longer than this
-                        (default 900)
+  --max-usd <n>         spend cap for one wiki pass, in USD, estimated from the usage the
+                        API reports (default ${DEFAULT_MAX_USD})
+  --pass-timeout <sec>  kill a pass that runs longer than this (default 900)
   --attempts <n>        how many times the page pass may be retried against the gates
                         (default 2: one retry, because the usual failure is correctable)
-  --budget-share <i>/<n>
-                        this run's place in the day's schedule of runs that share the
-                        Gateway credit balance (default 1/1). Its share is what the
-                        Gateway reports left divided by the runs still to come, so an
-                        early venue cannot spend a later venue's allowance
   --drain               fold every capture this venue still owes the wiki, not just the
                         oldest one (default: one fold per run, so a backlog drains over
                         several runs instead of overrunning the job's own time limit)
@@ -183,20 +121,14 @@ interface Args {
   tokenEnv: string;
   /** Unset means the model the pass itself defaults to. */
   model?: string;
-  /** Who pays for the pass, and what that implies about the budget and the key. */
-  provider: ProviderSpec;
   skipWiki: boolean;
-  /** Which editor produces the page changes. */
-  editor: "fx" | "api" | "anthropic";
-  /** Wall-clock cap on one fx or anthropic pass, in seconds. */
+  /** Wall-clock cap on one wiki pass, in seconds. */
   passTimeoutSec: number;
   /** Estimated-spend cap for one anthropic pass, in USD. */
   maxUsd: number;
   noGates: boolean;
   /** How many times the page pass may be retried against the gates. */
   attempts: number;
-  /** This run's place in the day's schedule of runs sharing the free-model budget. */
-  budgetShare: BudgetShare;
   /** Fold every capture this venue still owes the wiki, not just the oldest. */
   drain: boolean;
   /** How many folds one --drain run may attempt, so a backlog cannot overrun the job. */
@@ -225,12 +157,9 @@ function parseCliArgs(argv: string[]): Args {
         "since",
         "token-env",
         "model",
-        "provider",
-        "editor",
         "pass-timeout",
         "max-usd",
         "attempts",
-        "budget-share",
         "drain-max",
       ],
       boolean: ["all", "drain", "skip-wiki", "no-gates", "dry-run", "help"],
@@ -274,29 +203,6 @@ function parseCliArgs(argv: string[]): Args {
     return collected;
   };
 
-  const editor = str("editor");
-  if (editor !== undefined && editor !== "fx" && editor !== "api" && editor !== "anthropic") {
-    throw new Error(`--editor must be fx, api or anthropic, not '${editor}'`);
-  }
-  const providerFlag = str("provider");
-  const provider = resolveProvider(
-    providerFlag === undefined ? undefined : parseProviderName(providerFlag),
-  );
-  // The anthropic provider and the anthropic editor are one thing seen from two sides: the
-  // provider is who pays, the editor is the code that runs. Neither works without the
-  // other, so a mismatch is refused by name instead of failing as a missing key or a
-  // protocol the AI SDK path cannot speak.
-  const resolvedEditor = editor ?? (provider.name === "anthropic" ? "anthropic" : "fx");
-  if ((provider.name === "anthropic") !== (resolvedEditor === "anthropic")) {
-    throw new Error(
-      "--provider anthropic and --editor anthropic go together: the Anthropic API is " +
-        "reached only by the anthropic editor, and that editor runs only on it",
-    );
-  }
-  const budgetShareRaw = str("budget-share");
-  const budgetShare = budgetShareRaw === undefined
-    ? { index: 1, count: 1 }
-    : parseBudgetShare(budgetShareRaw);
   const drainMaxRaw = str("drain-max");
   let drainMax = 6;
   if (drainMaxRaw !== undefined) {
@@ -322,14 +228,11 @@ function parseCliArgs(argv: string[]): Args {
     ...(since === undefined ? {} : { since }),
     tokenEnv: str("token-env") ?? "DCWG_DISCORD_BOT_TOKEN",
     ...(model === undefined ? {} : { model }),
-    provider,
     skipWiki: parsed["skip-wiki"] === true,
-    editor: resolvedEditor,
     passTimeoutSec: num("pass-timeout", 900),
     maxUsd: num("max-usd", DEFAULT_MAX_USD),
     noGates: parsed["no-gates"] === true,
     attempts: num("attempts", 2),
-    budgetShare,
     drain: parsed.drain === true,
     drainMax,
     dryRun: parsed["dry-run"] === true,
@@ -352,18 +255,6 @@ function requireToken(name: string): string {
   return token;
 }
 
-/**
- * Where fx keeps its per-machine settings.
- *
- * fx resolves the provider it is pointed at against this file, so a run checks it rather
- * than writing it: the connector does not edit a user's global settings, and a machine
- * whose file names no such provider should fail here in one line rather than inside a
- * pass. `DCWG_FX_SETTINGS` overrides the path, for tests and for a home that is not $HOME.
- */
-function fxSettingsPath(): string {
-  return Deno.env.get("DCWG_FX_SETTINGS") ?? `${Deno.env.get("HOME") ?? ""}/.fx/settings.json`;
-}
-
 /** The repo's own validation, in the order AGENTS.md prescribes. */
 async function readJson(path: string): Promise<Record<string, unknown>> {
   try {
@@ -383,35 +274,6 @@ async function readExistingCaptures(dir: string): Promise<string[]> {
     // directory does not exist yet
   }
   return names;
-}
-
-/**
- * What this run may spend from, and what a pass costs, before the fold starts.
- *
- * The Gateway meters money rather than requests, so a budget is two probes: the team's
- * credit balance, and the catalogue price of the model this run was pointed at. The
- * second is skipped for the API editor, which has no step loop to bound: its spend is
- * the number of capture slices it is handed, not something a per-pass estimate covers.
- *
- * Both are best-effort. A probe that cannot answer leaves the run ungoverned rather than
- * failing it, because an unreadable budget and an absent one are the same situation, and
- * the provider's own refusal is the backstop.
- */
-async function passBudget(
-  args: Args,
-): Promise<{ credits: GatewayCredits; passCostUsd: number | undefined } | undefined> {
-  // An unmetered provider has no balance to read: a Gemini pass is bounded by Google's
-  // own rate limit, which fx retries through, not by credits a share could divide.
-  if (!args.provider.metered) return undefined;
-  // The credit probe is the Gateway's. An anthropic pass bounds itself with --max-usd.
-  if (args.provider.protocol !== "gateway") return undefined;
-  if (args.editor !== "fx") return undefined;
-  const apiKey = Deno.env.get(args.provider.keyEnv);
-  if (!apiKey) return undefined;
-  const credits = await probeGatewayCredits({ apiKey });
-  if (credits === undefined) return undefined;
-  const modelId = args.model ?? args.provider.defaultModel;
-  return { credits, passCostUsd: estimatePassCostUsd(await probeModelPrice({ apiKey, modelId })) };
 }
 
 function report(
@@ -461,30 +323,19 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     throw error;
   }
   /**
-   * The pass's credential and its fx preconditions, checked before any capture is
-   * fetched. Both failures are configuration rather than content, so they exit 2 with the
-   * fix named: a run that got as far as calling a model on an unreadable provider would
-   * spend its whole time budget to learn what this check says in a line.
+   * The pass's credential, checked before any capture is fetched. A missing key is
+   * configuration rather than content, so it exits 2 with the fix named: a run that got as
+   * far as calling a model without one would spend its whole time budget to learn what
+   * this check says in a line.
    */
   let passKey: string | undefined;
   if (!args.skipWiki && !args.dryRun) {
-    const resolved = resolveApiKey(args.provider, (name) => Deno.env.get(name));
+    const resolved = resolveApiKey((name) => Deno.env.get(name));
     if (!resolved) {
-      console.error(`error: ${missingKeyMessage(args.provider)}`);
+      console.error(`error: ${missingKeyMessage()}`);
       return 2;
     }
     passKey = resolved.value;
-    if (args.editor === "fx") {
-      const problems = fxProviderProblems(
-        await readJson(fxSettingsPath()),
-        args.provider,
-        resolved.name,
-      );
-      if (problems.length) {
-        console.error(`error: ${problems.join("\n  ")}`);
-        return 2;
-      }
-    }
   }
 
   const root = args.root;
@@ -605,23 +456,10 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   if (args.dryRun) {
     if (newMessages) console.log(text);
     if (!args.skipWiki) {
-      const pages = await readPages(root);
-      // Show the fold this run would perform, which is the oldest thing it owes the
-      // wiki rather than always the capture that was just fetched.
       const target = queued[0];
-      console.error("\n--- wiki pass prompt (dry run; no model call) ---\n");
       console.error(
-        buildPrompt(
-          {
-            root,
-            channelName,
-            forum,
-            capturePath: target?.capture ?? "(not written)",
-            offset: target?.offset ?? 0,
-          },
-          pages,
-          target ? await Deno.readTextFile(`${root}/${target.capture}`) : text,
-        ),
+        `\n[dry-run] the wiki pass would fold ${target?.capture ?? "(not written)"} with ` +
+          `${args.model ?? ANTHROPIC_DEFAULT_MODEL}; no model call is made`,
       );
     }
     return report(
@@ -741,35 +579,16 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
   const foldCeiling = args.drain ? args.drainMax : 1;
 
   /**
-   * What one attempt may spend, as the agent's own step ceiling.
-   *
-   * fx applies `max_agent_steps` from the workspace's `.fx.json`, and it bounds an
-   * agentic request rather than counting the requests a pass will make: measured
-   * 2026-10-18 on 0.0.14, a workspace capped at 3 reported four steps and exited with the
-   * task unfinished. It is read from the config rather than restated here so the number
-   * that governs the schedule is the number the agent runs under.
-   */
-  const passSteps = await readFxSteps(root);
-
-  /**
-   * The agent's standing instructions, handed to fx with `--system`.
+   * The pass's standing instructions, and the client that carries them.
    *
    * Read once per run rather than per fold: they do not change between folds, and a
-   * missing prompt file should stop the run here instead of halfway through a pass.
+   * missing prompt file should stop the run here instead of halfway through a pass. The
+   * wiki pass is not skipped past this point, so the key is present.
    */
-  const standingInstructions = args.editor === "fx"
-    ? await readStandingInstructions(root)
-    : args.editor === "anthropic"
-    ? await readPassInstructions(root)
-    : "";
-  /**
-   * The Anthropic client, built once per run. Both whole-capture editors read the capture
-   * themselves, so they share the tree-snapshot path below; only the anthropic editor
-   * needs a client, and it is never built for a run that skips the wiki pass.
-   */
-  const anthropicClient = args.editor === "anthropic" && !args.skipWiki && !args.dryRun
-    ? makeClient(resolveApiKey(args.provider, (name) => Deno.env.get(name))!.value)
-    : undefined;
+  const standingInstructions = await readPassInstructions(root);
+  const anthropicClient = makeClient(passKey!);
+  const modelId = args.model ?? ANTHROPIC_DEFAULT_MODEL;
+  console.log(`provider: ${describeModel(modelId)}`);
 
   /** Attempts the last fold was allowed, so the report names what actually ran. */
   let foldAttempts = args.attempts;
@@ -844,64 +663,11 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     const kind = captureKind(captureText);
     const posts = postsInCapture(captureText);
     const foldForum = kind ? POST_SHAPED.has(kind) : forum;
-    // fx reads the capture off disk with its own tools, so one pass folds the
-    // whole file; the API editor is handed one slice, and an entry stays queued behind
-    // its offset while a capture longer than a prompt is still only half read.
-    const absorbed = args.editor !== "api"
-      ? captureText.length
-      : captureSlice(captureText, fold.offset, CAPTURE_CHAR_CAP).to;
+    // The pass reads the whole capture, so one fold absorbs all of it.
+    const absorbed = captureText.length;
 
-    /**
-     * Ask what is left of the balance before spending any of it, and what one pass costs.
-     *
-     * The alternative is what happened on 2026-10-17: two attempts that each answered
-     * 429 in about a minute, reported as a fold the material could not survive. A pass
-     * that cannot be paid for is not attempted, because attempting it teaches nothing
-     * and spends the run's own time budget.
-     */
-    const budget = await passBudget(args);
-    const credits = budget?.credits;
-    const passCostUsd = budget?.passCostUsd;
-    const modelId = args.model ?? args.provider.defaultModel;
-    if (credits) console.log(describeGatewayCredits(credits));
-    console.log(`provider: ${describeProvider(args.provider, modelId)}`);
-    /**
-     * What this run may spend on this fold, and how many attempts that buys.
-     *
-     * The Gateway bills tokens, so the unit is money and the balance is shared: the
-     * workflow serves its venues one process at a time, so a run that spends the whole
-     * remainder starves the runs after it. `--budget-share` divides the remainder by the
-     * runs still to come, and a pass costs what the catalogue prices at this run's model,
-     * so a share that cannot pay for one pass defers the fold rather than starting a pass
-     * that stops halfway. A free model costs nothing, so its share buys every attempt
-     * asked for and the provider's own rate limit is what bounds it. A run whose balance
-     * or price could not be read is ungoverned here: it spends what `--attempts` allows
-     * and the provider's own 429 handling covers the rest.
-     */
-    const allowance = credits === undefined
-      ? undefined
-      : creditAllowance(credits, args.budgetShare);
-    const attempts = allowance === undefined || passCostUsd === undefined
-      ? args.attempts
-      : affordableAttempts(allowance, passCostUsd, args.attempts);
+    const attempts = args.attempts;
     foldAttempts = attempts;
-    if (credits !== undefined && allowance !== undefined && passCostUsd !== undefined) {
-      console.log(
-        `budget: run ${args.budgetShare.index} of ${args.budgetShare.count}, share $${
-          allowance.toFixed(4)
-        } of $${credits.balanceUsd.toFixed(2)} left, ${describePassCost(passCostUsd)}, ` +
-          `capped at ${passSteps} agent step(s) by .fx.json: ${attempts} attempt(s) of ${args.attempts}`,
-      );
-    }
-    if (attempts === 0) {
-      budgetBlocked = true;
-      budgetBlockedCapture = foldPath;
-      budgetBlockedReason = `${describeGatewayCredits(credits)}; this run's share of $${
-        (allowance ?? 0).toFixed(4)
-      } cannot pay for one pass at ${modelId} (${describePassCost(passCostUsd)})`;
-      console.log(`fold deferred: ${budgetBlockedReason}`);
-      break;
-    }
 
     let changedThisFold: string[] = [];
     let feedback: string | undefined;
@@ -911,17 +677,16 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     let rateLimitNote = "";
 
     /**
-     * What an fx pass is measured against, and what a failed attempt is
+     * What a pass is measured against, and what a failed attempt is
      * restored to. Taken here, after the connector's own capture and cursor
      * writes, so those are not mistaken for changes the agent made.
      */
-    const treeBefore = args.editor !== "api" ? await snapshotTree(root) : undefined;
+    const treeBefore = await snapshotTree(root);
 
     /**
      * Mark this capture folded in: the queue advances past what the pass absorbed and
-     * its pages join the run's report. A partial fold for the API editor advances only
-     * to the end of the slice it was handed, so the entry stays queued and the next run
-     * reads on from there instead of losing the rest of the capture.
+     * its pages join the run's report. The entry advances to the end of the capture the
+     * pass absorbed, and leaves the queue once that is the whole of it.
      */
     const recordFold = async () => {
       // A fold that landed supersedes an earlier attempt that wrote nothing: the
@@ -934,179 +699,85 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
     };
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      let revert: () => Promise<void>;
-
-      if (args.editor !== "api") {
-        // Bound before the pass runs rather than after it: a spawn failure throws instead
-        // of returning `!ok` ("Failed to spawn 'fx': entity not found" is how that
-        // surfaces), and by then the agent may already have edited pages. Bound here, that
-        // throw can undo them instead of leaving pages behind that no gate has seen.
-        revert = () => restoreTree(root, treeBefore!);
-        // A capture an earlier run committed and could not fold in is being picked back
-        // up here, and the pass should not call days-old material new.
-        const queued = foldPath !== capturePath;
-        let run: PassRun;
-        if (args.editor === "fx") {
-          const briefPath = await writeBrief(
-            root,
-            renderBrief({
-              capturePath: foldPath,
-              channelName,
-              messageCount: fold.messages,
-              lastUpdated: previousRun,
-              forum: foldForum,
-              threads: posts,
-              queued,
-              feedback,
-            }),
-          );
-          run = await runFx({
-            root,
-            briefPath,
-            system: standingInstructions,
-            // The resolved id rather than `args.model`: the run report names this model, so
-            // the pass has to run the model it named, on either provider.
-            model: modelId,
-            provider: args.provider,
-            apiKey: passKey,
-            timeoutMs: args.passTimeoutSec * 1000,
-          }).catch(async (error: unknown) => {
-            await revert();
-            await cleanBrief(root);
-            throw error;
-          });
-          await cleanBrief(root);
-        } else {
-          // The staged pass: the capture goes to the model whole (split only past the
-          // chunk limit), and every page it writes is composed and checked in code.
-          run = await runAnthropicPass({
-            root,
-            capturePath: foldPath,
-            captureText,
-            system: standingInstructions,
-            model: modelId,
-            complete: anthropicComplete(anthropicClient!, modelId),
-            task: {
-              capturePath: foldPath,
-              channelName,
-              messageCount: fold.messages,
-              lastUpdated: previousRun,
-              queued,
-              forum: foldForum,
-              feedback,
-            },
-            posts,
-            maxUsd: args.maxUsd,
-            timeoutMs: args.passTimeoutSec * 1000,
-          }).catch(async (error: unknown) => {
-            await revert();
-            throw error;
-          });
-        }
-        const changed = diffTree(treeBefore!, await snapshotTree(root));
-        const stray = outsideWiki(changed);
-        usage = { inputTokens: run.usage.inputTokens, outputTokens: run.usage.outputTokens };
-        revert = () => restoreTree(root, treeBefore!);
-
-        // The tree compare is the write-surface control, not the agent's own
-        // permission rules: a rule that failed open in testing cannot be trusted
-        // to fail closed here. Anything outside wiki/ reverts the whole attempt.
-        if (!run.ok || stray.length) {
-          await revert();
-          lastFailure = !run.ok
-            ? `the ${args.editor} pass did not finish: ${
-              run.timedOut ? `killed after ${args.passTimeoutSec}s` : `exit ${run.code}`
-            }${run.stderr ? `\n${run.stderr}` : ""}`
-            : `the pass changed files outside wiki/, so the whole attempt was reverted:\n  - ${
-              stray.join("\n  - ")
-            }`;
-          feedback = lastFailure;
-          console.log(
-            `attempt ${attempt}/${attempts} ${
-              !run.ok
-                ? run.timedOut
-                  ? `timed out after ${args.passTimeoutSec}s`
-                  : `failed (exit ${run.code})`
-                : `wrote outside wiki/ (${stray.length} path(s))`
-            }`,
-          );
-          // A provider cap is not a verdict on the material. Noted per attempt so a
-          // fold whose attempts were *all* rate-limited can be told apart from one
-          // that reached the model and wrote something the gates rejected.
-          if (run.rateLimited) {
-            rateLimitedAttempts += 1;
-            rateLimitNote = run.rateLimited;
-            console.log(`attempt ${attempt}/${attempts} was rate-limited: ${run.rateLimited}`);
-          }
-          continue;
-        }
-
-        changedThisFold = changed;
-        notes = `${args.editor}: ${run.usage.steps} step(s), ${run.usage.inputTokens} in / ` +
-          `${run.usage.outputTokens} out${
-            run.usage.costUsd === undefined ? "" : `, ~$${run.usage.costUsd.toFixed(3)}`
-          }`;
-        console.log(
-          `attempt ${attempt}/${attempts}: ${changedThisFold.length} page file(s) changed: ${
-            changedThisFold.join(", ") || "none"
-          }`,
-        );
-      } else {
-        const wiki = await runWikiPass({
-          root,
-          channelName,
-          forum: foldForum,
+      // Bound before the pass runs rather than after it: a throw (a network failure, a
+      // bug) surfaces as an exception, not a failed result, and by then the pass may
+      // already have written pages. Bound here, the throw can undo them instead of
+      // leaving pages behind that no gate has seen.
+      const revert = () => restoreTree(root, treeBefore);
+      // A capture an earlier run committed and could not fold in is being picked back up
+      // here, and the pass should not call days-old material new.
+      const queued = foldPath !== capturePath;
+      // The staged pass: the capture goes to the model whole (split only past the chunk
+      // limit), and every page it writes is composed and checked in code.
+      const run: PassRun = await runAnthropicPass({
+        root,
+        capturePath: foldPath,
+        captureText,
+        system: standingInstructions,
+        model: modelId,
+        complete: anthropicComplete(anthropicClient, modelId),
+        task: {
           capturePath: foldPath,
-          offset: fold.offset,
-          model: modelId,
-          provider: args.provider,
-          apiKey: passKey,
+          channelName,
+          messageCount: fold.messages,
+          lastUpdated: previousRun,
+          queued,
+          forum: foldForum,
           feedback,
-        });
+        },
+        posts,
+        maxUsd: args.maxUsd,
+        timeoutMs: args.passTimeoutSec * 1000,
+      }).catch(async (error: unknown) => {
+        await revert();
+        throw error;
+      });
+      const changed = diffTree(treeBefore, await snapshotTree(root));
+      const stray = outsideWiki(changed);
+      usage = { inputTokens: run.usage.inputTokens, outputTokens: run.usage.outputTokens };
 
-        if ("problems" in wiki) {
-          const byModel = wiki.failure === "model";
-          lastFailure = byModel
-            ? `the model call failed:\n  - ${wiki.problems.join("\n  - ")}`
-            : `the write guard rejected the pass:\n  - ${wiki.problems.join("\n  - ")}`;
-          feedback = lastFailure;
-          console.log(
-            `attempt ${attempt}/${attempts} rejected: ${
-              byModel ? "the model call failed" : "the write guard"
-            }`,
-          );
-          continue;
-        }
-
-        const unwritable = wiki.edits.find((edit) =>
-          !checkEditablePath(edit.path, new TextEncoder().encode(edit.content).length).ok
-        );
-        if (unwritable) {
-          await wiki.revert();
-          const check = checkEditablePath(
-            unwritable.path,
-            new TextEncoder().encode(unwritable.content).length,
-          );
-          lastFailure = `the model proposed a path it may not write (${unwritable.path}: ${
-            "reason" in check ? check.reason : "no reason given"
-          })`;
-          feedback = lastFailure;
-          console.log(`attempt ${attempt}/${attempts} proposed an unwritable path`);
-          continue;
-        }
-
-        changedThisFold = wiki.edits.map((edit) => edit.path);
-        notes = wiki.notes;
-        usage = wiki.usage;
-        revert = wiki.revert;
-        for (const edit of wiki.edits) await writePage(root, edit as PageEdit);
+      // The tree compare is the write-surface control: anything outside wiki/ reverts the
+      // whole attempt, whatever the pass reported.
+      if (!run.ok || stray.length) {
+        await revert();
+        lastFailure = !run.ok
+          ? `the pass did not finish: ${
+            run.timedOut ? `killed after ${args.passTimeoutSec}s` : `exit ${run.code}`
+          }${run.stderr ? `\n${run.stderr}` : ""}`
+          : `the pass changed files outside wiki/, so the whole attempt was reverted:\n  - ${
+            stray.join("\n  - ")
+          }`;
+        feedback = lastFailure;
         console.log(
-          `attempt ${attempt}/${attempts}: ${changedThisFold.length} page edit(s): ${
-            changedThisFold.join(", ") || "none"
+          `attempt ${attempt}/${attempts} ${
+            !run.ok
+              ? run.timedOut
+                ? `timed out after ${args.passTimeoutSec}s`
+                : `failed (exit ${run.code})`
+              : `wrote outside wiki/ (${stray.length} path(s))`
           }`,
         );
-        for (const adjustment of wiki.adjustments) console.log(`  adjusted: ${adjustment}`);
+        // A provider cap is not a verdict on the material. Noted per attempt so a fold
+        // whose attempts were *all* rate-limited can be told apart from one that reached
+        // the model and wrote something the gates rejected.
+        if (run.rateLimited) {
+          rateLimitedAttempts += 1;
+          rateLimitNote = run.rateLimited;
+          console.log(`attempt ${attempt}/${attempts} was rate-limited: ${run.rateLimited}`);
+        }
+        continue;
       }
+
+      changedThisFold = changed;
+      notes = `${run.usage.steps} call(s), ${run.usage.inputTokens} in / ` +
+        `${run.usage.outputTokens} out${
+          run.usage.costUsd === undefined ? "" : `, ~$${run.usage.costUsd.toFixed(3)}`
+        }`;
+      console.log(
+        `attempt ${attempt}/${attempts}: ${changedThisFold.length} page file(s) changed: ${
+          changedThisFold.join(", ") || "none"
+        }`,
+      );
 
       // A pass that changed no page did not fold the capture, whatever the gates say
       // about an untouched tree, so this is settled before the gates rather than left to
@@ -1166,7 +837,7 @@ export async function main(argv: string[] = Deno.args): Promise<number> {
         break;
       }
 
-      // Undo this attempt before the next one: the editor must see the pages as
+      // Undo this attempt before the next one: the pass must see the pages as
       // they were, not as its own rejected attempt left them.
       await revert();
       await writeCapturesIndex(root);
