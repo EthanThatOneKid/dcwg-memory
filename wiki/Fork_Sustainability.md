@@ -33,7 +33,7 @@ One adjacent wish was recorded and not acted on. `strmnn` said he wishes they wo
 
 `Pierrot` proposed reaching out to companies that currently use Deno, naming Supabase and Netlify. `daniellacosse` agreed with the direction and added a precondition: the group needs a little more first. He pointed at a list another participant had made in the server.
 
-`Broglah` added Neon, linking its Deno Deploy integration guide, and noted that Databricks owns it. Ethan added that the Turso team used Deno and were recently acquihired. Taken together, the three replies are an argument about the prospects rather than for them: the named companies are either owned by a larger company or have already been acquired, which is the same consolidation that produced the handoff in the first place.
+`Broglah` added Neon, linking its Deno Deploy integration guide, and noted that Databricks owns it. `Ethan:Print"Ethan";:GoTo Ethan` added that the Turso team used Deno and were recently acquihired. Taken together, the three replies are an argument about the prospects rather than for them: the named companies are either owned by a larger company or have already been acquired, which is the same consolidation that produced the handoff in the first place.
 
 ## The customer-trust argument
 
@@ -49,7 +49,7 @@ The structural point is worth separating from the funding question: the group's 
 
 ## Open questions
 
-- Whether an Open Collective is created, and who creates it.
+- Whether an Open Collective is created, on who creates it.
 - Whether the corporate outreach happens, and whether a company that already has a Deno integration is a better prospect than one that does not.
 - Whether bounties are used, given they are most useful early and there is no money yet.
 - Whether a fork with a single maintainer is acceptable at all, which is the question `davey` opened with and the thread did not answer.

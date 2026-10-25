@@ -15,17 +15,17 @@ Nobody gave him a reason, and he did it.
 
 ## The plan and the objections
 
-`daniellacosse`'s only concern was overlap with `andy`'s work, specifically the tests `andy` had been getting to run. `CaptainLach` confirmed there should be no overlap.
+`daniellacosse` inquired (2026-10-13) if this would overlap with `andy`'s testing efforts, specifically the tests `andy` had been getting to run. `CaptainLach` confirmed (2026-10-13) there should be no overlap.
 
 `davey` liked the idea and raised the question that decides whether the numbers mean anything: would the results be skewed if the existing benchmarks ran on non-free-tier runners? He also offered his own setup as a template, a pull request check that fails and comments when a benchmark slips by more than a threshold, which he called a potentially good way to catch accidental regressions.
 
-That led to a hosting question from `davey`, whether the benchmarks would collide with GitHub Pages if the project used them for a dodo homepage or docs, and whether they could be served from a path. `w` said he would opt for a path himself, offering "benches or benchmarks", and `davey` settled on benches.
+That led to a hosting question from `davey`, whether the benchmarks would collide with GitHub Pages if the project used them for a dodo homepage or docs, and whether they could be served from a path. `w` said he would opt for a path himself (2026-10-13), offering "benches or benchmarks", and `davey` settled on benches (2026-10-13).
 
 ## Noise, and how much of it is tolerable
 
-The most useful exchange in the thread is about measurement quality on free infrastructure. `w` reported that free runners can be noisy, and that plus or minus seven percent is not unusual, but that if you introduce a meaningful regression it is still generally apparent through the noise. He offered two mitigations: Gungraun, and running multiple trials and taking the minimum rather than the average if straight lines are the priority.
+The most useful exchange in the thread is about measurement quality on free infrastructure. `w` reported (2026-10-13) that free runners can be noisy, and that plus or minus seven percent is not unusual, but that if you introduce a meaningful regression it is still generally apparent through the noise. He offered two mitigations: `Gungraun`, and running multiple trials and taking the minimum rather than the average if straight lines are the priority.
 
-`davey` answered with the threshold he runs in production: 25 percent. He linked both the pull request comment his workflow produces and the workflow itself as inspiration, and said it worked well enough for him to catch a few regressions early.
+`davey` answered (2026-10-13) with the threshold he runs in production: 25 percent. He linked both the pull request comment his workflow produces and the workflow itself as inspiration, and said it worked well enough for him to catch a few regressions early.
 
 So the thread contains a working answer to the noise problem, which is to set the threshold high enough that noise never trips it and let the change-detection catch only regressions worth acting on. Nobody argued about whether 25 percent is the right number.
 
@@ -35,15 +35,15 @@ So the thread contains a working answer to the noise problem, which is to set th
 
 That is a small thing that matters for the group's record: the assumption that Deno's benchmark history was lost with the acquisition was wrong, and the live page is current.
 
-`daniellacosse` read the page and found it hard to use, which produced the most concrete criticism of the measurement work. He asked how big `workers_large_message` is exactly, asked whether the figures include cold startup, and said 80 milliseconds to encode some text seems really slow when he knows Deno is faster than that. Separately, `Cyan` shared observations from a personal minimal runtime project, reporting a "7ms startup time" that was "around the same to bun," and attributed its smaller size to minimal content. Regarding build performance for a potential rewrite, `Cyan` noted that building V8 on their machine takes approximately "6 minutes" in performance mode, while the Zig portion of their runtime compiled in "a few seconds." He then asked for percentiles: they are not breaking the results down by percentile, and that matters, because a tame p99 is a great talking point, since it means the system is more predictable.
+`daniellacosse` read the page (2026-10-14) and found it hard to use, which produced the most concrete criticism of the measurement work. He asked how big `workers_large_message` is exactly, asked whether the figures include cold startup, and said 80 milliseconds to encode some text seems really slow when he knows Deno is faster than that. He also asked for percentiles: they are not breaking the results down by percentile, and that matters, because a tame p99 is a great talking point, since it means the system is more predictable.
 
-`w` answered the coverage question: many of the small benchmarks in the project are not shown on that page, and he had a suite running with almost every benchmark in the project included plus a workflow file to write pages, though he described it as still a bit of a mess.
+`w` answered the coverage question (2026-10-14): many of the small benchmarks in the project are not shown on that page, and he had a suite running with almost every benchmark in the project included plus a workflow file to write pages, though he described it as still a bit of a mess, and unlikely to effectively prevent regressions once an extensions system was implemented.
 
 ## The question that outlives the harness
 
-`w`'s doubt about the exercise is the part of the thread that is still open, and it is specific: using those benches as a starting point will not be that helpful for avoiding regressions if the extensions system gets flipped on its head. `daniellacosse` agreed on the mechanism, since extensions will presumably add to startup, and otherwise the runtime work is just moving code around, so maybe the group should focus on the benchmarks that matter for that. He added that coming back to this may make sense once the group starts thinking about promoting dodo.
+`w`'s doubt about the exercise is the part of the thread that is still open, and it is specific: using those benches as a starting point will not be that helpful for avoiding regressions if the extensions system gets flipped on its head. `daniellacosse` agreed on the mechanism (2026-10-14), since extensions will presumably add to startup, and otherwise the runtime work is just moving code around, so maybe the group should focus on the benchmarks that matter for that. He added that coming back to this may make sense once the group starts thinking about promoting dodo.
 
-`w` closed the thread with what he is most curious about: whether there are benefits currently being realized through link-time optimization and having everything in one build that end up lost.
+`w` closed the thread with what he is most curious about (2026-10-14): whether there are benefits currently being realized through link-time optimization and having everything in one build that end up lost.
 
 That is the thread's sharpest question and it is a direct challenge to the modular architecture the group is pursuing. Deno's current build gets LTO across everything in one binary. A minimal core with separately built extension components may not, and nobody in this capture addressed whether the measured cost of that is acceptable. It is the same boundary question the architecture threads argue about from the other direction, and it is the one place where performance work would settle a design argument rather than merely report on it.
 
