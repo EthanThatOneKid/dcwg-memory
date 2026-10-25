@@ -17,13 +17,15 @@ This is the same shape the group had argued about the day before, in [Runtime ar
 
 `Flying Mindz | Jannick` made the only objection in the thread, and it is not technical: "On a technical level I can't argue. But I do not see how a technical shift or rewrite helps us solve the actual problem."
 
-`andy`'s answer is what the proposal is really for. It lets the group solve the problem of everyone having different wants for what dodo should be, by allowing for customization. He also conceded the rewrite concern rather than defending it: they should definitely have a fork as a safety net, and maybe switch to a rewrite as a sort of "dodo v2", because in the long run Deno's codebase has a very strange architecture. `daniellacosse` separated the two halves of the objection, reading it as being about the rewrite rather than the modularity, and noted that forking is definitely the fastest way to get their footing without ruling out other options.
+`andy`'s answer is what the proposal is really for. It lets the group solve the problem of everyone having different wants for what dodo should be, by allowing for customization. He also conceded the rewrite concern rather than defending it: they should definitely have a fork as a safety net, and maybe switch to a rewrite as a sort of "dodo v2", because in the long run Deno's codebase has a very strange architecture. `daniellacosse` separated the two halves of the objection, reading it as being about the rewrite rather than the modularity, and noted that forking is definitely the fastest way to get their footing without ruling out other options. `netop://ウィビ` echoed support for a rewrite on 2026-10-18, calling it a "good idea" because Deno, "as great as it is, is the result of YEARS of work that, like any codebase, has accumulated technical debt." `netop://ウィビ` added that a rewrite could "keep compatibility and score better on benchmarks, easy."
 
 `daniellacosse` also connected the proposal to the monorepo effort: getting everything into the same repository so it is not a tangled mess aligns with this, and once well organized, supporting extensions becomes a lot easier and seems necessary besides.
 
 ## The prototype went to Zig, not Rust
 
-`andy` said he would prototype the initial version in another language, still using V8, to understand V8 before eventually moving to Rust, given his inexperience with Rust and V8. Asked what redoing the bindings is like, his first answer was that the borrow checker was being mean to him. He then chose Zig, for three reasons he gave on 2026-10-13: it does not fight you about memory management and just kind of trusts you, it has a really nice build system, and partly to gently poke fun at Bun.
+`andy` said he would prototype the initial version in another language, still using V8, to understand V8 before eventually moving to Rust, given his inexperience with Rust and V8. Asked what redoing the bindings is like, his first answer was that the borrow checker was being mean to him. He then chose Zig, for three reasons he gave on 2026-10-13: it does not fight you about memory management and just kind of trusts you, it has a really nice build system, and partly to gently poke fun at Bun. On 2026-10-18, `andy` reiterated strong support for a rewrite but expressed dislike for Zig as a language, finding it "annoying" and "painful," noting its "poopy" LSP support and "confusing" build system, despite acknowledging its fast compile times.
+
+`Cyan` also raised concerns about Rust compilation time on 2026-10-18, claiming it takes "1 hour" for CI compared to approximately six minutes for V8 and only a few seconds for the Zig portion of his own personal runtime. `Cyan` further stated that his personal runtime implements cross-language link-time optimization (LTO) with Zig, noting that Bun's claim about Rust being good for LTO while Zig cannot do it is "definitely false".
 
 `CaptainLach` pushed back on the reasoning rather than the choice: Rust does not fight with you, it just keeps you from shooting yourself in the foot ever again, and the same problems would exist in Zig but would be invisible until some point. `daniellacosse` called that totally accurate and still endorsed the detour, on the grounds that direct V8 understanding is valuable and that getting `andy` there faster is good, adding that he would prefer everyone get better at Rust but that is the next push after the initial fork is stable.
 
@@ -55,18 +57,24 @@ The objection is fair and it is the same one the group applied to naming the for
 
 `CaptainLach` took on the extension-authoring side, and his report on 2026-10-18 is the most concrete technical contribution in the thread. Deno has a built-in FFI, which he has used in several projects, but what the project really should have is `deno_bindgen`. That repository is very old and does not work, and how it did work was very wrong. There was a fork, `kzha0/deno-bindgen2`, which did work, but in his assessment the code is "utter ass". He has forked it to `are-we-dodo-yet/dodo-bindgen`, which read through the GitHub API on 2026-10-18 is public, primary language Rust, created 2026-10-18, last pushed 2026-10-18.[^2]
 
-His plan for it is to replace the `-rust-ir` crate and source code parsing with a uniffi-like approach, where macros generate symbols in the binary that can be extracted and parsed to produce usable code. That is a design decision, not a cleanup, and it is the one place in this capture where someone states what they intend to build and why.
+On 2026-10-18, `CaptainLach` reported writing a small `ffmpeg` wrapper using an unreleased version of `dodo-bindgen`, demonstrating its ability to expose Rust implementations to TypeScript, including asynchronous functions. He later released the updated `dodo-bindgen` to `are-we-dodo-yet/dodo-bindgen` on the same day.[^3] `Cyan` also stated on 2026-10-18 that he "already made both Zig and Rust use the same binding" and would upload his version soon to `origine-js/origine`.[^4]
+
+`CaptainLach`'s plan for `dodo-bindgen` is to replace the `-rust-ir` crate and source code parsing with a uniffi-like approach, where macros generate symbols in the binary that can be extracted and parsed to produce usable code. That is a design decision, not a cleanup, and it is the one place in this capture where someone states what they intend to build and why.
 
 ## Where it stands
 
-A prototype exists and is public, an extensions SDK CLI works, runtime extension loading is the next step and is paused, and the bindings fork exists with a stated design. The core language question that the earlier thread left open was settled by `andy` prototyping in Zig with an eventual move to Rust, which is a plan rather than a decision anyone else endorsed. Nobody has reviewed the prototype, and the group has not convened to compare the rewrite against adapting the current Deno codebase, which was `andy`'s own proposal for how the two tracks would be judged.
+A prototype (`dodo-x`) exists and is public, an extensions SDK CLI works, runtime extension loading is the next step and is paused, and `dodo-bindgen` exists with a stated design. The core language question that the earlier thread left open was settled by `andy` prototyping in Zig with an eventual move to Rust, which is a plan rather than a decision anyone else endorsed.
+
+On 2026-10-18, `daniellacosse` outlined a long-term rewrite strategy: first, "lock down some kind of C ABI in the current codebase" to enable incremental rewrites of "various modules/extensions in whatever, even golang," while rigorously ensuring "xplat" (cross-platform) compatibility. He suggested that `Cyan` and `andy` collaborate on `dodo-x` (are-we-dodo-yet/dodo-x) to produce a "proposed spec and proof of concept," emphasizing the necessity of "proper mechanisms to ensure we catch any regressions" before any rewrite.
+
+Nobody has reviewed the `dodo-x` prototype, and the group has not convened to compare the rewrite against adapting the current Deno codebase, which was `andy`'s own proposal for how the two tracks would be judged.
 
 ## Open questions
 
 - Whether `dodo-x` keeps its name, which `CaptainLach` argues it should not while it cannot load dodo or Deno extensions.
 - Whether the rewrite or the fork wins, which `andy` proposed deciding after both have had time.
-- Whether the extension system is dynamic with a C ABI or statically compiled, which the bindings work is a bet on.
-- Whether anyone but `andy` and `CaptainLach` is working in these repositories, since no other contributor appears in the thread.
+- The path for the extension system (dynamic with a C ABI, as proposed by `daniellacosse`, or statically compiled, which `CaptainLach`'s initial bindings work implies).
+- Whether anyone but `andy`, `CaptainLach`, and `Cyan` (with his `origine-js/origine` project) is working in these repositories, since no other contributor appears in the thread.
 
 ## Related
 
@@ -81,3 +89,7 @@ A prototype exists and is public, an extensions SDK CLI works, runtime extension
 [^1]: [`are-we-dodo-yet/dodo-x`](https://github.com/are-we-dodo-yet/dodo-x), read through the GitHub API on 2026-10-18.
 
 [^2]: [`are-we-dodo-yet/dodo-bindgen`](https://github.com/are-we-dodo-yet/dodo-bindgen), read through the GitHub API on 2026-10-18, along with the two repositories `CaptainLach` cited as its ancestors, [`denoland/deno_bindgen`](https://github.com/denoland/deno_bindgen) and [`kzha0/deno-bindgen2`](https://github.com/kzha0/deno-bindgen2).
+
+[^3]: [`are-we-dodo-yet/dodo-bindgen`](https://github.com/are-we-dodo-yet/dodo-bindgen), released on 2026-10-18.
+
+[^4]: [`origine-js/origine`](https://github.com/origine-js/origine), noted by `Cyan` on 2026-10-18 as his personal runtime.

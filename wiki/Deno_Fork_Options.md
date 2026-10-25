@@ -23,6 +23,18 @@ The compatibility fork is the one with a constituency. `davey` asked for Deno un
 
 The stripped fork is where the disagreement is. `netop://ウィビ` wants to strip everything, keeps only the namespace for compatibility, and considers Node compatibility a historical adoption tactic rather than a feature. `daniellacosse` offered the synthesis: a core runtime with KV, Deploy, and Node compatibility as modules you turn on per project, which `netop://ウィビ` said matches the plugin ecosystem he was already planning.
 
+## Dodo's Emerging Identity and Philosophy
+
+Participants articulated a more defined vision for the Dodo compatibility fork during discussions.
+
+`Sandeep Kumar Kuanar✌🏼` proposed Dodo's core philosophy as a "core LEGO brick" runtime that allows users to "assemble" what they need, including Node or Bun compatibility, and provides pre-built solutions for common tasks tailored to specific target audiences.
+
+`daniellacosse` expressed the belief that Dodo should aim for "a full, streamlined, batteries-included development experience for small teams," similar to Laravel for PHP or Ruby on Rails for Ruby, but specifically with TypeScript and code that can run "everywhere at face value." He emphasized that Deno's "best in class" developer experience is a primary concern for Dodo's target user market, which he feels is not adequately served by Node.
+
+`w` envisioned Dodo's architecture as `cli <-> core <-> runtime <-> v8`, with the `core` designed to be "very friendly to embedders," noting that embedding is his "raison d'etre" for participating.
+
+`daniellacosse` further elaborated on Dodo's core identity, stressing an emphasis on "predictability and determinism," which he stated underpins security, web standards, and developer experience. The ultimate goal is achieving cross-platform execution, envisioning a world where simple scripts can be written in 30 minutes and trusted to run in a terminal, on an iPad, or even (as a stretch goal) on a Nintendo Switch. He acknowledged iOS's JIT limitations but mentioned having "written xplat in go" and possessing a prototype that "beats react in jitless."
+
 ## Naming candidates
 
 | Name   | CLI     | Argument for                                                                                          | Argument against                                              |
@@ -40,13 +52,13 @@ One correction is worth keeping, because it is the only check anyone ran on the 
 ## What the group agreed a fork must preserve
 
 1. The permission model, which `davey` called the deciding factor and which is the one feature with no equivalent elsewhere.
-1. Deno compatibility, at least enough to run and compile backend services.
-1. LTS behavior: no feature churn, just security patches.
-1. The namespace, so existing imports keep resolving.
+2. Deno compatibility, at least enough to run and compile backend services.
+3. LTS behavior: no feature churn, just security patches.
+4. The namespace, so existing imports keep resolving.
 
 ## The concrete outcome
 
-`netop://ウィビ` shipped first, with [Ende](Ende_Runtime.md), a drop-in fork with no Node compatibility. The group's own compatibility fork has no name, no repository, and no owner as of the 2026-10-11 capture. See [Ende vs Dodo](Ende_vs_Dodo.md) for the two positions side by side.
+`netop://ウィビ` shipped first, with [Ende](Ende_Runtime.md), a drop-in fork with no Node compatibility. While `dodo` has emerged as the favored name for a compatibility fork, with an evolving identity and philosophical direction, it still lacks a dedicated repository and owner as of the 2026-10-18 capture. See [Ende vs Dodo](Ende_vs_Dodo.md) for the two positions side by side.
 
 ## Open questions
 

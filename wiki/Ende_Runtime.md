@@ -17,7 +17,7 @@ The first concrete fork to come out of the working group, announced in [WM-105, 
 
 ## What it is
 
-A drop-in Deno fork. It keeps the namespace so existing imports resolve, and strips everything else.
+A drop-in Deno fork. It keeps the namespace so existing imports resolve, and strips everything else. `netop://ウィビ` stated that Ende's identity "has been decided" as a runtime "for people who don't want all the extra stuff," serving as "a foundation for TypeScript apps" (2026-10-18).
 
 ## Roadmap as published
 
