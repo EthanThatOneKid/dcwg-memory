@@ -661,3 +661,32 @@ Deno.test("--tag replaces the default tags instead of adding to them", async () 
     );
   });
 });
+
+Deno.test("small queued captures are folded in one pass, and --batch-chars 0 folds them one at a time", async () => {
+  await withFoldEnv(async () => {
+    const root = await Deno.makeTempDir();
+    await seedGateCleanWiki(root);
+    await runCli([...BASE, "--root", root]);
+    await runCli([...BASE, "--root", root]);
+
+    const batched = await runCli([...FOLDING, "--root", root]);
+    const line = batched.out.find((entry) => entry.startsWith("batching "));
+    assert(line, "two fresh small captures share a fold");
+    assert(line.includes("2026-08-01_dcwg-talk.md") && line.includes("2026-08-01_dcwg-talk-2.md"), line);
+
+    const alone = await runCli([...FOLDING, "--batch-chars", "0", "--root", root]);
+    assert(!alone.out.some((entry) => entry.startsWith("batching ")), "0 turns batching off");
+  }, "empty-plan");
+});
+
+Deno.test("--batch-chars must be a non-negative integer", async () => {
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (...parts: unknown[]) => errors.push(parts.join(" "));
+  try {
+    assertEquals(await main(["--channel", CHANNEL, "--venue", "dcwg-talk", "--batch-chars", "1.5"]), 2);
+  } finally {
+    console.error = originalError;
+  }
+  assert(errors.join("\n").includes("--batch-chars must be a non-negative integer"));
+});
