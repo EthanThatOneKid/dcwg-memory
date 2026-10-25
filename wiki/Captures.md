@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 22 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 23 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -34,6 +34,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #propose — 2026-10-22](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-22_dcwg-propose.md): Append-only capture of #propose from 2026-10-22T21:41:36Z to 2026-10-23T18:06:37Z, pulled from the Discord REST API. 139 messages, 5 participants, across 1 thread.
 - [Discord #brainstorm — 2026-10-23](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-23_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-10-23T23:10:00Z to 2026-10-24T17:38:39Z, pulled from the Discord REST API. 2 messages, 2 participants.
 - [Discord #propose — 2026-10-23](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-23_dcwg-propose.md): Append-only capture of #propose from 2026-10-23T18:08:59Z to 2026-10-24T15:47:00Z, pulled from the Discord REST API. 172 messages, 5 participants, across 3 threads.
+- [Discord #brainstorm — 2026-10-24](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-24_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-10-24T21:26:22Z to 2026-10-25T00:30:03Z, pulled from the Discord REST API. 71 messages, 4 participants.
 
 ## Pasted briefs
 
