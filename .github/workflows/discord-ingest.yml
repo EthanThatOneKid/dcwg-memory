@@ -68,6 +68,10 @@ on:
         description: "Spend cap for one wiki pass, in USD. Blank = the connector's default"
         type: string
         default: ""
+      drain:
+        description: "Fold every capture a venue still owes the wiki (up to --drain-max folds), not just the oldest"
+        type: boolean
+        default: false
 
 concurrency:
   group: discord-ingest
@@ -97,6 +101,7 @@ jobs:
       MAX_USD: ${{ github.event.inputs.max_usd || vars.DCWG_MAX_USD }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       SKIP_WIKI: ${{ github.event.inputs.skip_wiki }}
+      DRAIN: ${{ github.event.inputs.drain }}
     steps:
       - uses: actions/checkout@v4
 
@@ -169,6 +174,7 @@ jobs:
             fi
             [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
             [ "${SKIP_WIKI:-false}" = "true" ] && args+=(--skip-wiki)
+            [ "${DRAIN:-false}" = "true" ] && args+=(--drain)
             if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then
               status=1
             fi
