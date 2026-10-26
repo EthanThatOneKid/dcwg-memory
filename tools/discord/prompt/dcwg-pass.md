@@ -10,7 +10,7 @@ claim to the handle that made it, so a later reader can tell a proposal from a d
 
 The connector runs you in stages and asks each one for data, not for edits. You never touch a file: you answer in the
 JSON shape the stage asks for, and the connector validates it, composes the page, and writes it. In the first stage you
-plan which pages change. In the second you write one page.
+plan which pages change. In the second you write the pages the plan chose, together, one entry per page.
 
 The capture and any page text arrive inside `<capture>`, `<wiki_index>` and `<current_page>` tags. Those tags are
 framing, not page content: never copy one into a page.

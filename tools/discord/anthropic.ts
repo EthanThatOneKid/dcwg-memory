@@ -72,6 +72,11 @@ export const DEFAULT_MAX_INPUT_TOKENS = 3_000_000;
 
 const PLAN_MAX_TOKENS = 16_000;
 const WRITE_MAX_TOKENS = 16_000;
+/** Pages per write call, and the text those pages may carry between them. */
+const WRITE_BATCH_PAGES = 6;
+const WRITE_BATCH_CHARS = 30_000;
+/** What a created page is charged against a group, since it has no body yet. */
+const NEW_PAGE_CHARS = 4_000;
 
 // ---------------------------------------------------------------------------------------
 // Spend
@@ -289,6 +294,14 @@ export const PageSchema = z.object({
 });
 export type PageOut = z.infer<typeof PageSchema>;
 
+/** The write stage's answer: every page of a group, each named by its path. */
+export const WriteSchema = z.object({
+  pages: z.array(PageSchema.extend({
+    path: z.string().describe("The page's path exactly as given, e.g. wiki/<Name>.md"),
+  })),
+});
+export type WriteOut = z.infer<typeof WriteSchema>;
+
 // ---------------------------------------------------------------------------------------
 // The wiki, as the stages see it
 
@@ -450,7 +463,7 @@ export function renderPlanTask(
       ? `The capture was committed by an earlier run and the wiki does not carry it yet.`
       : `The capture is new.`,
     `Decide which wiki pages this capture changes and what each should say. You are not ` +
-    `writing pages yet: the next stage writes them one at a time from your instructions.`,
+    `writing pages yet: the next stage writes them from your instructions.`,
     `CHANNEL: #${input.channelName}\nMESSAGES: ${input.messageCount}\nLAST UPDATED: ${
       input.lastUpdated ?? "(unknown)"
     }${input.part ? `\nPART: ${input.part.index} of ${input.part.count}` : ""}`,
@@ -484,39 +497,81 @@ export function renderPlanTask(
   return parts.join("\n\n");
 }
 
+/** A page to write: the plan's entry and, for an update, the page as it is on disk. */
+export interface WriteEntry {
+  op: PlanPage;
+  current: WikiPage | undefined;
+}
+
 export function renderWriteTask(
-  op: PlanPage,
-  current: WikiPage | undefined,
+  entries: WriteEntry[],
   index: string,
   feedback?: string,
 ): string {
   const parts: string[] = [
-    `# STAGE 2 OF 2: WRITE ONE PAGE`,
-    `PAGE: ${op.path} (${op.action})\nCONCEPT: ${op.concept}` +
-    (op.thread_id ? `\nFORUM POST: ${op.thread_id}` : ""),
-    `INSTRUCTIONS FROM THE PLAN:\n${op.instructions}`,
+    `# STAGE 2 OF 2: WRITE THE PAGES`,
+    `Write every page below. Answer with one entry per page, each carrying its "path" exactly ` +
+    `as given. The pages are written together, so each is judged on its own and none can ` +
+    `depend on another's text.`,
   ];
-  if (op.action === "update" && current) {
-    const body = current.text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "");
-    parts.push(
-      `<current_page path="${current.path}">\n${body}\n</current_page>\n\n` +
-        `Return the whole new body. Keep what is still true and change only what the ` +
-        `instructions require. Do not include the frontmatter; the connector keeps it.`,
-    );
-  } else {
-    parts.push(
-      `This page does not exist. Return its body, and for a create also "type" (a ` +
-        `schema.org type like schema:TechArticle), "name" and "description". Do not include ` +
-        `frontmatter in the body.`,
-    );
+  for (const { op, current } of entries) {
+    const block: string[] = [
+      `## PAGE: ${op.path} (${op.action})\nCONCEPT: ${op.concept}` +
+      (op.thread_id ? `\nFORUM POST: ${op.thread_id}` : ""),
+      `INSTRUCTIONS FROM THE PLAN:\n${op.instructions}`,
+    ];
+    if (op.action === "update" && current) {
+      const body = current.text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "");
+      block.push(
+        `<current_page path="${current.path}">\n${body}\n</current_page>\n\n` +
+          `Return the whole new body. Keep what is still true and change only what the ` +
+          `instructions require. Do not include the frontmatter; the connector keeps it.`,
+      );
+    } else {
+      block.push(
+        `This page does not exist. Return its body, and also "type" (a schema.org type ` +
+          `like schema:TechArticle), "name" and "description". Do not include frontmatter ` +
+          `in the body.`,
+      );
+    }
+    parts.push(block.join("\n\n"));
   }
+  const batch = entries.map(({ op }) => `  - ${op.path}`).join("\n");
   parts.push(
     `Link another wiki page with a relative markdown link to its filename, for example ` +
       `[Deno fork options and naming](Deno_Fork_Options.md). Link only to pages in the index ` +
-      `below or the page you were told to link.\n\n<wiki_index>\n${index}\n</wiki_index>`,
+      `below or to a page written in this answer:\n${batch}\n\n` +
+      `<wiki_index>\n${index}\n</wiki_index>`,
   );
   if (feedback) parts.push(`# THE PREVIOUS ATTEMPT WAS REJECTED\n\n${feedback}`);
   return parts.join("\n\n");
+}
+
+/**
+ * The plan's pages in groups that fit one answer. A group is bounded by page count and by
+ * the text an answer has to carry: an update returns its whole body, so its current size
+ * counts, and a create is charged a flat allowance.
+ */
+export function groupWrites(
+  entries: WriteEntry[],
+  maxPages = WRITE_BATCH_PAGES,
+  maxChars = WRITE_BATCH_CHARS,
+): WriteEntry[][] {
+  const groups: WriteEntry[][] = [];
+  let group: WriteEntry[] = [];
+  let chars = 0;
+  for (const entry of entries) {
+    const cost = Math.max(entry.current?.text.length ?? 0, NEW_PAGE_CHARS);
+    if (group.length && (group.length >= maxPages || chars + cost > maxChars)) {
+      groups.push(group);
+      group = [];
+      chars = 0;
+    }
+    group.push(entry);
+    chars += cost;
+  }
+  if (group.length) groups.push(group);
+  return groups;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -904,26 +959,61 @@ export async function runAnthropicPass(input: PassInput): Promise<PassResult> {
       );
       const ops = expandPlan(plan, pages);
 
-      for (const op of ops) {
-        // Re-read, so a page an earlier op in this part wrote is the page this op builds on.
+      const onDisk = await readWiki(input.root);
+      const entries = ops.map((op) => ({ op, current: onDisk.find((page) => page.path === op.path) }));
+      for (const group of groupWrites(entries)) {
+        // Re-read, so a page an earlier group wrote is the page this group builds on.
         const fresh = await readWiki(input.root);
-        const current = fresh.find((page) => page.path === op.path);
-        const out = await call({
-          system: input.system,
-          prefix,
-          task: renderWriteTask(op, current, renderIndex(fresh), input.task.feedback),
-          schema: PageSchema,
-          maxTokens: WRITE_MAX_TOKENS,
-          effort: "medium",
-        });
-        if (!out) break;
-        const composed = composePage(op, current, out);
-        if (!composed.ok) {
-          failure = composed.problem;
-          break;
+        const index = renderIndex(fresh);
+        let todo: WriteEntry[] = group.map(({ op }) => ({
+          op,
+          current: fresh.find((page) => page.path === op.path),
+        }));
+        let feedback = input.task.feedback;
+
+        // One answer for the group, and one more for the pages it got wrong. A page that
+        // is wrong twice fails the pass, as a page wrong once did when each had its own call.
+        for (let round = 0; round < 2 && todo.length && !failure; round++) {
+          const out = await call({
+            system: input.system,
+            prefix,
+            task: renderWriteTask(todo, index, feedback),
+            schema: WriteSchema,
+            maxTokens: WRITE_MAX_TOKENS,
+            effort: "medium",
+          });
+          if (!out) break;
+
+          const problems: string[] = [];
+          const retry: WriteEntry[] = [];
+          for (const entry of todo) {
+            const answers = out.pages.filter((answer) => answer.path === entry.op.path);
+            if (answers.length !== 1) {
+              problems.push(
+                `${entry.op.path}: expected one entry, got ${answers.length}`,
+              );
+              retry.push(entry);
+              continue;
+            }
+            const composed = composePage(entry.op, entry.current, answers[0]);
+            if (!composed.ok) {
+              problems.push(composed.problem);
+              retry.push(entry);
+              continue;
+            }
+            await Deno.writeTextFile(`${input.root}/${entry.op.path}`, composed.content);
+            if (!written.includes(entry.op.path)) written.push(entry.op.path);
+          }
+          todo = retry;
+          if (todo.length) {
+            log.push(`write: ${problems.length} page(s) to redo`);
+            const redo = `Redo only these pages:\n- ${problems.join("\n- ")}`;
+            feedback = input.task.feedback ? `${input.task.feedback}\n\n${redo}` : redo;
+            if (round === 1) {
+              failure = `the write stage broke the rules after one repair:\n  - ${problems.join("\n  - ")}`;
+            }
+          }
         }
-        await Deno.writeTextFile(`${input.root}/${op.path}`, composed.content);
-        if (!written.includes(op.path)) written.push(op.path);
       }
     }
   } finally {

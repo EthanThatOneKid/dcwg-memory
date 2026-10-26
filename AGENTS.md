@@ -158,7 +158,8 @@ a model call, a gate, or a rate limit can stop it folding that capture in. The
 connector therefore writes the capture, advances the cursor with it, and records
 what the wiki still owes in a queue (under `_pending` in `raw/discord/.cursor`, a
 file the hub already treats as mutable connector state). A run folds its venue's
-queue oldest first and stops after one capture unless `--drain`, because each fold is
+queue oldest first and stops after one fold unless `--drain` (a fold may carry several small
+captures: they share a pass while their text stays under `--batch-chars`), because each fold is
 a whole page pass with its own attempts and a backlog should drain over several runs
 rather than overrun the job's own time limit. A fold that cannot pass its gates after
 `--attempts` reports NEEDS_ATTENTION, commits nothing to `wiki/`, and leaves its entry
@@ -216,9 +217,20 @@ is 125 KB (~32k tokens), measured 2026-10-22, so the whole working set fits in o
    edits. `validatePlan` checks it in code before anything is written: every path passes
    `checkEditablePath`, creates are creates and updates are updates, every create names an
    existing page to be linked from, and each forum post owns exactly one page. One repair
-   call is allowed, with the problems quoted; a second failure fails the attempt.
-2. **Write.** One call per page, handed that page's current body and its instructions. The
-   model returns a body. The connector composes the file: an update keeps the page's own
+   call is allowed, with the problems quoted; a second failure fails the attempt. Before
+   validating, `normalizePlan` repairs what code can: a `thread_id` on a text channel (no
+   posts, nothing to anchor) is dropped, a `linked_from` given as a bare filename is read as
+   `wiki/<name>`, and one that names no page is replaced with the indexed page closest to the
+   concept. Each repair is an `adjusted:` line, and it costs no request, which matters on a
+   free tier. A create may also link from another create in the same plan, if the chain ends
+   on an indexed page.
+2. **Write.** One call per group of pages (`groupWrites`: up to 6 pages and 30,000 characters
+   of current text, a create charged 4,000), each page handed its current body and its
+   instructions. The model returns a list of `{path, body, ...}` entries, matched back by
+   path. A page that is missing, duplicated, or fails `composePage` is redone alone in one
+   more call, and the good ones are kept; wrong twice fails the pass. The pages of a group are
+   written without seeing each other's text, so a page may link only to the index or to a path
+   written in the same answer. The connector composes each file: an update keeps the page's own
    frontmatter (`carryFrontmatterForward`, so a model that returns its own block does not
    replace it), and a create gets a frontmatter the connector builds, including the
    `wazoo:thread` anchor. A create's inbound link is added to the linking page's
@@ -267,8 +279,8 @@ data and never touches a file.
 Not yet verified live: the unit tests drive the stages against a stubbed model, and nothing
 here has called the real Anthropic or Gemini API. For Gemini, what the first run settles is whether
 `responseJsonSchema` accepts the plan schema (it has nullable fields), what the free tier's per-minute and
-per-day limits allow (the pass makes one plan call plus one call per page, each carrying the whole
-capture), and what the cached-token count looks like. The first dispatch should be a manual one with
+per-day limits allow (the pass makes one plan call plus one write call per group of up to 6 pages, each
+carrying the whole capture), and what the cached-token count looks like. The first dispatch should be a manual one with
 `max_usd` 0.50 against one venue, before the next scheduled run spends anything. Server-side refusal
 `fallbacks` are not enabled: a refusal is reported as `refusal` and fails the attempt.
 
