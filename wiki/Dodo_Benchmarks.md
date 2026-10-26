@@ -39,6 +39,8 @@ That is a small thing that matters for the group's record: the assumption that D
 
 `w` answered the coverage question (2026-10-14): many of the small benchmarks in the project are not shown on that page, and he had a suite running with almost every benchmark in the project included plus a workflow file to write pages, though he described it as still a bit of a mess, and unlikely to effectively prevent regressions once an extensions system was implemented.
 
+On 2026-10-18, `w` asked `CaptainLach` to review `are-we-dodo-yet/dodo/pull/11`, which aims to integrate a continuous benchmark GitHub action into the project's CI. `CaptainLach` (2026-10-18) expressed unfamiliarity with GitHub Actions and suggested testing the PR on a `gh-pages` branch or within `w`'s personal repository before merging to observe its initial results. `w` (2026-10-18) confirmed he would investigate testing it in his repo.
+
 ## The question that outlives the harness
 
 `w`'s doubt about the exercise is the part of the thread that is still open, and it is specific: using those benches as a starting point will not be that helpful for avoiding regressions if the extensions system gets flipped on its head. `daniellacosse` agreed on the mechanism (2026-10-14), since extensions will presumably add to startup, and otherwise the runtime work is just moving code around, so maybe the group should focus on the benchmarks that matter for that. He added that coming back to this may make sense once the group starts thinking about promoting dodo.

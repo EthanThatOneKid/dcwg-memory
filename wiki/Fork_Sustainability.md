@@ -61,6 +61,7 @@ The structural point is worth separating from the funding question: the group's 
 - [Ende](Ende_Runtime.md): a fork with a single owner, which is the arrangement this thread is worried about.
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): the alternative to a fork, and what a transfer would require.
 - [Deno versus Node features](Deno_vs_Node_Features.md): the other thread about who the project is for, which is the same question as who would pay for it.
+- [Dodo's Identity and Economic Reality proposal](Dodo_Identity_and_Economics.md): a discussion about Dodo's identity as an embeddable runtime and various economic models for funding maintainers.
 
 ## Sources
 

@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 25 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 26 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -37,6 +37,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #brainstorm — 2026-10-24](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-24_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-10-24T21:26:22Z to 2026-10-25T00:30:03Z, pulled from the Discord REST API. 71 messages, 4 participants.
 - [Discord #propose — 2026-10-24](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-24_dcwg-propose.md): Append-only capture of #propose from 2026-10-24T19:36:38Z to 2026-10-24T23:33:20Z, pulled from the Discord REST API. 15 messages, 5 participants, across 2 threads.
 - [Discord #propose — 2026-10-25](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-25_dcwg-propose.md): Append-only capture of #propose from 2026-10-25T07:06:08Z to 2026-10-25T07:20:21Z, pulled from the Discord REST API. 2 messages, 2 participants, across 2 threads.
+- [Discord #propose — 2026-10-26](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-26_dcwg-propose.md): Append-only capture of #propose from 2026-10-26T10:35:28Z to 2026-10-26T11:59:10Z, pulled from the Discord REST API. 3 messages, 2 participants, across 1 thread.
 
 ## Pasted briefs
 
@@ -52,6 +53,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Deno fork options and naming](Deno_Fork_Options.md): The two-fork thesis, the naming candidates weighed on 2026-10-11 (Ende, dodo, endo, noend, Pteryx), and what the group agreed a fork must preserve.
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): What a community handoff of the Deno runtime, std, and rusty_v8 would have to transfer, split into what is possible, what needs negotiation, and what is not on the table.
 - [Deno versus Node features](Deno_vs_Node_Features.md): The 2026-10-16
+- [Dodo's Identity and Economic Reality](Dodo_Identity_and_Economics.md): A 2026-10-18 #propose thread discussing Dodo's identity as an embeddable runtime, its modular architecture, and economic models for funding maintainers, including challenges like JITless platforms and Node.js compatibility.
 - [Ende](Ende_Runtime.md): A planned drop-in Deno fork by Paul Anthony Webb that keeps the namespace for compatibility and drops Node compatibility, Deno Deploy, KV, and Jupyter; not public yet, soft launch planned for December 2026.
 - [Ende vs Dodo](Ende_vs_Dodo.md): Why Ende and Dodo are not competing runtimes. Ende is a fork with an owner, a registered namespace, and a published roadmap; Dodo is a name the group liked for a compatibility fork that nobody has started.
 - [Fresh framework migration](Fresh_Framework_Migration.md): Fresh, Deno's full-stack web framework, moved out of the denoland GitHub organization into freshframework. The verified facts of that move, and which of them transfer to a runtime handoff.
