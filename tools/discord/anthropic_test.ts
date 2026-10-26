@@ -7,7 +7,8 @@ import {
   emptyUsage,
   estimateCostUsd,
   expandPlan,
-  PageSchema,
+  groupWrites,
+  normalizePlan,
   type Plan,
   PlanSchema,
   renderIndex,
@@ -16,6 +17,7 @@ import {
   type Usage,
   validatePlan,
   type WikiPage,
+  WriteSchema,
 } from "./anthropic.ts";
 import { postsInCapture } from "./thread_pages.ts";
 
@@ -46,7 +48,7 @@ const page = (path: string, name: string, anchors: string[] = []): WikiPage => (
 });
 
 Deno.test("both answers serialize to a JSON schema the API accepts", () => {
-  for (const schema of [PlanSchema, PageSchema]) {
+  for (const schema of [PlanSchema, WriteSchema]) {
     const format = zodOutputFormat(schema);
     assertEquals(format.type, "json_schema");
     assertEquals((format.schema as { type?: string }).type, "object");
@@ -307,19 +309,24 @@ Deno.test("a pass plans once, writes each page, links the new page, and books th
           }],
         } satisfies Plan;
       }
-      return request.task.includes("PAGE: wiki/Rust_Core_Idea.md")
-        ? {
-          body: "# Rust core idea\n\nA proposal.\n",
-          type: "schema:TechArticle",
-          name: "Rust core idea",
-          description: "d",
-        }
-        : {
-          body: "# Deno\n\nSee [Rust core idea](Rust_Core_Idea.md).\n",
-          type: "",
-          name: "",
-          description: "",
-        };
+      return {
+        pages: [
+          {
+            path: "wiki/Rust_Core_Idea.md",
+            body: "# Rust core idea\n\nA proposal.\n",
+            type: "schema:TechArticle",
+            name: "Rust core idea",
+            description: "d",
+          },
+          {
+            path: "wiki/Deno.md",
+            body: "# Deno\n\nSee [Rust core idea](Rust_Core_Idea.md).\n",
+            type: "",
+            name: "",
+            description: "",
+          },
+        ],
+      };
     });
 
     const result = await runAnthropicPass({
@@ -336,8 +343,8 @@ Deno.test("a pass plans once, writes each page, links the new page, and books th
     assertEquals(result.stderr, "");
     assert(result.ok);
     assertEquals(result.written.sort(), ["wiki/Deno.md", "wiki/Rust_Core_Idea.md"]);
-    assertEquals(result.usage.steps, 3); // one plan, two writes
-    assertEquals(result.usage.inputTokens, 3_000);
+    assertEquals(result.usage.steps, 2); // one plan, one write for both pages
+    assertEquals(result.usage.inputTokens, 2_000);
 
     const created = await Deno.readTextFile(`${root}/wiki/Rust_Core_Idea.md`);
     assertStringIncludes(created, 'wazoo:thread: "111"');
@@ -459,6 +466,198 @@ Deno.test("a rate limit is reported as one, not as a verdict on the material", a
     });
     assert(!result.ok);
     assertEquals(result.rateLimited, "rate limited: 429");
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+// ---- mechanical plan repairs ---------------------------------------------------------------
+
+const create = (over: Partial<Plan["pages"][number]>): Plan["pages"][number] => ({
+  path: "wiki/New.md",
+  action: "create",
+  concept: "New",
+  thread_id: null,
+  instructions: "i",
+  linked_from: "wiki/Deno.md",
+  ...over,
+});
+
+Deno.test("normalizePlan drops a thread_id on a text channel, and leaves a forum's alone", () => {
+  const pages = [page("wiki/Deno.md", "Deno")];
+  const plan: Plan = { summary: "x", pages: [create({ thread_id: "999" })] };
+
+  const text = normalizePlan(plan, { pages, posts: [] });
+  assertEquals(text.plan.pages[0].thread_id, null);
+  assertStringIncludes(text.adjusted.join("\n"), "dropped thread_id 999");
+  assertEquals(validatePlan(text.plan, { pages, posts: [] }), []);
+
+  const forum = normalizePlan(plan, { pages, posts: [{ id: "111", title: "One" }] });
+  assertEquals(forum.plan.pages[0].thread_id, "999");
+  assertEquals(forum.adjusted, []);
+});
+
+Deno.test("normalizePlan reads a bare filename as the indexed page", () => {
+  const pages = [page("wiki/Deno.md", "Deno")];
+  const plan: Plan = { summary: "x", pages: [create({ linked_from: "Deno.md" })] };
+  const fixed = normalizePlan(plan, { pages, posts: [] });
+  assertEquals(fixed.plan.pages[0].linked_from, "wiki/Deno.md");
+  assertEquals(validatePlan(fixed.plan, { pages, posts: [] }), []);
+});
+
+Deno.test("normalizePlan replaces a link to an invented page with the closest real one", () => {
+  const pages = [
+    page("wiki/Deno.md", "Deno"),
+    { ...page("wiki/Runtime_Options.md", "Runtime options"), description: "JavaScript engines" },
+  ];
+  const plan: Plan = {
+    summary: "x",
+    pages: [create({
+      path: "wiki/Porffor_JavaScript_Engine.md",
+      concept: "Porffor JavaScript engine",
+      linked_from: "Prior_Art_Runtimes.md",
+    })],
+  };
+  const fixed = normalizePlan(plan, { pages, posts: [] });
+  assertEquals(fixed.plan.pages[0].linked_from, "wiki/Runtime_Options.md");
+  assertEquals(validatePlan(fixed.plan, { pages, posts: [] }), []);
+});
+
+Deno.test("a create may link from another create that links on to a real page", () => {
+  const pages = [page("wiki/Deno.md", "Deno")];
+  const hub = create({ path: "wiki/Hub.md", concept: "Hub" });
+  const leaf = create({ path: "wiki/Leaf.md", concept: "Leaf", linked_from: "wiki/Hub.md" });
+  assertEquals(validatePlan({ summary: "x", pages: [leaf, hub] }, { pages, posts: [] }), []);
+
+  const a = create({ path: "wiki/A.md", linked_from: "wiki/B.md" });
+  const b = create({ path: "wiki/B.md", linked_from: "wiki/A.md" });
+  assertStringIncludes(
+    validatePlan({ summary: "x", pages: [a, b] }, { pages, posts: [] }).join("\n"),
+    "is not a page in the index",
+  );
+});
+
+// ---- batched writes ------------------------------------------------------------------------
+
+const planOf = (count: number): Plan => ({
+  summary: "many",
+  pages: Array.from({ length: count }, (_, i) => ({
+    path: `wiki/Page_${i}.md`,
+    action: "create" as const,
+    concept: `Page ${i}`,
+    thread_id: null,
+    instructions: "i",
+    linked_from: "wiki/Deno.md",
+  })),
+});
+
+const written = (path: string) => ({
+  path,
+  body: `# ${path}\n\nText.\n`,
+  type: "schema:TechArticle",
+  name: path,
+  description: "d",
+});
+
+const textTask = { ...task, forum: false };
+
+Deno.test("groupWrites splits by page count and by the text a group carries", () => {
+  const entry = (path: string, size = 0) => ({
+    op: planOf(1).pages[0],
+    current: size ? { ...page(path, path), text: "x".repeat(size) } : undefined,
+  });
+  const six = Array.from({ length: 13 }, (_, i) => entry(`wiki/${i}.md`));
+  assertEquals(groupWrites(six).map((group) => group.length), [6, 6, 1]);
+
+  const big = [entry("wiki/A.md", 20_000), entry("wiki/B.md", 20_000), entry("wiki/C.md", 100)];
+  assertEquals(groupWrites(big).map((group) => group.length), [1, 2]);
+
+  assertEquals(groupWrites([]), []);
+});
+
+Deno.test("a plan of several pages is written in one call", async () => {
+  const root = await fixture();
+  try {
+    const { complete, requests } = stub((request) =>
+      request.schema === PlanSchema
+        ? planOf(4)
+        : { pages: planOf(4).pages.map((p) => written(p.path)).concat([written("wiki/Deno.md")]) }
+    );
+    const result = await runAnthropicPass({
+      root,
+      capturePath: task.capturePath,
+      captureText: HEADER + "## text\n\nhi\n",
+      system: "rules",
+      model: "claude-opus-5-5",
+      complete,
+      task: textTask,
+      posts: [],
+    });
+    assertEquals(result.stderr, "");
+    assert(result.ok);
+    assertEquals(result.usage.steps, 2); // one plan, one write for five pages
+    assertEquals(requests.filter((r) => r.schema === WriteSchema).length, 1);
+    assertEquals(result.written.length, 5);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("a page the write got wrong is redone alone, and the good ones are kept", async () => {
+  const root = await fixture();
+  try {
+    let writes = 0;
+    const { complete, requests } = stub((request) => {
+      if (request.schema === PlanSchema) return planOf(2);
+      writes++;
+      if (writes === 1) {
+        // Page_1 is missing and Page_0 has an empty body.
+        return {
+          pages: [{ ...written("wiki/Page_0.md"), body: "" }, written("wiki/Deno.md")],
+        };
+      }
+      return { pages: [written("wiki/Page_0.md"), written("wiki/Page_1.md")] };
+    });
+    const result = await runAnthropicPass({
+      root,
+      capturePath: task.capturePath,
+      captureText: HEADER + "## text\n\nhi\n",
+      system: "rules",
+      model: "claude-opus-5-5",
+      complete,
+      task: textTask,
+      posts: [],
+    });
+    assertEquals(result.stderr, "");
+    assert(result.ok);
+    assertEquals(result.usage.steps, 3); // plan, write, redo
+    const redo = requests[2].task;
+    assertStringIncludes(redo, "Redo only these pages");
+    assert(!redo.includes("## PAGE: wiki/Deno.md"));
+    assertStringIncludes(redo, "## PAGE: wiki/Page_0.md");
+    assertStringIncludes(redo, "## PAGE: wiki/Page_1.md");
+    assertEquals(result.written.sort(), ["wiki/Deno.md", "wiki/Page_0.md", "wiki/Page_1.md"]);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("a page still wrong after the redo fails the pass, with the page named", async () => {
+  const root = await fixture();
+  try {
+    const { complete } = stub((request) => request.schema === PlanSchema ? planOf(1) : { pages: [] });
+    const result = await runAnthropicPass({
+      root,
+      capturePath: task.capturePath,
+      captureText: HEADER + "## text\n\nhi\n",
+      system: "rules",
+      model: "claude-opus-5-5",
+      complete,
+      task: textTask,
+      posts: [],
+    });
+    assert(!result.ok);
+    assertStringIncludes(result.stderr, "wiki/Page_0.md: expected one entry, got 0");
   } finally {
     await Deno.remove(root, { recursive: true });
   }

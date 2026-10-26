@@ -16,7 +16,7 @@
  *   GEMINI_API_KEY           the wiki pass on --provider gemini, a Google AI Studio key
  *
  * The wiki pass is the staged pipeline in `anthropic.ts`: one plan call, then one write
- * call per page, bounded by `--max-usd`. See "The staged Anthropic pass" in AGENTS.md.
+ * call per group of pages, bounded by `--max-usd`. See "The staged Anthropic pass" in AGENTS.md.
  */
 
 import { parseArgs } from "@std/cli/parse-args";

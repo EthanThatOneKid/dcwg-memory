@@ -59,7 +59,7 @@ export async function runGates(root: string): Promise<string[]> {
 }
 
 if (import.meta.main) {
-  const root = Deno.args[0] ?? new URL("../..", import.meta.url).pathname;
+  const root = Deno.args[0] ?? `${import.meta.dirname}/../..`;
   const failed = await runGates(root.replace(/\/$/, ""));
   if (failed.length > 0) {
     console.error(`\n${failed.length} gate(s) failed: ${failed.join(", ")}`);
