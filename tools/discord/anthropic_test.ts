@@ -7,6 +7,7 @@ import {
   emptyUsage,
   estimateCostUsd,
   expandPlan,
+  normalizePlan,
   PageSchema,
   type Plan,
   PlanSchema,
@@ -462,4 +463,70 @@ Deno.test("a rate limit is reported as one, not as a verdict on the material", a
   } finally {
     await Deno.remove(root, { recursive: true });
   }
+});
+
+// ---- mechanical plan repairs ---------------------------------------------------------------
+
+const create = (over: Partial<Plan["pages"][number]>): Plan["pages"][number] => ({
+  path: "wiki/New.md",
+  action: "create",
+  concept: "New",
+  thread_id: null,
+  instructions: "i",
+  linked_from: "wiki/Deno.md",
+  ...over,
+});
+
+Deno.test("normalizePlan drops a thread_id on a text channel, and leaves a forum's alone", () => {
+  const pages = [page("wiki/Deno.md", "Deno")];
+  const plan: Plan = { summary: "x", pages: [create({ thread_id: "999" })] };
+
+  const text = normalizePlan(plan, { pages, posts: [] });
+  assertEquals(text.plan.pages[0].thread_id, null);
+  assertStringIncludes(text.adjusted.join("\n"), "dropped thread_id 999");
+  assertEquals(validatePlan(text.plan, { pages, posts: [] }), []);
+
+  const forum = normalizePlan(plan, { pages, posts: [{ id: "111", title: "One" }] });
+  assertEquals(forum.plan.pages[0].thread_id, "999");
+  assertEquals(forum.adjusted, []);
+});
+
+Deno.test("normalizePlan reads a bare filename as the indexed page", () => {
+  const pages = [page("wiki/Deno.md", "Deno")];
+  const plan: Plan = { summary: "x", pages: [create({ linked_from: "Deno.md" })] };
+  const fixed = normalizePlan(plan, { pages, posts: [] });
+  assertEquals(fixed.plan.pages[0].linked_from, "wiki/Deno.md");
+  assertEquals(validatePlan(fixed.plan, { pages, posts: [] }), []);
+});
+
+Deno.test("normalizePlan replaces a link to an invented page with the closest real one", () => {
+  const pages = [
+    page("wiki/Deno.md", "Deno"),
+    { ...page("wiki/Runtime_Options.md", "Runtime options"), description: "JavaScript engines" },
+  ];
+  const plan: Plan = {
+    summary: "x",
+    pages: [create({
+      path: "wiki/Porffor_JavaScript_Engine.md",
+      concept: "Porffor JavaScript engine",
+      linked_from: "Prior_Art_Runtimes.md",
+    })],
+  };
+  const fixed = normalizePlan(plan, { pages, posts: [] });
+  assertEquals(fixed.plan.pages[0].linked_from, "wiki/Runtime_Options.md");
+  assertEquals(validatePlan(fixed.plan, { pages, posts: [] }), []);
+});
+
+Deno.test("a create may link from another create that links on to a real page", () => {
+  const pages = [page("wiki/Deno.md", "Deno")];
+  const hub = create({ path: "wiki/Hub.md", concept: "Hub" });
+  const leaf = create({ path: "wiki/Leaf.md", concept: "Leaf", linked_from: "wiki/Hub.md" });
+  assertEquals(validatePlan({ summary: "x", pages: [leaf, hub] }, { pages, posts: [] }), []);
+
+  const a = create({ path: "wiki/A.md", linked_from: "wiki/B.md" });
+  const b = create({ path: "wiki/B.md", linked_from: "wiki/A.md" });
+  assertStringIncludes(
+    validatePlan({ summary: "x", pages: [a, b] }, { pages, posts: [] }).join("\n"),
+    "is not a page in the index",
+  );
 });

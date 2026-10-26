@@ -528,6 +528,103 @@ export interface PlanContext {
   posts: Array<{ id: string; title: string }>;
 }
 
+/**
+ * Whether a create's inbound link ends on a page that exists. A link may name another page
+ * this plan creates, since that page links on in turn, so the chain is followed until it
+ * lands on the index or loops.
+ */
+function linkReachesExisting(
+  op: PlanPage,
+  plan: Plan,
+  existing: Map<string, WikiPage>,
+): boolean {
+  const creates = new Map(plan.pages.filter((p) => p.action === "create").map((p) => [p.path, p]));
+  const visited = new Set<string>([op.path]);
+  let next = op.linked_from;
+  while (next) {
+    if (existing.has(next)) return true;
+    const hop = creates.get(next);
+    if (!hop || visited.has(next)) return false;
+    visited.add(next);
+    next = hop.linked_from;
+  }
+  return false;
+}
+
+const WORD = /[A-Za-z0-9]+/g;
+
+function words(text: string): Set<string> {
+  return new Set((text.toLowerCase().match(WORD) ?? []).filter((word) => word.length > 2));
+}
+
+/** The existing page that shares the most words with a concept, for a link the model got wrong. */
+function closestPage(concept: string, pages: WikiPage[]): WikiPage | undefined {
+  const wanted = words(concept);
+  let best: WikiPage | undefined;
+  let bestScore = 0;
+  for (const page of pages) {
+    const have = words(`${page.path} ${page.name} ${page.description}`);
+    let score = 0;
+    for (const word of wanted) if (have.has(word)) score++;
+    if (score > bestScore) {
+      best = page;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+/**
+ * Mechanical repairs to a plan, run before it is validated, so a request is not spent
+ * asking the model to fix what code can fix. Each repair is reported as an `adjusted:` line.
+ * `plan` is returned unchanged when nothing needed repairing.
+ *
+ * - A text channel has no posts, so a `thread_id` there anchors nothing; it is dropped. A
+ *   forum's `thread_id` is left alone, because a wrong one is a real fault.
+ * - `linked_from` is a path, and the model sometimes gives the bare filename. A name that
+ *   resolves to an indexed page once `wiki/` is prefixed is taken to mean that page.
+ * - A `linked_from` that names no page and no create in the plan is replaced by the
+ *   indexed page closest to the concept, because the orphan gate wants any real page to
+ *   link in, and this is the one the model's own concept points at.
+ */
+export function normalizePlan(
+  plan: Plan,
+  context: PlanContext,
+): { plan: Plan; adjusted: string[] } {
+  const adjusted: string[] = [];
+  const existing = new Set(context.pages.map((page) => page.path));
+  const creating = new Set(plan.pages.filter((op) => op.action === "create").map((op) => op.path));
+  const forum = context.posts.length > 0;
+
+  const pages = plan.pages.map((op) => {
+    const next = { ...op };
+    if (!forum && next.thread_id) {
+      adjusted.push(`${op.path}: dropped thread_id ${next.thread_id}; this capture has no posts`);
+      next.thread_id = null;
+    }
+    if (next.action === "create" && next.linked_from) {
+      const known = (path: string) => existing.has(path) || creating.has(path);
+      if (!known(next.linked_from)) {
+        const prefixed = `${WIKI_PREFIX}${next.linked_from.replace(/^\/+/, "")}`;
+        if (known(prefixed)) {
+          adjusted.push(`${op.path}: linked_from ${next.linked_from} read as ${prefixed}`);
+          next.linked_from = prefixed;
+        } else {
+          const close = closestPage(`${op.concept} ${op.path}`, context.pages);
+          if (close) {
+            adjusted.push(
+              `${op.path}: linked_from ${next.linked_from} is not a page; linking from ${close.path}`,
+            );
+            next.linked_from = close.path;
+          }
+        }
+      }
+    }
+    return next;
+  });
+  return { plan: adjusted.length ? { ...plan, pages } : plan, adjusted };
+}
+
 /** What is wrong with a plan, in words the model can act on. `[]` is a plan worth running. */
 export function validatePlan(plan: Plan, context: PlanContext): string[] {
   const problems: string[] = [];
@@ -549,7 +646,7 @@ export function validatePlan(plan: Plan, context: PlanContext): string[] {
     if (op.action === "create") {
       if (!op.linked_from) {
         problems.push(`${op.path}: a create needs "linked_from", an existing page`);
-      } else if (!existing.has(op.linked_from)) {
+      } else if (!linkReachesExisting(op, plan, existing)) {
         problems.push(`${op.path}: linked_from ${op.linked_from} is not a page in the index`);
       }
     }
@@ -764,6 +861,12 @@ export async function runAnthropicPass(input: PassInput): Promise<PassResult> {
       };
       const prefix = renderPrefix(input.capturePath, part);
 
+      const repair = (answer: Plan, known: WikiPage[], found: typeof posts): Plan => {
+        const fixed = normalizePlan(answer, { pages: known, posts: found });
+        for (const line of fixed.adjusted) log.push(`adjusted: ${line}`);
+        return fixed.plan;
+      };
+
       let plan = await call({
         system: input.system,
         prefix,
@@ -773,6 +876,7 @@ export async function runAnthropicPass(input: PassInput): Promise<PassResult> {
         effort: "high",
       });
       if (!plan) break;
+      plan = repair(plan, pages, posts);
 
       // One repair, because the usual fault is a missing link or a post without a page.
       const problems = validatePlan(plan, { pages, posts });
@@ -787,6 +891,7 @@ export async function runAnthropicPass(input: PassInput): Promise<PassResult> {
           effort: "high",
         });
         if (!plan) break;
+        plan = repair(plan, pages, posts);
         const remaining = validatePlan(plan, { pages, posts });
         if (remaining.length) {
           failure = `the plan broke the rules after one repair:\n  - ${remaining.join("\n  - ")}`;
