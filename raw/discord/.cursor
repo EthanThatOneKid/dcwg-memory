@@ -1,16 +1,9 @@
 {
   "1558888938842624093": "1560326306858668165",
-  "_lastRun": "2026-10-26T19:22:07Z",
+  "_lastRun": "2026-10-27T18:43:00Z",
   "1558965777850302546": "1563711205342970018",
   "1559302572974538843": "1559349752905072641",
   "_pending": [
-    {
-      "capture": "raw/discord/2026-10-18_dcwg-brainstorm-2.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 12,
-      "offset": 0,
-      "stalls": 1
-    },
     {
       "capture": "raw/discord/2026-10-18_dcwg-brainstorm-3.md",
       "venue": "dcwg-brainstorm",

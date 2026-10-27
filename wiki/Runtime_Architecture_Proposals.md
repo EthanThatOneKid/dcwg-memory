@@ -39,8 +39,8 @@ He is right, and the nuance is worth recording because the mistake is the common
 `daniellacosse` stated the order of preference explicitly:
 
 1. The community gets Deno and the means to maintain it as it is. "✨ ideal ✨"
-1. A fork of Deno, possibly dressed up a little.
-1. A rewrite, if maintaining the fork proves too difficult.
+2. A fork of Deno, possibly dressed up a little.
+3. A rewrite, if maintaining the fork proves too difficult.
 
 The disagreement is about when to start, not about the order. `andy` argued the one year of upstream maintenance is enough runway to have a rewrite ready to hand off from Deno, with a fork of the final release as the fallback if it is not. `daniellacosse` argued for starting sooner so that there is enough overlap for people to choose the fork rather than simply leave Deno when support ends.
 
@@ -73,6 +73,7 @@ Only two things: that extensions should be authorable in TypeScript and Rust, an
 - [Deno Core Working Group](Deno_Core_Working_Group.md): who is in the room.
 - [Rust core rewrite proposal](Rust_Core_Proposal.md): the rewrite that got formalized on 2026-10-12, prototyped in zig first.
 - [Rust upskilling](Rust_Upskilling.md): the skill survey that followed, and what to learn before contributing to either.
+- [Deno JavaScriptCore Compatibility](Deno_JavaScriptCore_Compatibility.md): `CaptainLach` reported Deno's compatibility with JavaScriptCore based on manual checks.
 
 ## Sources
 

@@ -51,6 +51,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Deno Core Working Group](Deno_Core_Working_Group.md): An informal group of Deno users organizing on Discord to keep the runtime alive after Cloudflare acquired Deno Land Inc. and Deno ended its own runtime development.
 - [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md): The Discord handles visible in the group's #talk capture, with the public identity behind each handle where one could be confirmed.
 - [Deno fork options and naming](Deno_Fork_Options.md): The two-fork thesis, the naming candidates weighed on 2026-10-11 (Ende, dodo, endo, noend, Pteryx), and what the group agreed a fork must preserve.
+- [Deno JavaScriptCore Compatibility](Deno_JavaScriptCore_Compatibility.md): CaptainLach reported that Deno works perfectly fine with JavaScriptCore, based on manual checks.
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): What a community handoff of the Deno runtime, std, and rusty_v8 would have to transfer, split into what is possible, what needs negotiation, and what is not on the table.
 - [Deno versus Node features](Deno_vs_Node_Features.md): The 2026-10-16
 - [Dodo's Identity and Economic Reality](Dodo_Identity_and_Economics.md): A 2026-10-18 #propose thread discussing Dodo's identity as an embeddable runtime, its modular architecture, and economic models for funding maintainers, including challenges like JITless platforms and Node.js compatibility.
