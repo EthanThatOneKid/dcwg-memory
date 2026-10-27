@@ -46,6 +46,7 @@ The repository is public, so these files are readable in place. The same files a
 
 ## What is derived from them
 
+- [A "Killer App Framework" for Dodo](Killer_App_Framework.md): The 2026-10-21
 - [Benchmarking dodo](Dodo_Benchmarks.md): The 2026-10-13
 - [Deno](Deno.md): A JavaScript, TypeScript, and WebAssembly runtime built on V8 and Rust, created by Ryan Dahl and Bert Belder, whose own development ends about a year after Cloudflare acquired Deno Land Inc. on 2026-10-09.
 - [Deno Core Working Group](Deno_Core_Working_Group.md): An informal group of Deno users organizing on Discord to keep the runtime alive after Cloudflare acquired Deno Land Inc. and Deno ended its own runtime development.
@@ -58,8 +59,10 @@ The repository is public, so these files are readable in place. The same files a
 - [Ende vs Dodo](Ende_vs_Dodo.md): Why Ende and Dodo are not competing runtimes. Ende is a fork with an owner, a registered namespace, and a published roadmap; Dodo is a name the group liked for a compatibility fork that nobody has started.
 - [Fresh framework migration](Fresh_Framework_Migration.md): Fresh, Deno's full-stack web framework, moved out of the denoland GitHub organization into freshframework. The verified facts of that move, and which of them transfer to a runtime handoff.
 - [Luca Casonato](Luca_Casonato.md): Creator of the Fresh web framework and former Deno core team member, now at Railway; named in the group as the person who has already done a Deno-project handoff.
+- [Per-package (module-level) permissions](Per_Package_Permissions.md): The 2026-10-21
 - [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): The projects that already implement a minimal core with opt-in extensions, checked against live repositories on 2026-10-11, covering Andromeda and Nova, LLRT, WinterJS, workerd, Bun, and the C# hosting precedent.
 - [Runtime architecture proposals](Runtime_Architecture_Proposals.md): The 2026-10-11 architecture thread on a minimal core with opt-in extensions, the host-language question (C#, Go, Rust), extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
 - [Rust core rewrite proposal](Rust_Core_Proposal.md): The 2026-10-12
 - [Rust upskilling for the fork](Rust_Upskilling.md): The 2026-10-12
+- [Sandboxed extension boundary](Sandboxed_Extension_Boundary.md): The 2026-10-22 to 2026-10-25
 - [Sustaining the fork](Fork_Sustainability.md): The 2026-10-12
