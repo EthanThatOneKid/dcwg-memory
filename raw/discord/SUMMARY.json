@@ -2,10 +2,10 @@
   "status": "OK",
   "connector": "discord",
   "fetched": 0,
-  "ingested": 3,
+  "ingested": 2,
   "skipped_by_appraisal": 0,
   "actionable_candidates": 0,
   "cursor": "1564247015695581216",
-  "lastRun": "2026-10-27T18:43:00Z",
+  "lastRun": "2026-10-27T18:43:38Z",
   "captures": 24
 }
