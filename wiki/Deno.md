@@ -31,7 +31,7 @@ The part that matters to anyone building on Deno was not in the Cloudflare post.
 | JSR                | continues; infrastructure moves to Cloudflare                                                | no end date announced                                   |
 | `rusty_v8`         | continues, with work toward integrating it into `workerd`                                    | no end date announced                                   |
 
-Deno Deploy Classic is a separate, earlier sunset and was already listed for 2026-07-20, before this announcement.
+Deno Deploy Classic is a separate, earlier sunset and was already listed for 2026-07-20, before this announcement. Discussions around the inner workings of [Deno Deploy Architecture](Deno_Deploy_Architecture.md) have provided insight into its historical and current operating mechanisms.
 
 The technical centerpiece of the acquisition is `celld`, Deno's August 2026 self-hostable implementation of Workers and Durable Objects, which Cloudflare wants for self-hosting. Cloudflare is buying the team and that project more than the runtime.
 
@@ -48,6 +48,10 @@ Nothing has moved yet. The repositories, the crates, the JSR scopes, and the `de
 ## Why it matters to the working group
 
 An MIT runtime that nobody will develop is not dead code, it is an unowned one. The pieces that need an owner are the ones that cannot be re-derived from the source: the trademark, the registry scopes, the crate ownership, and the signing keys behind binary distribution. [Deno runtime handoff](Deno_Runtime_Handoff.md) works through which of those can move. [Fresh framework migration](Fresh_Framework_Migration.md) is the one precedent the group has for a project that did move out of `denoland` cleanly.
+
+## Related Technical Discussions
+
+Discussions have explored various technical aspects relevant to Deno and its future, including the potential of [WebGPU and LLM Performance](WebGPU_and_LLM_Performance.md), the characteristics of the [Porffor JavaScript Engine](Porffor_JavaScript_Engine.md), and different [File System APIs for Deno](File_System_APIs_for_Deno.md).
 
 ## Sources
 

@@ -1,48 +1,13 @@
 {
   "1558888938842624093": "1560326306858668165",
-  "_lastRun": "2026-10-27T18:43:38Z",
-  "1558965777850302546": "1563711205342970018",
+  "_lastRun": "2026-10-28T18:52:47Z",
+  "1558965777850302546": "1564835035633287169",
   "1559302572974538843": "1559349752905072641",
   "_pending": [
-    {
-      "capture": "raw/discord/2026-10-18_dcwg-brainstorm-3.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 14,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
-      "capture": "raw/discord/2026-10-18_dcwg-brainstorm-4.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 28,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
-      "capture": "raw/discord/2026-10-20_dcwg-brainstorm.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 14,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
-      "capture": "raw/discord/2026-10-20_dcwg-brainstorm-2.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 5,
-      "offset": 0,
-      "stalls": 0
-    },
     {
       "capture": "raw/discord/2026-10-20_dcwg-propose.md",
       "venue": "dcwg-propose",
       "messages": 42,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
-      "capture": "raw/discord/2026-10-22_dcwg-brainstorm.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 2,
       "offset": 0,
       "stalls": 0
     },
@@ -61,23 +26,9 @@
       "stalls": 0
     },
     {
-      "capture": "raw/discord/2026-10-23_dcwg-brainstorm.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 2,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
       "capture": "raw/discord/2026-10-23_dcwg-propose.md",
       "venue": "dcwg-propose",
       "messages": 172,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
-      "capture": "raw/discord/2026-10-24_dcwg-brainstorm.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 71,
       "offset": 0,
       "stalls": 0
     },

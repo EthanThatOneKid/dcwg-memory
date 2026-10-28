@@ -1,0 +1,9 @@
+---
+"@type": schema:TechArticle
+schema:name: "File System APIs for Deno"
+schema:description: "Discussions on potential file system APIs for Deno, comparing Origin Private File System (OPFS) with object storage and IndexedDB, considering portability, performance, and user experience."
+wazoo:source: dcwg
+wiki:priority: medium
+---
+
+On 2026-10-24, `daniellacosse` suggested that Deno consider an Origin Private File System (OPFS) extension, possibly as an alternative to `@std/fs`, for its portability (`1563702895818571916`, `1563703852841181357`). `netop://ウィビ` cited MDN, highlighting OPFS's low-level, byte-by-byte file access that is private to the origin, requires fewer security checks, is faster than File System Access API calls, and offers synchronous calls within web workers (`1563711095405809685`). `daniellacosse` affirmed his positive experience with OPFS (`1563711205342970018`). Conversely, `CaptainLach` argued that object storage is generally better for end-users and more portable than a file system, as FS implies file locking and other issues that are often problematic. He noted that object storage can be implemented atop FS, but not the reverse (`1563703942787891302`, `1563704003689451601`, `1563704776544362568`, `1563704808391581799`). `CaptainLach` also brought up IndexedDB, asserting it was not inherently slow unless compared to FS operations that bypass `fsync`, and that durability can be reduced in IndexedDB as well (`1563705596501434520`, `1563705657654251641`, `1563705762134495384`, `1563707141569773750`). `daniellacosse` expressed that IndexedDB was not intuitive and recalled experiencing slowness possibly due to structured cloning, though he admitted he was less knowledgeable about typed arrays at the time (`1563705824583487549`, `1563708024038887565`, `1563708245011337280`, `1563708344915726368`, `1563709205846954096`). `CaptainLach` noted that `JSON.stringify` is highly optimized in V8 (`1563709342664892419`).
