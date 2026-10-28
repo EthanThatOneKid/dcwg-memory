@@ -23,6 +23,11 @@ Every handle that speaks in the 2026-10-11 `#talk` capture, with the public iden
 | `davey`                          | not established                                                                                | Unidentified                                          |
 | `W7T2A [OAI],`                   | not established                                                                                | Unidentified                                          |
 | `Max P.`                         | not established                                                                                | Unidentified                                          |
+| `Sandeep Kumar Kuanar✌🏼`        | not established                                                                                | Unidentified                                          |
+| `Ooker`                          | not established                                                                                | Unidentified                                          |
+| `Doctor 🤖`                      | not established                                                                                | Unidentified                                          |
+| `paula`                          | not established                                                                                | Unidentified                                          |
+| `lishaduck`                      | not established                                                                                | Unidentified                                          |
 
 `Divy` and `Crowl` never speak in the capture; they are named only in Ethan's report that he had reached out to them. The confirmed identity for each is inferred from their GitHub profile, not from the Discord log.
 

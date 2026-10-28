@@ -67,3 +67,4 @@ Each footnote names what it was read for, and every source was read on 2026-10-1
 ## Related
 
 - [Rust core rewrite proposal](Rust_Core_Proposal.md): the proposal to build a new runtime on `rusty_v8` rather than on `deno_core`, and what happened to it.
+- [Celld Runtime](Celld_Runtime.md): An explanation of Celld as a lightweight, secure runtime for single-threaded JavaScript processors, its benefits for microservices, and its limited applications outside of backend environments.
