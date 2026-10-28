@@ -42,10 +42,25 @@ The thread is the record of a working prototype rather than a plan, and the date
 | 2026-10-16 | The repository published as `are-we-dodo-yet/dodo-x`, described by `andy` as very incomplete |
 | 2026-10-16 | The extensions SDK CLI working, with running extensions at runtime as the next step          |
 | 2026-10-18 | No progress expected for a few days, because `andy` is playing Silksong                      |
+| 2026-10-21 | Extensions load into memory, after `andy` fought the `tar` crate; "scrappy" prototype        |
 
 `daniellacosse` asked how the cold start was on 2026-10-15 and `andy` said he had not checked yet. `daniellacosse` also stopped tinkering with his own implementation because `andy` had been killing it, and suggested an informal presentation on what `andy` has learned once he feels good about it, which `andy` agreed to.
 
 Read through the GitHub API on 2026-10-18, `are-we-dodo-yet/dodo-x` is public, primary language Rust, created 2026-10-15, last pushed 2026-10-15, one star, described as "an experment with a modular architecture for dodo".[^1]
+
+## Extensions load, and what they cannot yet do
+
+On 2026-10-21 (UTC) `andy` reported that, after fighting the `tar` crate, he could load extensions into memory, and later the same day called it a "shitty scrappy extensions prototype". He listed what is missing: inter-container communication and proper FFI, because as built extensions cannot talk to user code at all. All they can do is add a prelude to it.
+
+His example is `console`. The `console` extension is, at this point, only a prelude that makes `console.log` call `extensionsRuntime.postMessage`, which is not properly implemented yet, so it just prints its input. That makes the test proposed in [Runtime architecture proposals](Runtime_Architecture_Proposals.md), implementing `console` as an extension to see whether an extension system works at all, partly run: the loading path exists and the messaging path does not.
+
+## The FFI plan, and the `Deno.dlopen` exchange
+
+`CaptainLach` suggested using Deno-compatible FFI so that `dodo-bindgen` works with it. `andy` said the plan is more low-level than that and probably will not be Deno-compatible FFI. His stated design is that extensions talk to native system APIs directly rather than through Rust, so the extensions SDK would provide a code generator for native system API bindings from a TypeScript config file, and perhaps a standard library of very common native APIs. A Deno FFI extension might exist, and a polyfill in the SDK if people want one.
+
+`CaptainLach` replied that Deno's FFI is already low-level, just wrappers over `dlopen`, `dlsym`, and similar. `andy` first said `dodo-bindgen` assumes a Rust layer; `CaptainLach` answered that it does not, then clarified he had meant only that the runtime would implement `Deno.dlopen`, because with that one method both system libraries and `dodo-bindgen`-compiled ones can be used, and all `dodo-bindgen` wants is `Deno.dlopen`. On 2026-10-21 `andy` agreed that `Deno.dlopen` can be polyfilled. That leaves the FFI question at a workable compromise rather than a decision: the native layer is low-level and extension-facing, and a `Deno.dlopen` polyfill would be the compatibility bridge.
+
+The same native-call idea appears as `andy`'s `extensionsRuntime.nativeCall` sketch in the [sandboxed extension boundary](Sandboxed_Extension_Boundary.md) thread two days later, where it is argued against per-extension sandboxing.
 
 ## The naming objection
 
@@ -63,7 +78,7 @@ On 2026-10-19, `CaptainLach` clarified that his `dodo-bindgen` project uses `Den
 
 ## Where it stands
 
-A prototype (`dodo-x`) exists and is public, an extensions SDK CLI works, runtime extension loading is the next step and is paused, and `dodo-bindgen` exists with a stated design. The core language question that the earlier thread left open was settled by `andy` prototyping in Zig with an eventual move to Rust, which is a plan rather than a decision anyone else endorsed.
+A prototype (`dodo-x`) exists and is public, an extensions SDK CLI works, extensions load into memory as of 2026-10-21 but cannot yet talk to user code, and `dodo-bindgen` exists with a stated design. The core language question that the earlier thread left open was settled by `andy` prototyping in Zig with an eventual move to Rust, which is a plan rather than a decision anyone else endorsed.
 
 On 2026-10-18, `daniellacosse` outlined a long-term rewrite strategy: first, "lock down some kind of C ABI in the current codebase" to enable incremental rewrites of "various modules/extensions in whatever, even golang," while rigorously ensuring "xplat" (cross-platform) compatibility. He suggested that `Cyan` and `andy` collaborate on `dodo-x` (are-we-dodo-yet/dodo-x) to produce a "proposed spec and proof of concept," emphasizing the necessity of "proper mechanisms to ensure we catch any regressions" before any rewrite.
 
@@ -73,7 +88,8 @@ Nobody has reviewed the `dodo-x` prototype, and the group has not convened to co
 
 - Whether `dodo-x` keeps its name, which `CaptainLach` argues it should not while it cannot load dodo or Deno extensions.
 - Whether the rewrite or the fork wins, which `andy` proposed deciding after both have had time.
-- The path for the extension system (dynamic with a C ABI, as proposed by `daniellacosse`, or statically compiled, which `CaptainLach`'s initial bindings work implies).
+- The path for the extension system (dynamic with a C ABI, as proposed by `daniellacosse`, or statically compiled, which `CaptainLach`'s initial bindings work implies). Loading works; the inter-container communication and FFI that `andy` named as missing on 2026-10-21 decide the rest.
+- Whether `dodo-x` will provide `Deno.dlopen` as a polyfill, which `andy` allowed and which is all `CaptainLach` says `dodo-bindgen` needs.
 - Whether anyone but `andy`, `CaptainLach`, and `Cyan` (with his `origine-js/origine` project) is working in these repositories, since no other contributor appears in the thread.
 
 ## Related

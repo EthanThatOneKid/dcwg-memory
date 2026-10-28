@@ -49,6 +49,19 @@ However, `Cyan` argued on 2026-10-18 that Deno's permission system has "no clear
 
 On 2026-10-20, `Ooker` asked if, even with Node compatibility features, the effort to use add-ons remains lower than transitioning to Deno, and whether Deno could theoretically lower the transition effort to be less than the effort to stay with Node. `daniellacosse` responded that for Deno to make transition effort lower than staying with Node, it would need to become a drop-in replacement, a goal Bun targeted for its rapid adoption, noting this is a trade-off between architectural integrity and faster user adoption. `daniellacosse` clarified that 'Node compat' in Deno is primarily about accessing code in NPM, not about being a drop-in replacement that behaves exactly like Node. `daniellacosse` expressed openness to exploring additions to the 'node compat' extension to ease transition for users, but drew a line at replicating Node's 'fake permissions,' considering it 'too far'.
 
+## Trust and governance
+
+`Matthew` returned to the thread on 2026-10-21 (UTC) with a different objection from his earlier one, and it is about who maintains the result rather than the architecture. His points, as he made them:
+
+- Trust is very important. Many large companies already trust Node.js, which has a major organization behind it and many years of track record, so it could be very difficult to convince large companies to switch to a fork of Deno that has no formal structure or governance and is maintained by volunteers who might abandon it within months.
+- His ideal outcome, if possible, is for everything good about Deno to be merged into Node.js, so that as many people as possible benefit and there is less fragmentation, though architectural differences may make that difficult.
+- If Deno has a fundamentally superior architecture, an organization like the OpenJSF should adopt Deno, continue its development, and try to move as many people as possible from Node.js to Deno. He wants large companies using it and contributing, so it stays well supported and might eventually replace Node.js.
+- Security is one of Deno's major benefits, but he would trust a fork less if it is a side project of random volunteers. He would like large companies using it in production, with a strong incentive to keep it secure because they have a lot to lose.
+
+`andy` replied to `daniellacosse`'s earlier point that layering tools like Docker or Snyk on Node is cheaper at enterprise scale than porting a large codebase, with a single line: "node is insecure with monitoring". No one answered it in the thread. It is a claim, not a measurement, and it contests the "secure with addons" framing `daniellacosse` gave in the previous section.
+
+`Matthew`'s argument overlaps the funding and foundation question in [Sustaining the fork](Fork_Sustainability.md): it makes governance a precondition for adoption by exactly the companies the group would need.
+
 ## Where it stands
 
 Nothing was decided, no work follows from the thread, and no participant changed position. Its value in the record is that it states the fork's purpose in a way the architecture threads do not: if the group's runtime is a developer-experience product with opinionated defaults, then moving those features into Node is not the same project at a different scale, it is the end of the project.

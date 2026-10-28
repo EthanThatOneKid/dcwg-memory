@@ -5,27 +5,6 @@
   "1559302572974538843": "1559349752905072641",
   "_pending": [
     {
-      "capture": "raw/discord/2026-10-20_dcwg-propose.md",
-      "venue": "dcwg-propose",
-      "messages": 42,
-      "offset": 0,
-      "stalls": 1
-    },
-    {
-      "capture": "raw/discord/2026-10-21_dcwg-propose.md",
-      "venue": "dcwg-propose",
-      "messages": 58,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
-      "capture": "raw/discord/2026-10-22_dcwg-propose.md",
-      "venue": "dcwg-propose",
-      "messages": 139,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
       "capture": "raw/discord/2026-10-23_dcwg-propose.md",
       "venue": "dcwg-propose",
       "messages": 172,
