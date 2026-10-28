@@ -73,6 +73,9 @@ Only two things: that extensions should be authorable in TypeScript and Rust, an
 - [Deno Core Working Group](Deno_Core_Working_Group.md): who is in the room.
 - [Rust core rewrite proposal](Rust_Core_Proposal.md): the rewrite that got formalized on 2026-10-12, prototyped in zig first.
 - [Rust upskilling](Rust_Upskilling.md): the skill survey that followed, and what to learn before contributing to either.
+- [Sandboxed extension boundary](Sandboxed_Extension_Boundary.md): the 2026-10-22 thread testing whether extensions can be sandboxed per extension.
+- [Per-package (module-level) permissions](Per_Package_Permissions.md): the 2026-10-21 thread on permissions scoped to packages rather than the whole process.
+- [A "Killer App Framework" for Dodo](Killer_App_Framework.md): the 2026-10-21 showcase-framework proposal and the objection to it.
 - [Deno JavaScriptCore Compatibility](Deno_JavaScriptCore_Compatibility.md): `CaptainLach` reported Deno's compatibility with JavaScriptCore based on manual checks.
 
 ## Sources

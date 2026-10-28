@@ -48,6 +48,7 @@ The repository is public, so these files are readable in place. The same files a
 
 ## What is derived from them
 
+- [A "Killer App Framework" for Dodo](Killer_App_Framework.md): The 2026-10-21
 - [Benchmarking dodo](Dodo_Benchmarks.md): The 2026-10-13
 - [Celld Runtime](Celld_Runtime.md): An explanation of Celld as a lightweight, secure runtime for single-threaded JavaScript processors, its benefits for microservices, and its limited applications outside of backend environments.
 - [Deno](Deno.md): A JavaScript, TypeScript, and WebAssembly runtime built on V8 and Rust, created by Ryan Dahl and Bert Belder, whose own development ends about a year after Cloudflare acquired Deno Land Inc. on 2026-10-09.
@@ -64,10 +65,12 @@ The repository is public, so these files are readable in place. The same files a
 - [File System APIs for Deno](File_System_APIs_for_Deno.md): Discussions on potential file system APIs for Deno, comparing Origin Private File System (OPFS) with object storage and IndexedDB, considering portability, performance, and user experience.
 - [Fresh framework migration](Fresh_Framework_Migration.md): Fresh, Deno's full-stack web framework, moved out of the denoland GitHub organization into freshframework. The verified facts of that move, and which of them transfer to a runtime handoff.
 - [Luca Casonato](Luca_Casonato.md): Creator of the Fresh web framework and former Deno core team member, now at Railway; named in the group as the person who has already done a Deno-project handoff.
+- [Per-package (module-level) permissions](Per_Package_Permissions.md): The 2026-10-21
 - [Porffor JavaScript Engine](Porffor_JavaScript_Engine.md): Discussions on the Porffor JavaScript engine, including its potential use in Deno, its current limitations, and performance characteristics compared to traditional interpreters.
 - [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): The projects that already implement a minimal core with opt-in extensions, checked against live repositories on 2026-10-11, covering Andromeda and Nova, LLRT, WinterJS, workerd, Bun, and the C# hosting precedent.
 - [Runtime architecture proposals](Runtime_Architecture_Proposals.md): The 2026-10-11 architecture thread on a minimal core with opt-in extensions, the host-language question (C#, Go, Rust), extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
 - [Rust core rewrite proposal](Rust_Core_Proposal.md): The 2026-10-12
 - [Rust upskilling for the fork](Rust_Upskilling.md): The 2026-10-12
+- [Sandboxed extension boundary](Sandboxed_Extension_Boundary.md): The 2026-10-22 to 2026-10-25
 - [Sustaining the fork](Fork_Sustainability.md): The 2026-10-12
 - [WebGPU and LLM Performance](WebGPU_and_LLM_Performance.md): Claims and discussions about using WebGPU compute shaders for iOS performance and running LLMs, including challenges and architectural suggestions.
