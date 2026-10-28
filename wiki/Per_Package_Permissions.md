@@ -35,7 +35,9 @@ The thread was revived on 2026-10-24 by `davey`, who asked three things:
 - Why the context and globals must be shared, and whether something like `new Worker`, but better, could work, since Deno lets you set permissions as an argument to `Worker`.
 - On 2026-10-25, whether the runtime could offer a transparent layer, so a module believes it has the same context but is in fact limited to what its manifest grants. `davey` said they had not looked into the area and thought it would be very cool.
 
-`andy` answered that sharing context is how ES modules work, while extensions do not share it. `daniellacosse` agreed that modules and extensions are different ideas, and said modules cannot be effectively permissioned per package, but that with different contexts it becomes possible.
+`andy` answered the first two on 2026-10-24 that sharing context is how ES modules work, while extensions do not share it. `daniellacosse` agreed that modules and extensions are different ideas, and said modules cannot be effectively permissioned per package, but that with different contexts it becomes possible.
+
+On 2026-10-27 `daniellacosse` replied to `davey`'s transparent-layer suggestion that he was not sure what `davey` meant, and welcomed a sketch in code or pseudocode of the idea. Nothing came back in the capture.
 
 ## Where it stands
 

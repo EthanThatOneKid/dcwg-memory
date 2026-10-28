@@ -60,6 +60,8 @@ On 2026-10-20, `Ooker` asked if, even with Node compatibility features, the effo
 
 `andy` replied to `daniellacosse`'s earlier point that layering tools like Docker or Snyk on Node is cheaper at enterprise scale than porting a large codebase, with a single line: "node is insecure with monitoring". No one answered it in the thread. It is a claim, not a measurement, and it contests the "secure with addons" framing `daniellacosse` gave in the previous section.
 
+On 2026-10-27 (UTC) `Matthew` posted a link to `nodejs/discussions/5181`, "Future of Node.js and Deno", whose embedded text asks, in the first person, whether Deno would be worth forking and maintaining or whether its best parts could be added to Node.js. The capture does not say who opened it; `netop://ウィビ` replied as if `Matthew` had. That discussion could not be resolved through the GitHub API on 2026-10-28, so what it contains beyond the embed, and whether anyone replied, is unchecked. `netop://ウィビ` doubted it would help: he did not see the point of taking these questions to Node.js, which he said had effectively "won" by outlasting the runtime of the person who has criticized it for years, and he asked what incentive anyone on the Node.js steering committee would have to pick up slack left by someone who does not believe Deno has a future. He added that the long questions could be answered by a favorite LLM and that he would be surprised if a Node.js contributor responded. Both are his opinions, and nobody replied in the capture.
+
 `Matthew`'s argument overlaps the funding and foundation question in [Sustaining the fork](Fork_Sustainability.md): it makes governance a precondition for adoption by exactly the companies the group would need.
 
 ## Where it stands
