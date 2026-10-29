@@ -84,12 +84,21 @@ jobs:
   ingest:
     runs-on: ubuntu-latest
     env:
-      # venue=channel-id, one per line. Add a line to capture another channel.
-      # A venue is the channel plus every thread under it, so a forum works here
-      # too: its posts are threads, and each one is captured under its own heading.
+      # venue=channel-id, one per line. These are the PINNED venues: they keep their names,
+      # which are the filenames of captures already in `raw/`, and they are archived even if
+      # discovery below is off or fails. Every other public channel the bot can read is added
+      # by tools/discord/discover.ts. A venue is the channel plus every thread under it, so a
+      # forum works here too: its posts are threads, and each one is captured under its own
+      # heading.
       VENUES: |
+        dcwg-talk=1558888938842624093
         dcwg-brainstorm=1558965777850302546
         dcwg-propose=1559218298128695386
+      # Set the repository variable DCWG_DISCOVER to "false" to archive the pinned venues only.
+      # DCWG_EXCLUDE_CHANNELS is a comma- or space-separated list of channel ids to leave out
+      # even though they are public.
+      DISCOVER: ${{ vars.DCWG_DISCOVER }}
+      EXCLUDE_CHANNELS: ${{ vars.DCWG_EXCLUDE_CHANNELS }}
       # github.event.inputs is a string map that is empty on a scheduled run, so
       # every one of these falls back in the shell rather than in an expression.
       MODEL: ${{ github.event.inputs.model || vars.DCWG_MODEL }}
@@ -130,6 +139,16 @@ jobs:
           git config user.name "dcwg-ingest"
           git config user.email "dcwg-ingest@users.noreply.github.com"
           status=0
+          # Ask the server which channels are public and readable, and archive those too. The
+          # pinned list is the floor: if discovery fails for any reason it prints the pinned
+          # venues alone, so the archive never records less than it did before.
+          if [ "${DISCOVER:-true}" != "false" ]; then
+            if discovered=$(deno run -A tools/discord/discover.ts --pinned-env VENUES --exclude "${EXCLUDE_CHANNELS:-}"); then
+              VENUES="$discovered"
+            else
+              echo "::warning::channel discovery failed; archiving the pinned venues only"
+            fi
+          fi
           venue_total=$(grep -c . <<< "$VENUES")
           venue_index=0
           # Push a venue's commit, rebasing if `main` moved while the model was running.
