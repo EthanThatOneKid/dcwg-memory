@@ -62,6 +62,8 @@ His example is `console`. The `console` extension is, at this point, only a prel
 
 The same native-call idea appears as `andy`'s `extensionsRuntime.nativeCall` sketch in the [sandboxed extension boundary](Sandboxed_Extension_Boundary.md) thread two days later, where it is argued against per-extension sandboxing.
 
+On 2026-10-21 `andy` also reported a V8 problem he hit while building the prototype: with more than one `Context` in an isolate, reading fields of the window object from Rust returns `undefined`. His guess was that the global proxy behaves like the ordinary global object when there is a single context and becomes stricter when there are several, and he asked how to get the real global object. Nobody answered in the capture.
+
 ## The FFI argument of 2026-10-23
 
 On 2026-10-23 (UTC) `andy` posted a tldraw board of his thoughts on the Rust core, and `CaptainLach` answered it point by point. This is the longest technical exchange in the thread and it was unresolved when `CaptainLach` left, saying they were going in circles and that he would rephrase his objection later. The board itself is not in the capture.

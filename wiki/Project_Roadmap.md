@@ -52,3 +52,6 @@ The roadmap predates much of the discussion recorded elsewhere. The extensions i
 - [Deno Core Working Group](Deno_Core_Working_Group.md): the group the roadmap is for.
 - [Sustaining the fork](Fork_Sustainability.md): the fundraising and foundation items.
 - [Dodo's identity and the economic reality](Dodo_Identity_and_Economics.md): where the triage board was recommended to new contributors.
+- [Deno Desktop and Laufey](Deno_Desktop_and_Laufey.md): the far goal of Deno Desktop and Mobile.
+- [TypeScript 7 and type-aware tooling](TypeScript_7_and_Tooling.md): the far goal of authoring its own dependency updates.
+- [Foundation outreach and Bart's reply](Foundation_Outreach.md): the foundation and fundraising items.
