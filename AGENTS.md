@@ -145,7 +145,10 @@ range. The gates are the review step, and a failing gate reverts the pass's page
 edits while leaving the capture committed. It needs `DISCORD_BOT_TOKEN` plus the key for the
 provider the pass runs on: `ANTHROPIC_API_KEY` (the default) or `GEMINI_API_KEY`. When that key is
 unset the workflow still archives every venue (it passes `--skip-wiki` and warns), so the record
-never waits on a key and the folds stay queued until one is added. Inference is the staged pass
+never waits on a key and the folds stay queued until one is added. The workflow runs in two phases
+for the same reason: it first archives every venue with `--skip-wiki` and pushes each capture, cursor and
+queue entry, and only then folds the queue, so a fold that is rate limited, slow or killed cannot take a
+capture with it. Inference is the staged pass
 described below; the repository variables `DCWG_PROVIDER`, `DCWG_MODEL` and `DCWG_MAX_USD` repoint
 the schedule's provider, model and spend cap without editing the workflow. `DCWG_MODEL` names a
 model for one provider, so change it together with `DCWG_PROVIDER`.
