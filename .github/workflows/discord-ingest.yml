@@ -92,11 +92,11 @@ jobs:
       # venue=channel-id, one per line. These are the PINNED venues: they keep their names,
       # which are the filenames of captures already in `raw/`, and they are archived even if
       # discovery below is off or fails. Every other public channel the bot can read is added
-      # by tools/discord/discover.ts. A venue is the channel plus every thread under it, so a
+      # by tools/discord/discover.ts, but only those whose description says "This channel is indexed by AI."
+      # (public is not consent). A venue is the channel plus every thread under it, so a
       # forum works here too: its posts are threads, and each one is captured under its own
       # heading.
       VENUES: |
-        dcwg-talk=1558888938842624093
         dcwg-brainstorm=1558965777850302546
         dcwg-propose=1559218298128695386
       # Set the repository variable DCWG_DISCOVER to "false" to archive the pinned venues only.
