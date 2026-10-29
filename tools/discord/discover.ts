@@ -12,8 +12,12 @@
  * Discord's algorithm. A channel the bot cannot read is left out too, since it would fail
  * the job every day without recording anything.
  *
+ * Public is not consent, so a public channel is archived only if it also opts in: its
+ * description must say "This channel is indexed by AI." (see `INDEX_ANNOTATION`).
+ *
  * Channels the workflow already names are pinned: they keep their venue names, which are
- * the filenames of existing captures, and they are kept whatever discovery decides.
+ * the filenames of existing captures, and they are kept whatever discovery decides. Their
+ * annotation status is logged, not enforced.
  *
  * Usage:
  *   DCWG_DISCORD_BOT_TOKEN=... deno run -A discover.ts --pinned-env VENUES
@@ -55,7 +59,25 @@ export interface GuildChannel {
   type: number;
   position?: number;
   nsfw?: boolean;
+  /** The channel's description. Read to see whether the channel opts in to indexing; never logged. */
+  topic?: string | null;
   permission_overwrites?: PermissionOverwrite[];
+}
+
+/**
+ * The phrase a channel's description carries to opt in to being archived.
+ *
+ * `andy` proposed on 2026-10-16 that the memory bot watch channels whose description includes
+ * "This channel is indexed by AI." and that it "should never index channels not explicitly
+ * annotated as being indexed"; `daniellacosse` agreed and suggested an opt-out. On 2026-10-28 the
+ * server was told the archive covered only two channels. Public is not consent, so a discovered
+ * channel is archived only when it says so.
+ */
+export const INDEX_ANNOTATION = /this channel is indexed by ai/i;
+
+/** Whether a channel description opts in to being indexed. */
+export function isIndexed(topic: string | null | undefined): boolean {
+  return INDEX_ANNOTATION.test(topic ?? "");
 }
 
 export interface GuildRole {
@@ -174,6 +196,8 @@ export function discoverVenues(input: DiscoverInput): Discovery {
       skip("not public: @everyone cannot view it and read its history");
     } else if (!canRead(permissionsFor(input.guildId, input.roles, channel, input.bot))) {
       skip("the bot cannot view it and read its history");
+    } else if (!isIndexed(channel.topic)) {
+      skip("not annotated as indexed");
     } else {
       const venue = venueName(channel.name, channel.id, taken);
       taken.add(venue);
@@ -181,6 +205,27 @@ export function discoverVenues(input: DiscoverInput): Discovery {
     }
   }
   return { venues, skipped };
+}
+
+export interface PinnedStatus {
+  venue: string;
+  channel: string;
+  /** Whether the channel's description opts in; undefined when the server does not list the channel. */
+  indexed: boolean | undefined;
+}
+
+/**
+ * Whether each pinned venue's channel carries the opt-in annotation.
+ *
+ * Pinned venues are archived whatever discovery decides, because someone named them, so this
+ * only reports: a pinned channel that is not annotated is for a person to look at.
+ */
+export function pinnedStatus(channels: readonly GuildChannel[], pinned: readonly Venue[]): PinnedStatus[] {
+  const byId = new Map(channels.map((c) => [c.id, c]));
+  return pinned.map((v) => {
+    const channel = byId.get(v.channel);
+    return { ...v, indexed: channel ? isIndexed(channel.topic) : undefined };
+  });
 }
 
 /** Parse `venue=channel` lines, ignoring blanks. */
@@ -255,6 +300,14 @@ async function main(argv: string[]): Promise<number> {
       pinned,
       exclude,
     });
+    for (const p of pinnedStatus(channels, pinned)) {
+      const state = p.indexed === undefined
+        ? "not listed by the server"
+        : p.indexed
+        ? "annotated as indexed"
+        : "NOT annotated as indexed";
+      console.error(`pinned ${p.venue} (${p.channel}): ${state}`);
+    }
     for (const line of formatSkipped(skipped)) console.error(line);
     console.error(`${venues.length} venue(s): ${pinned.length} pinned, ${venues.length - pinned.length} discovered`);
     console.log(formatVenues(venues));

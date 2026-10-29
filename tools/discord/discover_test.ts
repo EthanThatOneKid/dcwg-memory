@@ -11,9 +11,11 @@ import {
   formatSkipped,
   type GuildChannel,
   type GuildRole,
+  isIndexed,
   parseIds,
   parseVenues,
   permissionsFor,
+  pinnedStatus,
   READ_MESSAGE_HISTORY,
   slugify,
   venueName,
@@ -28,8 +30,10 @@ const READ = VIEW_CHANNEL | READ_MESSAGE_HISTORY;
 const everyoneRole = (permissions: bigint): GuildRole => ({ id: GUILD, permissions: String(permissions) });
 const modsRole: GuildRole = { id: MODS, permissions: "0" };
 
+const OPT_IN = "Welcome. This channel is indexed by AI.";
+
 function channel(id: string, name: string, extra: Partial<GuildChannel> = {}): GuildChannel {
-  return { id, name, type: 0, ...extra };
+  return { id, name, type: 0, topic: OPT_IN, ...extra };
 }
 
 const deny = (id: string, bits: bigint, type = 0) => ({ id, type, allow: "0", deny: String(bits) });
@@ -202,4 +206,56 @@ Deno.test("the skipped-channel log never carries a channel name", () => {
   assertEquals(lines.includes("skipped 2 channel(s) that hold no message history"), true);
   assertEquals(lines.some((line) => line.startsWith("skipped 1: not public")), true);
   assertEquals(lines.some((line) => line === "skipped 4: age-restricted"), true);
+});
+
+Deno.test("a public channel that does not opt in is not discovered", () => {
+  const found = discover(
+    [
+      channel("1", "no-topic", { topic: null }),
+      channel("2", "other-topic", { topic: "General chat" }),
+      channel("3", "yes"),
+    ],
+    [everyoneRole(READ)],
+  );
+  assertEquals(found.venues.map((v) => v.channel), ["3"]);
+  assertEquals(found.skipped.map((s) => s.reason), ["not annotated as indexed", "not annotated as indexed"]);
+});
+
+Deno.test("the annotation is matched case-insensitively and anywhere in the description", () => {
+  assertEquals(isIndexed("THIS CHANNEL IS INDEXED BY AI"), true);
+  assertEquals(isIndexed("Rules and links. This channel is indexed by AI. Be kind."), true);
+  assertEquals(isIndexed("This channel is NOT indexed by AI"), false);
+  assertEquals(isIndexed("indexed"), false);
+  assertEquals(isIndexed(undefined), false);
+});
+
+Deno.test("a non-public channel is skipped for being non-public even when it carries the annotation", () => {
+  const found = discover(
+    [channel("1", "staff", { permission_overwrites: [deny(GUILD, VIEW_CHANNEL)] })],
+    [everyoneRole(READ)],
+  );
+  assertEquals(found.venues, []);
+  assertEquals(found.skipped[0].reason.startsWith("not public"), true);
+});
+
+Deno.test("a pinned venue is kept without the annotation, and its status is reported", () => {
+  const channels = [channel("1", "plain", { topic: "hello" }), channel("2", "marked"), channel("3", "gone")];
+  const pinned = [
+    { venue: "dcwg-plain", channel: "1" },
+    { venue: "dcwg-marked", channel: "2" },
+    { venue: "dcwg-missing", channel: "99" },
+  ];
+  const found = discover(channels.slice(0, 2), [everyoneRole(READ)], { pinned });
+  assertEquals(found.venues.map((v) => v.channel), ["1", "2", "99"]);
+  assertEquals(pinnedStatus(channels, pinned).map((p) => p.indexed), [false, true, undefined]);
+});
+
+Deno.test("the skipped log never carries a channel topic", () => {
+  const found = discover(
+    [channel("1", "x", { topic: "private notes about the staff room" })],
+    [everyoneRole(READ)],
+  );
+  const text = formatSkipped(found.skipped).join(" | ");
+  assertEquals(/private|staff|notes/i.test(text), false);
+  assertEquals(text, "skipped 1: not annotated as indexed");
 });
