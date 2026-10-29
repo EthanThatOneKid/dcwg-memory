@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 35 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 36 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -20,6 +20,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #talk — 2026-10-11](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-talk-2.md): Append-only capture of #talk from 2026-10-11T17:10:14Z to 2026-10-15T04:34:05Z, pulled from the Discord REST API. 698 messages, 104 participants.
 - [Discord #general — 2026-10-11](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-talk-3.md): Append-only capture of #general from 2026-10-11T17:29:20Z to 2026-10-28T22:13:04Z, pulled from the Discord REST API. 663 messages, 107 participants, across 8 threads.
 - [Deno Core Working Group Discord, #talk — 2026-10-11](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-talk.md): Append-only capture of one day of Deno Core Working Group Discord chatter about forking Deno after the Cloudflare acquisition: naming candidates, compatibility scope, and how to approach the current maintainers.
+- [Discord #ende — 2026-10-12](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-12_dcwg-ende.md): Append-only capture of #ende from 2026-10-12T18:46:55Z to 2026-10-28T23:07:44Z, pulled from the Discord REST API. 333 messages, 18 participants.
 - [Discord #news — 2026-10-12](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-12_dcwg-news.md): Append-only capture of #news from 2026-10-12T17:58:14Z to 2026-10-18T13:01:11Z, pulled from the Discord REST API. 8 messages, 3 participants.
 - [Discord #propose — 2026-10-12](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-12_dcwg-propose.md): Append-only capture of #propose from 2026-10-12T15:02:57Z to 2026-10-18T19:09:33Z, pulled from the Discord REST API. 180 messages, 15 participants, across 5 threads.
 - [Discord #dodoer — 2026-10-13](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-13_dcwg-dodoer.md): Append-only capture of #dodoer from 2026-10-13T14:54:10Z to 2026-10-27T14:58:42Z, pulled from the Discord REST API. 85 messages, 47 participants.
