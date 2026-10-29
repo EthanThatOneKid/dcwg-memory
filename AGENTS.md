@@ -134,8 +134,16 @@ privileged intent and no portal approval step. That intent matters only for
 live delivery over the gateway, which this connector does not use.
 
 The daily run is automated: `.github/workflows/discord-ingest.yml` runs the
-connector on a cron over the `VENUES` list, which is `#brainstorm` and
-`#propose` only. It then canonicalizes and validates its own output
+connector on a cron over every public channel the bot can read. `VENUES` in the workflow is the pinned
+list (`#talk`, `#brainstorm`, `#propose`): those keep their venue names, which are the filenames of
+existing captures, and are archived even if discovery fails. `tools/discord/discover.ts` adds the rest
+by asking the server. Because everything here is published, "public" is decided conservatively: a channel
+is listed only when `@everyone` can view it and read its history (role permissions plus the channel's own
+overwrites, Discord's algorithm) and the bot can too; age-restricted channels, voice, category and stage
+channels are never listed. The repository variable `DCWG_EXCLUDE_CHANNELS` (channel ids) leaves a public
+channel out and `DCWG_DISCOVER=false` turns discovery off. A new channel is captured from its first
+message, and each capture queues a fold, so adding channels grows the wiki's backlog, not the archive's
+risk. It then canonicalizes and validates its own output
 (`deno task gates`: fmt, the three checks, the orphan check, the thread check),
 and commits and pushes to `main`
 when they pass. It pushes rather than opening a pull request because the cursor in
@@ -145,7 +153,10 @@ range. The gates are the review step, and a failing gate reverts the pass's page
 edits while leaving the capture committed. It needs `DISCORD_BOT_TOKEN` plus the key for the
 provider the pass runs on: `ANTHROPIC_API_KEY` (the default) or `GEMINI_API_KEY`. When that key is
 unset the workflow still archives every venue (it passes `--skip-wiki` and warns), so the record
-never waits on a key and the folds stay queued until one is added. Inference is the staged pass
+never waits on a key and the folds stay queued until one is added. The workflow runs in two phases
+for the same reason: it first archives every venue with `--skip-wiki` and pushes each capture, cursor and
+queue entry, and only then folds the queue, so a fold that is rate limited, slow or killed cannot take a
+capture with it. Inference is the staged pass
 described below; the repository variables `DCWG_PROVIDER`, `DCWG_MODEL` and `DCWG_MAX_USD` repoint
 the schedule's provider, model and spend cap without editing the workflow. `DCWG_MODEL` names a
 model for one provider, so change it together with `DCWG_PROVIDER`.
