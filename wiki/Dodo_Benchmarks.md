@@ -53,6 +53,8 @@ That is the thread's sharpest question and it is a direct challenge to the modul
 
 A benchmark suite is running in the dodo repository with a workflow to publish pages, at `benches` rather than the repository root, and the group has a noise-tolerant threshold in `davey`'s 25 percent. The published Deno page is current and was judged unclear, missing cold-start disclosure and percentile breakdowns. The question of what modularization costs in lost link-time optimization is open and unmeasured.
 
+On 2026-10-20 (UTC) `CaptainLach` posted a link to the published results, `https://are-we-dodo-yet.github.io/dodo/benches/`, with a note that the current results came from a temporary repository and that CI would now run on the primary one. The page was not read for this record, so what it currently shows is unchecked. The move means the numbers on the earlier page were produced elsewhere than the repository the group now treats as primary.
+
 ## Open questions
 
 - Whether the reported numbers include cold startup, which `daniellacosse` asked and nobody answered.
