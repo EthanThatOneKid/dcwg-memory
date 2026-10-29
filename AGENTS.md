@@ -133,8 +133,9 @@ another user's message text from a channel it could see. So the archive needs no
 privileged intent and no portal approval step. That intent matters only for
 live delivery over the gateway, which this connector does not use.
 
-The daily run is automated: `.github/workflows/discord-ingest.yml` runs the
-connector on a cron over every public channel the bot can read. `VENUES` in the workflow is the pinned
+The archive run is manual: `.github/workflows/discord-ingest.yml` has no cron (removed
+2026-10-29, because the fold kept failing on the Gemini free tier) and is started by hand with
+`workflow_dispatch`, every few days. It runs the connector over every public channel the bot can read. `VENUES` in the workflow is the pinned
 list (`#talk`, `#brainstorm`, `#propose`): those keep their venue names, which are the filenames of
 existing captures, and are archived even if discovery fails. `tools/discord/discover.ts` adds the rest
 by asking the server. Because everything here is published, "public" is decided conservatively: a channel

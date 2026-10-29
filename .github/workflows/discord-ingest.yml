@@ -30,7 +30,7 @@ name: Discord ingest
 # token against a Console account's credit; a Claude chat subscription does not pay for it.
 #
 # `--provider` picks who answers: `anthropic` (the default) or `gemini`, Google's free tier.
-# The repository variable DCWG_PROVIDER repoints the daily schedule without editing this
+# The repository variable DCWG_PROVIDER repoints a run's provider without editing this
 # file, the same way DCWG_MODEL repoints the model.
 #
 # Required repository secrets:
@@ -43,9 +43,10 @@ name: Discord ingest
 # never accepts a token as a command-line argument.
 
 on:
-  schedule:
-    # 13:17 UTC = 06:17 America/Los_Angeles during PDT, 05:17 during PST.
-    - cron: "17 13 * * *"
+  # Manual only. The daily cron was removed on 2026-10-29: the wiki fold kept failing on the
+  # Gemini free tier and the automation needed repeated repair, so the archive and the fold
+  # are run by hand every few days instead. Dispatch this workflow to archive (tick
+  # skip_wiki to archive without a fold); the wiki is folded by hand from the captures.
   workflow_dispatch:
     inputs:
       dry_run:
@@ -103,7 +104,7 @@ jobs:
       # even though they are public.
       DISCOVER: ${{ vars.DCWG_DISCOVER }}
       EXCLUDE_CHANNELS: ${{ vars.DCWG_EXCLUDE_CHANNELS }}
-      # github.event.inputs is a string map that is empty on a scheduled run, so
+      # github.event.inputs is a string map that is empty on any run not started by hand, so
       # every one of these falls back in the shell rather than in an expression.
       MODEL: ${{ github.event.inputs.model || vars.DCWG_MODEL }}
       # Same shape: the repository variable DCWG_PROVIDER repoints the schedule. Unset, the
