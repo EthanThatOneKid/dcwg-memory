@@ -134,8 +134,16 @@ privileged intent and no portal approval step. That intent matters only for
 live delivery over the gateway, which this connector does not use.
 
 The daily run is automated: `.github/workflows/discord-ingest.yml` runs the
-connector on a cron over the `VENUES` list, which is `#brainstorm` and
-`#propose` only. It then canonicalizes and validates its own output
+connector on a cron over every public channel the bot can read. `VENUES` in the workflow is the pinned
+list (`#talk`, `#brainstorm`, `#propose`): those keep their venue names, which are the filenames of
+existing captures, and are archived even if discovery fails. `tools/discord/discover.ts` adds the rest
+by asking the server. Because everything here is published, "public" is decided conservatively: a channel
+is listed only when `@everyone` can view it and read its history (role permissions plus the channel's own
+overwrites, Discord's algorithm) and the bot can too; age-restricted channels, voice, category and stage
+channels are never listed. The repository variable `DCWG_EXCLUDE_CHANNELS` (channel ids) leaves a public
+channel out and `DCWG_DISCOVER=false` turns discovery off. A new channel is captured from its first
+message, and each capture queues a fold, so adding channels grows the wiki's backlog, not the archive's
+risk. It then canonicalizes and validates its own output
 (`deno task gates`: fmt, the three checks, the orphan check, the thread check),
 and commits and pushes to `main`
 when they pass. It pushes rather than opening a pull request because the cursor in
