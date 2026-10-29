@@ -8,6 +8,7 @@ import {
   ADMINISTRATOR,
   canRead,
   discoverVenues,
+  formatSkipped,
   type GuildChannel,
   type GuildRole,
   parseIds,
@@ -184,4 +185,21 @@ Deno.test("venues and ids parse from the formats the workflow passes", () => {
   assertEquals(parseVenues("a=1\n\n  b = 2  \n"), [{ venue: "a", channel: "1" }, { venue: "b", channel: "2" }]);
   assertEquals([...parseIds("1, 2\n3 x")], ["1", "2", "3"]);
   assertEquals([...parseIds(undefined)], []);
+});
+
+Deno.test("the skipped-channel log never carries a channel name", () => {
+  const found = discover(
+    [
+      channel("1", "secret-staff-room", { permission_overwrites: [deny(GUILD, VIEW_CHANNEL)] }),
+      channel("2", "Staff Voice", { type: 2 }),
+      channel("3", "Private Category", { type: 4 }),
+      channel("4", "spicy", { nsfw: true }),
+    ],
+    [everyoneRole(READ)],
+  );
+  const lines = formatSkipped(found.skipped);
+  assertEquals(lines.some((line) => /secret|staff|voice|category|spicy/i.test(line)), false);
+  assertEquals(lines.includes("skipped 2 channel(s) that hold no message history"), true);
+  assertEquals(lines.some((line) => line.startsWith("skipped 1: not public")), true);
+  assertEquals(lines.some((line) => line === "skipped 4: age-restricted"), true);
 });

@@ -56,6 +56,10 @@ on:
         description: "Capture only; do not touch the wiki pages"
         type: boolean
         default: false
+      discover_only:
+        description: "List the venues channel discovery would archive, then stop. Nothing is fetched, committed or folded, and no channel content is logged. Use this, not dry_run, to preview: dry_run prints each capture's text to this public log"
+        type: boolean
+        default: false
       provider:
         description: "Who answers the wiki pass: anthropic or gemini. Blank = the repository variable DCWG_PROVIDER, else anthropic"
         type: string
@@ -108,6 +112,7 @@ jobs:
       PROVIDER: ${{ github.event.inputs.provider || vars.DCWG_PROVIDER }}
       # Same shape as MODEL: the repository variable DCWG_MAX_USD tunes the schedule's cap.
       MAX_USD: ${{ github.event.inputs.max_usd || vars.DCWG_MAX_USD }}
+      DISCOVER_ONLY: ${{ github.event.inputs.discover_only }}
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       SKIP_WIKI: ${{ github.event.inputs.skip_wiki }}
       DRAIN: ${{ github.event.inputs.drain }}
@@ -142,7 +147,7 @@ jobs:
           # Ask the server which channels are public and readable, and archive those too. The
           # pinned list is the floor: if discovery fails for any reason it prints the pinned
           # venues alone, so the archive never records less than it did before.
-          if [ "${DISCOVER:-true}" != "false" ]; then
+          if [ "${DISCOVER:-true}" != "false" ] || [ "${DISCOVER_ONLY:-false}" = "true" ]; then
             if discovered=$(deno run -A tools/discord/discover.ts --pinned-env VENUES --exclude "${EXCLUDE_CHANNELS:-}"); then
               VENUES="$discovered"
             else
@@ -150,6 +155,11 @@ jobs:
             fi
           fi
           venue_total=$(grep -c . <<< "$VENUES")
+          if [ "${DISCOVER_ONLY:-false}" = "true" ]; then
+            echo "discover_only: $venue_total venue(s) would be archived:"
+            echo "$VENUES"
+            exit 0
+          fi
           venue_index=0
           # Push a venue's commit, rebasing if `main` moved while the model was running.
           # The runner is ephemeral, so a rejected push would drop the venue's commit;

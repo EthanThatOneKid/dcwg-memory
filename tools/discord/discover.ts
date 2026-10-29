@@ -205,6 +205,24 @@ export function formatVenues(venues: readonly Venue[]): string {
   return venues.map((v) => `${v.venue}=${v.channel}`).join("\n");
 }
 
+/**
+ * The log lines for the channels discovery left out.
+ *
+ * This runs in a public repository's Actions log, so a skipped channel is named by id
+ * only. The channels it skips are mostly the ones that are not public, and a private
+ * channel's name is itself something the server did not publish. Channels with no message
+ * history (voice, category, stage) are one count, since nothing about them needs a line.
+ */
+export function formatSkipped(skipped: readonly Skipped[]): string[] {
+  const lines: string[] = [];
+  const noHistory = skipped.filter((s) => s.reason.startsWith("type "));
+  for (const s of skipped) {
+    if (!s.reason.startsWith("type ")) lines.push(`skipped ${s.channel}: ${s.reason}`);
+  }
+  if (noHistory.length) lines.push(`skipped ${noHistory.length} channel(s) that hold no message history`);
+  return lines;
+}
+
 async function main(argv: string[]): Promise<number> {
   const opts = new Map<string, string>();
   for (let i = 0; i < argv.length; i++) {
@@ -237,7 +255,7 @@ async function main(argv: string[]): Promise<number> {
       pinned,
       exclude,
     });
-    for (const s of skipped) console.error(`skipped #${s.name} (${s.channel}): ${s.reason}`);
+    for (const line of formatSkipped(skipped)) console.error(line);
     console.error(`${venues.length} venue(s): ${pinned.length} pinned, ${venues.length - pinned.length} discovered`);
     console.log(formatVenues(venues));
     return 0;

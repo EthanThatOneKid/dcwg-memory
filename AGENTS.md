@@ -141,7 +141,10 @@ by asking the server. Because everything here is published, "public" is decided 
 is listed only when `@everyone` can view it and read its history (role permissions plus the channel's own
 overwrites, Discord's algorithm) and the bot can too; age-restricted channels, voice, category and stage
 channels are never listed. The repository variable `DCWG_EXCLUDE_CHANNELS` (channel ids) leaves a public
-channel out and `DCWG_DISCOVER=false` turns discovery off. A new channel is captured from its first
+channel out and `DCWG_DISCOVER=false` turns discovery off. Discovery logs a skipped channel by id only,
+never by name, because the Actions log is public and most skipped channels are private. To preview what
+a run would archive, dispatch the workflow with `discover_only`, which lists the venues and stops. Do
+not use `dry_run` for that: it prints each capture's text to the public log. A new channel is captured from its first
 message, and each capture queues a fold, so adding channels grows the wiki's backlog, not the archive's
 risk. It then canonicalizes and validates its own output
 (`deno task gates`: fmt, the three checks, the orphan check, the thread check),
