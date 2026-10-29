@@ -75,6 +75,7 @@ Only two things: that extensions should be authorable in TypeScript and Rust, an
 - [Rust upskilling](Rust_Upskilling.md): the skill survey that followed, and what to learn before contributing to either.
 - [Sandboxed extension boundary](Sandboxed_Extension_Boundary.md): the 2026-10-22 thread testing whether extensions can be sandboxed per extension.
 - [Per-package (module-level) permissions](Per_Package_Permissions.md): the 2026-10-21 thread on permissions scoped to packages rather than the whole process.
+- [Standard libraries and extensions](Std_Libraries_and_Extensions.md): where a standard library ends and an extension begins, a shared `Runtime` global, and a manifest.
 - [A "Killer App Framework" for Dodo](Killer_App_Framework.md): the 2026-10-21 showcase-framework proposal and the objection to it.
 - [Deno JavaScriptCore Compatibility](Deno_JavaScriptCore_Compatibility.md): `CaptainLach` reported Deno's compatibility with JavaScriptCore based on manual checks.
 

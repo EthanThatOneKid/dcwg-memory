@@ -12,6 +12,10 @@ Its extension set is `broadcast_channel`, `cache_storage`, `canvas`, `console`, 
 
 What Andromeda is not is a Deno replacement, and the reason is its engine. Its `Cargo.toml` pins `nova_vm` from `trynova/nova` and names no `v8`, no `deno_core`, and no other engine, so it does not execute V8-hosted Deno code. Nova's own crate documentation describes an interpreter-oriented engine that prioritizes embedding and ergonomics over raw speed and does not implement the entire language, naming the absence of WebAssembly.[^3]
 
+## Andromeda's developers in the server
+
+On 2026-10-15 (UTC) `daniellacosse` pinged two people in the new `#andromeda` channel. `andy` asked whether `loading...` is the developer of Andromeda, and `daniellacosse` added a second mention; `marc` then answered "Yes" and greeted the channel. The capture does not make clear which of the two answered for which, so it records only that the Andromeda developers joined the server that day. Later in the same channel `loading...` posted a link to a full-stack app he was testing on Andromeda, a "forkable lists" site, and asked for more users to try it. The link was not visited for this record. The `#roadmap` channel, posted the next day, lists `@std` as owned jointly by the `#andromeda` and `#ende` channels; see [Dodo project roadmap](Project_Roadmap.md) and [JSR and the package registry](JSR_and_Package_Registry.md).
+
 ## What the projects cost and what they produced
 
 | Project                  | Host language | Engine         | Position                                           | Read 2026-10-11                                                                                  |
