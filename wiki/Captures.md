@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 34 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 35 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -24,6 +24,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #propose — 2026-10-12](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-12_dcwg-propose.md): Append-only capture of #propose from 2026-10-12T15:02:57Z to 2026-10-18T19:09:33Z, pulled from the Discord REST API. 180 messages, 15 participants, across 5 threads.
 - [Discord #dodoer — 2026-10-13](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-13_dcwg-dodoer.md): Append-only capture of #dodoer from 2026-10-13T14:54:10Z to 2026-10-27T14:58:42Z, pulled from the Discord REST API. 85 messages, 47 participants.
 - [Discord #rust-resources — 2026-10-14](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-14_dcwg-rust-resources.md): Append-only capture of #rust-resources from 2026-10-14T22:59:08Z to 2026-10-14T23:54:04Z, pulled from the Discord REST API. 4 messages, 2 participants.
+- [Discord #andromeda — 2026-10-15](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-15_dcwg-andromeda.md): Append-only capture of #andromeda from 2026-10-15T19:37:58Z to 2026-10-15T20:00:32Z, pulled from the Discord REST API. 10 messages, 5 participants.
 - [Discord #talk — 2026-10-15](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-15_dcwg-talk.md): Append-only capture of #talk from 2026-10-15T09:51:45Z to 2026-10-15T16:19:41Z, pulled from the Discord REST API. 80 messages, 10 participants.
 - [Discord #roadmap — 2026-10-16](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-16_dcwg-roadmap.md): Append-only capture of #roadmap from 2026-10-16T15:45:22Z to 2026-10-17T17:15:17Z, pulled from the Discord REST API. 3 messages, 1 participants.
 - [Discord #brainstorm — 2026-10-18](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-18_dcwg-brainstorm-2.md): Append-only capture of #brainstorm from 2026-10-18T19:13:27Z to 2026-10-18T19:25:54Z, pulled from the Discord REST API. 12 messages, 3 participants.
