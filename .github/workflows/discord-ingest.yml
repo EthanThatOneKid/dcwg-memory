@@ -145,10 +145,15 @@ jobs:
             echo "push failed: rebasing onto origin/main did not succeed"
             return 1
           }
-          while IFS='=' read -r venue channel; do
-            [ -z "$venue" ] && continue
+          # Two phases, so the record never waits on the wiki. The archive phase captures every
+          # venue with --skip-wiki and pushes it before any model is called: the capture, the
+          # cursor, and the queue entry that records what the wiki still owes. The fold phase
+          # then works the queue. A fold that runs long, is rate limited, or dies cannot take
+          # a capture with it, because the capture is already on `main` by then.
+          run_venue() {
+            local phase="$1" venue="$2" channel="$3"
             venue_index=$((venue_index + 1))
-            echo "::group::$venue ($channel) [$venue_index/$venue_total]"
+            echo "::group::$venue ($channel) [$phase $venue_index/$venue_total]"
             # Start this venue from a clean tree. A venue that died mid-pass can leave
             # edited or brand-new files behind, and `git add -A wiki` would then carry
             # them into the next venue's commit. `.dcwg` goes too, so the marker that
@@ -159,22 +164,18 @@ jobs:
             # --limit 0 drains the backlog, so a daily run cannot leave a gap
             # behind a message cap.
             args=(--channel "$channel" --venue "$venue" --root . --limit 0)
-            # Only pin a model when one was asked for: the connector names its own default.
-            if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
-            # The pass's own spend cap; unset means the connector's default.
-            if [ -n "${MAX_USD:-}" ]; then args+=(--max-usd "$MAX_USD"); fi
-            # Without a key the wiki pass cannot run. The capture is the record and must not
-            # wait on one, so the venue is archived and its fold stays queued for a run
-            # that has the key.
-            if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
-            if [ "${PROVIDER:-anthropic}" = "gemini" ]; then key_name=GEMINI_API_KEY; else key_name=ANTHROPIC_API_KEY; fi
-            if [ -z "${!key_name:-}" ]; then
-              echo "::warning::$key_name is not set; archiving $venue without a wiki pass"
+            if [ "$phase" = "archive" ]; then
+              # Capture only. No model, no key, nothing that can fail for want of budget.
               args+=(--skip-wiki)
+            else
+              # Only pin a model when one was asked for: the connector names its own default.
+              if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
+              # The pass's own spend cap; unset means the connector's default.
+              if [ -n "${MAX_USD:-}" ]; then args+=(--max-usd "$MAX_USD"); fi
+              if [ -n "${PROVIDER:-}" ]; then args+=(--provider "$PROVIDER"); fi
+              [ "${DRAIN:-false}" = "true" ] && args+=(--drain)
             fi
             [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
-            [ "${SKIP_WIKI:-false}" = "true" ] && args+=(--skip-wiki)
-            [ "${DRAIN:-false}" = "true" ] && args+=(--drain)
             if ! deno run -A tools/discord/ingest.ts "${args[@]}"; then
               status=1
             fi
@@ -195,18 +196,43 @@ jobs:
               git add -A -- wiki/Captures.md
               if [ -f .dcwg/pages-ok ]; then
                 git add -A wiki
-              else
+              elif [ "$phase" = "fold" ]; then
                 echo "no pages-ok marker for $venue: committing the capture and its index only"
               fi
               if git diff --cached --quiet; then
                 echo "nothing to commit for $venue"
               else
-                git commit -q -m "ingest: $venue Discord activity for $(date -u +%Y-%m-%d)"
+                if [ "$phase" = "archive" ]; then
+                  git commit -q -m "ingest: $venue Discord activity for $(date -u +%Y-%m-%d)"
+                else
+                  git commit -q -m "ingest: $venue wiki fold for $(date -u +%Y-%m-%d)"
+                fi
                 push_main || status=1
               fi
             fi
             echo "::endgroup::"
+          }
+
+          # Phase 1: archive every venue. This is the record and it runs first, unconditionally.
+          while IFS='=' read -r venue channel; do
+            [ -z "$venue" ] && continue
+            run_venue archive "$venue" "$channel"
           done <<< "$VENUES"
+
+          # Phase 2: fold the queue. Without the provider's key the pass cannot run, so the
+          # fold stays queued for a run that has it; the archive above does not wait on one.
+          if [ "${PROVIDER:-anthropic}" = "gemini" ]; then key_name=GEMINI_API_KEY; else key_name=ANTHROPIC_API_KEY; fi
+          if [ "${SKIP_WIKI:-false}" = "true" ]; then
+            echo "skip_wiki is set: archived without a wiki pass"
+          elif [ -z "${!key_name:-}" ]; then
+            echo "::warning::$key_name is not set; archived without a wiki pass"
+          else
+            venue_index=0
+            while IFS='=' read -r venue channel; do
+              [ -z "$venue" ] && continue
+              run_venue fold "$venue" "$channel"
+            done <<< "$VENUES"
+          fi
           exit "$status"
 
       - name: Report what changed
