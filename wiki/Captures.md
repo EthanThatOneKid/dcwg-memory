@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 30 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 31 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -22,6 +22,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Deno Core Working Group Discord, #talk — 2026-10-11](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-11_dcwg-talk.md): Append-only capture of one day of Deno Core Working Group Discord chatter about forking Deno after the Cloudflare acquisition: naming candidates, compatibility scope, and how to approach the current maintainers.
 - [Discord #propose — 2026-10-12](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-12_dcwg-propose.md): Append-only capture of #propose from 2026-10-12T15:02:57Z to 2026-10-18T19:09:33Z, pulled from the Discord REST API. 180 messages, 15 participants, across 5 threads.
 - [Discord #talk — 2026-10-15](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-15_dcwg-talk.md): Append-only capture of #talk from 2026-10-15T09:51:45Z to 2026-10-15T16:19:41Z, pulled from the Discord REST API. 80 messages, 10 participants.
+- [Discord #roadmap — 2026-10-16](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-16_dcwg-roadmap.md): Append-only capture of #roadmap from 2026-10-16T15:45:22Z to 2026-10-17T17:15:17Z, pulled from the Discord REST API. 3 messages, 1 participants.
 - [Discord #brainstorm — 2026-10-18](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-18_dcwg-brainstorm-2.md): Append-only capture of #brainstorm from 2026-10-18T19:13:27Z to 2026-10-18T19:25:54Z, pulled from the Discord REST API. 12 messages, 3 participants.
 - [Discord #brainstorm — 2026-10-18](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-18_dcwg-brainstorm-3.md): Append-only capture of #brainstorm from 2026-10-18T19:27:40Z to 2026-10-18T19:39:58Z, pulled from the Discord REST API. 14 messages, 3 participants.
 - [Discord #brainstorm — 2026-10-18](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-18_dcwg-brainstorm-4.md): Append-only capture of #brainstorm from 2026-10-18T21:16:27Z to 2026-10-19T15:45:48Z, pulled from the Discord REST API. 28 messages, 6 participants.
