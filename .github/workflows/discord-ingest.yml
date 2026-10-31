@@ -104,6 +104,10 @@ jobs:
       # even though they are public.
       DISCOVER: ${{ vars.DCWG_DISCOVER }}
       EXCLUDE_CHANNELS: ${{ vars.DCWG_EXCLUDE_CHANNELS }}
+      # Discovery archives only channels annotated "This channel is indexed by AI." unless the
+      # repository variable DCWG_REQUIRE_ANNOTATION is exactly "false", which archives every public
+      # channel (with the exclusions above). Set it only with moderators' agreement.
+      REQUIRE_ANNOTATION: ${{ vars.DCWG_REQUIRE_ANNOTATION }}
       # github.event.inputs is a string map that is empty on any run not started by hand, so
       # every one of these falls back in the shell rather than in an expression.
       MODEL: ${{ github.event.inputs.model || vars.DCWG_MODEL }}
@@ -149,7 +153,7 @@ jobs:
           # pinned list is the floor: if discovery fails for any reason it prints the pinned
           # venues alone, so the archive never records less than it did before.
           if [ "${DISCOVER:-true}" != "false" ] || [ "${DISCOVER_ONLY:-false}" = "true" ]; then
-            if discovered=$(deno run -A tools/discord/discover.ts --pinned-env VENUES --exclude "${EXCLUDE_CHANNELS:-}"); then
+            if discovered=$(deno run -A tools/discord/discover.ts --pinned-env VENUES --exclude "${EXCLUDE_CHANNELS:-}" --require-annotation "${REQUIRE_ANNOTATION:-true}"); then
               VENUES="$discovered"
             else
               echo "::warning::channel discovery failed; archiving the pinned venues only"
