@@ -259,3 +259,22 @@ Deno.test("the skipped log never carries a channel topic", () => {
   assertEquals(/private|staff|notes/i.test(text), false);
   assertEquals(text, "skipped 1: not annotated as indexed");
 });
+
+Deno.test("with the annotation requirement off, unannotated public channels are discovered, private ones still are not", () => {
+  const found = discover(
+    [
+      channel("1", "plain", { topic: null }),
+      channel("2", "marked"),
+      channel("3", "staff", { topic: null, permission_overwrites: [deny(GUILD, VIEW_CHANNEL)] }),
+      channel("4", "spicy", { topic: null, nsfw: true }),
+    ],
+    [everyoneRole(READ)],
+    { requireAnnotation: false },
+  );
+  assertEquals(found.venues.map((v) => v.channel), ["1", "2"]);
+});
+
+Deno.test("the annotation is required unless the caller says otherwise", () => {
+  const found = discover([channel("1", "plain", { topic: null })], [everyoneRole(READ)], {});
+  assertEquals(found.venues, []);
+});

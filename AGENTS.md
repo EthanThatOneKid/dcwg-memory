@@ -141,10 +141,14 @@ existing captures, and are archived even if discovery fails. `tools/discord/disc
 by asking the server. Because everything here is published, "public" is decided conservatively: a channel
 is listed only when `@everyone` can view it and read its history (role permissions plus the channel's own
 overwrites, Discord's algorithm) and the bot can too; age-restricted channels, voice, category and stage
-channels are never listed. Public is not consent either: a discovered channel is archived only if its
-description says "This channel is indexed by AI." (`andy`'s rule of 2026-10-16, which `daniellacosse` agreed with;
-on 2026-10-28 the server was told the archive covered `#brainstorm` and `#propose` only). Pinned channels are
-reported, not enforced. The repository variable `DCWG_EXCLUDE_CHANNELS` (channel ids) leaves a public
+channels are never listed. Public is not consent either, so by default a discovered channel is archived
+only if its description says "This channel is indexed by AI." (`andy`'s rule of 2026-10-16, which `daniellacosse`
+agreed with; on 2026-10-28 the server was told the archive covered `#brainstorm` and `#propose` only). On
+2026-10-31 Ethan reported that a moderator had given permission to archive all public channels; the moderator and the
+message are not in the record, so ask for it to be stated in the server. The repository variable
+`DCWG_REQUIRE_ANNOTATION` set to exactly `false` drops the annotation requirement (public, readable, and
+non-excluded channels are then archived); unset, or any other value, keeps it. Pinned channels are reported, not
+enforced. The repository variable `DCWG_EXCLUDE_CHANNELS` (channel ids) leaves a public
 channel out and `DCWG_DISCOVER=false` turns discovery off. Discovery logs a skipped channel by id only,
 never by name, because the Actions log is public and most skipped channels are private. To preview what
 a run would archive, dispatch the workflow with `discover_only`, which lists the venues and stops. Do
