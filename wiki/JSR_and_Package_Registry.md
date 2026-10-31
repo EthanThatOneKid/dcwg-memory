@@ -37,6 +37,8 @@ JSR is the package registry Deno's ecosystem publishes to, and it is where Ende 
 
 `netop://ウィビ` said his frustration with JSR led him to put a package manager on his roadmap, at `pm.ende.sh` instead of a new domain, because it seems odd to him that npm and JSR live apart from their frameworks. On 2026-10-21 `CaptainLach` pointed out a consequence of Ende rejecting `npm:` specifiers: proper private registries are out unless someone adds multi-registry JSR support and forks JSR so that it no longer depends on Google Cloud, which he described disparagingly. `netop://ウィビ` said he intends to fork JSR at some point, but not yet. `Stag Math` said he thought Cloudflare is supposed to continue to manage and support JSR. That belief was not checked here. `daniellacosse` answered that `Stag Math` did not understand `netop://ウィビ`, in the sense that forking JSR is just the kind of project he would take on, and `netop://ウィビ` agreed, "I'm insane."
 
+On 2026-10-30 a newcomer offered in `#brainstorm` to help maintain the standard library and official TypeScript packages. `daniellacosse` replied that the group has discussed sharing `@std` ownership with the `#ende` and `#andromeda` channels and pointed them there. That is the first record of anyone volunteering for the shared-standard-library idea; no owner has been named.
+
 ## Open questions
 
 - Whether JSR's pending-package and rate-limit problems are fixed or only worked around for a few scopes.
