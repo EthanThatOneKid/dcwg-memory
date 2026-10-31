@@ -60,26 +60,38 @@ The repository is public, so these files are readable in place. The same files a
 - [A "Killer App Framework" for Dodo](Killer_App_Framework.md): The 2026-10-21
 - [Benchmarking dodo](Dodo_Benchmarks.md): The 2026-10-13
 - [Celld Runtime](Celld_Runtime.md): An explanation of Celld as a lightweight, secure runtime for single-threaded JavaScript processors, its benefits for microservices, and its limited applications outside of backend environments.
+- [CI and release cadence](CI_and_Release_Cadence.md): The 2026-10-14 to 2026-10-17
+- [Community and press reaction](Community_and_Press_Reaction.md): The videos, articles, and posts about Deno's move to Cloudflare and about the forks that `#general` participants shared between 2026-10-15 and 2026-10-28, and what the group said about them.
 - [Deno](Deno.md): A JavaScript, TypeScript, and WebAssembly runtime built on V8 and Rust, created by Ryan Dahl and Bert Belder, whose own development ends about a year after Cloudflare acquired Deno Land Inc. on 2026-10-09.
 - [Deno Core Working Group](Deno_Core_Working_Group.md): An informal group of Deno users organizing on Discord to keep the runtime alive after Cloudflare acquired Deno Land Inc. and Deno ended its own runtime development.
 - [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md): The Discord handles visible in the group's #talk capture, with the public identity behind each handle where one could be confirmed.
 - [Deno Deploy Architecture](Deno_Deploy_Architecture.md): An analysis of Deno Deploy's architecture, including historical insights, current operating mechanisms, and discussions on resource usage and feasibility of replication.
+- [Deno Desktop and Laufey](Deno_Desktop_and_Laufey.md): The 2026-10-16 to 2026-10-27 discussion of Deno Desktop's webview layer Laufey, a contributor's open fixes, whether to switch to wry, the licensing and CLA question, and a competing fork.
 - [Deno fork options and naming](Deno_Fork_Options.md): The two-fork thesis, the naming candidates weighed on 2026-10-11 (Ende, dodo, endo, noend, Pteryx), and what the group agreed a fork must preserve.
 - [Deno JavaScriptCore Compatibility](Deno_JavaScriptCore_Compatibility.md): CaptainLach reported that Deno works perfectly fine with JavaScriptCore, based on manual checks.
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): What a community handoff of the Deno runtime, std, and rusty_v8 would have to transfer, split into what is possible, what needs negotiation, and what is not on the table.
 - [Deno versus Node features](Deno_vs_Node_Features.md): The 2026-10-16
+- [Dodo branding, namespaces, and website](Dodo_Branding_and_Namespaces.md): How the group claimed JSR scopes, chose and hunted for a domain, designed the Dodo logo, and started the website between 2026-10-12 and 2026-10-23.
+- [Dodo project roadmap](Project_Roadmap.md): The now, near and far roadmap that daniellacosse posted to
 - [Dodo's Identity and Economic Reality](Dodo_Identity_and_Economics.md): A 2026-10-18 #propose thread discussing Dodo's identity as an embeddable runtime, its modular architecture, and economic models for funding maintainers, including challenges like JITless platforms and Node.js compatibility.
-- [Ende](Ende_Runtime.md): A planned drop-in Deno fork by Paul Anthony Webb that keeps the namespace for compatibility and drops Node compatibility, Deno Deploy, KV, and Jupyter; not public yet, soft launch planned for December 2026.
+- [Ende](Ende_Runtime.md): A Deno fork by Paul Anthony Webb that keeps the Deno namespace and drops Node compatibility, Deno Deploy, KV, and Jupyter; public since 2026-10-13, first release v2026.10.14, with its own docs site and standard library.
 - [Ende vs Dodo](Ende_vs_Dodo.md): Why Ende and Dodo are not competing runtimes. Ende is a fork with an owner, a registered namespace, and a published roadmap; Dodo is a name the group liked for a compatibility fork that nobody has started.
 - [File System APIs for Deno](File_System_APIs_for_Deno.md): Discussions on potential file system APIs for Deno, comparing Origin Private File System (OPFS) with object storage and IndexedDB, considering portability, performance, and user experience.
+- [Foundation outreach and Bart's reply](Foundation_Outreach.md): The working group's contact with Deno's Bartek Iwańczuk from 2026-10-15 to 2026-10-28, what he said about a Deno foundation and about upstreaming fork changes, and how the group reacted, including whether Dodo should exist if a foundation does.
 - [Fresh framework migration](Fresh_Framework_Migration.md): Fresh, Deno's full-stack web framework, moved out of the denoland GitHub organization into freshframework. The verified facts of that move, and which of them transfer to a runtime handoff.
+- [JSR and the package registry](JSR_and_Package_Registry.md): What the 2026-10-16 to 2026-10-21
 - [Luca Casonato](Luca_Casonato.md): Creator of the Fresh web framework and former Deno core team member, now at Railway; named in the group as the person who has already done a Deno-project handoff.
 - [Per-package (module-level) permissions](Per_Package_Permissions.md): The 2026-10-21
 - [Porffor JavaScript Engine](Porffor_JavaScript_Engine.md): Discussions on the Porffor JavaScript engine, including its potential use in Deno, its current limitations, and performance characteristics compared to traditional interpreters.
 - [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md): The projects that already implement a minimal core with opt-in extensions, checked against live repositories on 2026-10-11, covering Andromeda and Nova, LLRT, WinterJS, workerd, Bun, and the C# hosting precedent.
+- [Projects that depend on Deno](Deno_Dependents.md): The list of GitHub repositories that depend on Deno, filtered by popularity, that w compiled on 2026-10-11 as potential allies, with the caveats the thread attached to it.
 - [Runtime architecture proposals](Runtime_Architecture_Proposals.md): The 2026-10-11 architecture thread on a minimal core with opt-in extensions, the host-language question (C#, Go, Rust), extensions authored in TypeScript, console as an extension, and the fork-versus-rewrite order of operations.
 - [Rust core rewrite proposal](Rust_Core_Proposal.md): The 2026-10-12
 - [Rust upskilling for the fork](Rust_Upskilling.md): The 2026-10-12
 - [Sandboxed extension boundary](Sandboxed_Extension_Boundary.md): The 2026-10-22 to 2026-10-25
+- [Self-hosted deploy platform](Self_Hosted_Deploy_Platform.md): CaptainLach's standalone, self-hosted implementation of a Deno Deploy-style platform, as described in
+- [Server rules and announcements](Server_Rules_and_Announcements.md): The four server rules posted in
+- [Standard libraries and extensions](Std_Libraries_and_Extensions.md): The 2026-10-16
 - [Sustaining the fork](Fork_Sustainability.md): The 2026-10-12
+- [TypeScript 7 and type-aware tooling](TypeScript_7_and_Tooling.md): The 2026-10-17 to 2026-10-21 discussion of how a Dodo fork keeps up with TypeScript 7, the Rust port tsrs, and what type-aware linting needs, and why TypeScript upgrades fall outside Deno's promised maintenance.
 - [WebGPU and LLM Performance](WebGPU_and_LLM_Performance.md): Claims and discussions about using WebGPU compute shaders for iOS performance and running LLMs, including challenges and architectural suggestions.

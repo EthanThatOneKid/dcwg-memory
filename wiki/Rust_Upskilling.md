@@ -64,6 +64,10 @@ The advice on where growth actually happens is the same as the group's earlier p
 
 `Sandeep Kumar Kuanar✌🏼` summarized his options as three routes: work through the embedding guide, read Deno pull requests and reverse engineer upward, or pick something small and ask for help when stuck. `w`'s answer was to do some of the first with a good stopping point decided in advance, the third if he already has something in mind, and the second if he needs to find a third.
 
+## Resources shared in `#rust-resources`
+
+On 2026-10-14 (UTC) `andy` opened a `#rust-resources` channel with tips for writing Rust: use `bacon`, a background code checker he called pretty rad, and watch the "No Boilerplate" video series on Rust, which he said helps less with how to write Rust than with how to think in a Rusty way. `CaptainLach` added `clippy`, the built-in linter, whose diagnostics he said teach code quality and idiom. These are recommendations from two participants, not material the group has adopted. The channel was first captured on 2026-10-29 and holds these four messages.
+
 ## Where it stands
 
 No hackathon was scheduled, no concept list was written, no skill register was created, and nobody was assigned anything. `w` also said plainly what the project does not have: someone to say "Sandeep, please do X". The learning question is answered in the thread and unowned, which is the same state as most of what the group has discussed.

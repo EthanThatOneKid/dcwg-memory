@@ -42,7 +42,7 @@ Two captures so far: `raw/discord/2026-10-11_dcwg-talk.md`, the group's `#talk` 
 
 ## Outreach
 
-Ethan reported on 2026-10-11 that he had reached out to Divy and Crowl: Divy Srivastava (`littledivy`) and Leo Kettmeir (`crowlKats`), both of Deno. Whether they responded is not in the capture. `daniellacosse` asked whether anyone already has a relationship with the current core maintainers; nobody answered before the capture ends. Reaching out to Luca Casonato, raised by `W7T2A` and seconded by Max P., was still just a proposal. See [Luca Casonato](Luca_Casonato.md) and [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md).
+Ethan reported on 2026-10-11 that he had reached out to Divy and Crowl: Divy Srivastava (`littledivy`) and Leo Kettmeir (`crowlKats`), both of Deno. Whether they responded is not in the capture. The later contact with Bart, the Deno team member who runs the foundation effort, and his 2026-10-28 reply are in [Foundation outreach and Bart's reply](Foundation_Outreach.md). `daniellacosse` asked whether anyone already has a relationship with the current core maintainers; nobody answered before the capture ends. Reaching out to Luca Casonato, raised by `W7T2A` and seconded by Max P., was still just a proposal. See [Luca Casonato](Luca_Casonato.md) and [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md).
 
 ## Related
 
@@ -56,3 +56,10 @@ Ethan reported on 2026-10-11 that he had reached out to Divy and Crowl: Divy Sri
 - [Deno versus Node features](Deno_vs_Node_Features.md): whether the project's purpose is to stay a distinct runtime at all.
 - [Fork sustainability](Fork_Sustainability.md): how the group proposed to pay for any of it.
 - [Rust upskilling](Rust_Upskilling.md): the skill survey and what to learn first.
+- [Dodo project roadmap](Project_Roadmap.md): the now, near, and far plan posted to the roadmap channel.
+- [Server rules and announcements](Server_Rules_and_Announcements.md): the four rules and the announcements channel.
+- [CI and release cadence](CI_and_Release_Cadence.md): how long the forks' CI runs and what Ende changed.
+- [JSR and the package registry](JSR_and_Package_Registry.md): publishing limits, stuck packages, and who owns the standard library.
+- [Foundation outreach and Bart's reply](Foundation_Outreach.md): contact with the Deno team and what Dodo is for if a foundation forms.
+- [Dodo branding, namespaces, and website](Dodo_Branding_and_Namespaces.md): scopes, domain hunting, the logo, and the website.
+- [Community and press reaction](Community_and_Press_Reaction.md): the videos and articles the group shared and discussed.

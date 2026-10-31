@@ -20,8 +20,18 @@ These are not two forks. They are a project and a preference. [Ende](Ende_Runtim
 | Scope             | Keeps the namespace, drops Node compatibility, Deno Deploy, KV, and Jupyter               | Keeps Deno as it is: LTS, security patches, the permission model, with extensions like KV later                                                           |
 | Namespace claimed | GitHub org `theende` and JSR scope `ende` on 2026-10-10, plus `ende.sh`                   | Nothing. JSR scope `dodo` is free; GitHub `dodo`, npm `dodo`, and crates.io `dodo` are all taken                                                          |
 | Default branch    | `main` (assumed)                                                                          | Experimented with `trunk` (renamed from `main`), but switched back to `main` (2026-10-14T20:08:57Z `CaptainLach`)                                         |
-| Public code       | None. Development happens on the author's own infrastructure at `eol.sh`                  | None                                                                                                                                                      |
-| Timeline          | Soft launch in December 2026, the author's own schedule                                   | None                                                                                                                                                      |
+| Public code       | `theende/ende` and `theende/std`, public since 2026-10-13; first release `v2026.10.14`    | `are-we-dodo-yet/dodo` (created 2026-10-12) and the `dodo-x` prototype, with no runnable build as of 2026-10-28                                           |
+| Timeline          | Released; the December soft launch in the 2026-10-11 post was overtaken                   | Awaiting a reply the group refers to as Bart's; see [Dodo project roadmap](Project_Roadmap.md)                                                            |
+
+## What changed after this page was first written
+
+The comparison above describes the position on 2026-10-13. Several of its premises have since changed, and the sections below are kept as the record of that position. Dates are UTC.
+
+- **Ende is now a released project.** Its repositories were public from 2026-10-13 and its first release, `v2026.10.14`, was announced on 2026-10-17. See [Ende](Ende_Runtime.md).
+- **Dodo is now more than a name.** The organization `are-we-dodo-yet` has a `dodo` repository (created 2026-10-12, 75 stars on 2026-10-29), a `dodo-x` prototype, and a published [roadmap](Project_Roadmap.md). As of 2026-10-28 `daniellacosse` said Dodo had no build yet and was waiting on a reply the group calls Bart's. The star counts were read from the GitHub API on 2026-10-29: 116 for `theende/ende` against 75 for `are-we-dodo-yet/dodo`, and `daniellacosse` guessed on 2026-10-21 that Ende had more stars than Dodo.
+- **How the two relate, in `daniellacosse`'s words (2026-10-14, `#dodoer`).** Asked by `Sandeep Kumar Kuanar✌🏼` whether they are the same, he said Dodo is a more "traditional" fork that aims to be fully backwards compatible and carry Deno's original philosophy forward, while Ende is a "sister" fork that aims to be much more streamlined and opinionated. He added, in spoiler text meant not to be shared with `netop://ウィビ`, that he hoped Dodo could eventually be structured to cover the Ende use case too. `andy` said that is more or less his goal with the modular core. The same exchange: `andy` said "dodoer" is not a team name, just a funny word.
+- **A possible spin-off.** On 2026-10-21 `daniellacosse` said that, depending on what happens next, it might make sense for Ende to spin off its own place, because if a foundation is secured Dodo "doesn't really need to exist." `netop://ウィビ` asked whether enough people care about Ende, and, once `daniellacosse` mentioned the star count, said "I'll get on that this weekend I guess." Nothing was decided.
+- **Convergence.** `daniellacosse` said on 2026-10-23 that it is cool to see everyone coming to agreement independently, and clarified on 2026-10-28 that the community seems split on Node support, with an emerging consensus on embeddability.
 
 ## The axis that separates them
 
@@ -50,6 +60,6 @@ So the position with the votes has no name, no repository, no owner, and no name
 
 ## What this page does not claim
 
-- That Dodo is a project. It is a name in one capture, and the page records its position rather than its existence.
-- That Ende's roadmap is implemented. Every item is a stated plan; there is no public repository to check it against.
+- That Dodo was a project on 2026-10-13. At that date it was a name in one capture. The section above records that it has since gained a repository and a roadmap, with no runnable build as of 2026-10-28.
+- That Ende's roadmap is fully implemented. Removal of Node compatibility, Deploy, KV, and Jupyter shipped in `v2026.10.14`; the rest of the roadmap is not shown to have shipped. The repository is public and can be checked.
 - That the compatibility fork is a separate project rather than a configuration of Ende, which is the open question `Deno_Fork_Options` leaves.
