@@ -133,9 +133,14 @@ another user's message text from a channel it could see. So the archive needs no
 privileged intent and no portal approval step. That intent matters only for
 live delivery over the gateway, which this connector does not use.
 
-The archive run is manual: `.github/workflows/discord-ingest.yml` has no cron (removed
-2026-10-29, because the fold kept failing on the Gemini free tier) and is started by hand with
-`workflow_dispatch`, every few days. It runs the connector over every public channel the bot can read. `VENUES` in the workflow is the pinned
+The archive runs on a daily schedule: `.github/workflows/discord-ingest.yml` fires at
+11:00 UTC (03:00 PST / 04:00 PDT), at least two and a half hours before the Muse fold at
+06:30 PT, because both write `raw/discord/.cursor` and a rebase conflict there costs the
+day's capture. A scheduled run archives only: it captures, advances the cursor, queues
+the fold, and never calls a model. The fold is the Muse cron (`DAILY_CRON.md`); a manual
+`workflow_dispatch` is the fallback and keeps the old archive+fold behaviour (tick
+`skip_wiki` to archive without a fold). A run covers every venue discovery lists.
+`VENUES` in the workflow is the pinned
 list (`#brainstorm`, `#propose`, the two channels the server was told are archived): those keep their venue names, which are the filenames of
 existing captures, and are archived even if discovery fails. `tools/discord/discover.ts` adds the rest
 by asking the server. Because everything here is published, "public" is decided conservatively: a channel
@@ -169,7 +174,7 @@ for the same reason: it first archives every venue with `--skip-wiki` and pushes
 queue entry, and only then folds the queue, so a fold that is rate limited, slow or killed cannot take a
 capture with it. Inference is the staged pass
 described below; the repository variables `DCWG_PROVIDER`, `DCWG_MODEL` and `DCWG_MAX_USD` repoint
-the schedule's provider, model and spend cap without editing the workflow. `DCWG_MODEL` names a
+a manual fold's provider, model and spend cap without editing the workflow. `DCWG_MODEL` names a
 model for one provider, so change it together with `DCWG_PROVIDER`.
 
 If the pass or a gate fails, the page edits are reverted, so a bad inference never

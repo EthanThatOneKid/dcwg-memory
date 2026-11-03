@@ -28,6 +28,20 @@ from `raw/` to `/dcwg-memory/raw/`, and `wiki/Captures.md` links to them. They a
 copied as assets, never parsed as wiki input, so `wiki fmt` can never rewrite an
 append-only capture.
 
+## The daily loop
+
+Two pieces, deliberately split so the record never waits on a model:
+
+1. **Archive**, by GitHub Actions at 11:00 UTC (03:00 PST / 04:00 PDT). Scheduled
+   runs of `.github/workflows/discord-ingest.yml` capture new Discord activity,
+   advance `raw/discord/.cursor`, and queue what the wiki still owes. They never
+   call a model.
+2. **Fold**, by the Muse cron `dcwg-memory-daily-wiki-sync` at about 06:30 PT. It
+   reads only the queue, edits `wiki/`, and runs the six gates before it commits.
+
+`DAILY_CRON.md` is the runbook: the verification commands, what to do when a run
+fails, and the cleanup that waits until the loop has run green once.
+
 ## Layout
 
 ```
@@ -42,7 +56,8 @@ layouts/wikipedia.html   the layout that builder renders
 assets/                  theme CSS, JS, and logo, copied into the site
 queries/                 example SPARQL queries, from the template
 wiki.yml                 Wiki CLI config (@wazoo/wiki)
-.github/workflows/       ci.yml (gates) and deploy.yml (GitHub Pages)
+DAILY_CRON.md            the daily archive + fold runbook (see "The daily loop")
+.github/workflows/       ci.yml (gates), deploy.yml (GitHub Pages), discord-ingest.yml (daily archive)
 ```
 
 ## Layers

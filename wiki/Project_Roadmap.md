@@ -47,6 +47,10 @@ The roadmap names owners only by Discord user id. The ids are not resolved in th
 
 The roadmap predates much of the discussion recorded elsewhere. The extensions item is the subject of [Rust core rewrite proposal](Rust_Core_Proposal.md) and [Sandboxed extension boundary](Sandboxed_Extension_Boundary.md), and the fundraising and foundation items depend on the reply the group is waiting for, recorded in [Sustaining the fork](Fork_Sustainability.md). "Most-starred Deno fork" can be checked against live numbers: on 2026-10-29 the GitHub API shows `are-we-dodo-yet/dodo` at 75 stars and `theende/ende` at 116, so the "near" goal is not met on that measure; see [Ende](Ende_Runtime.md).
 
+## First step toward a build
+
+The "release a runnable build" item had its first concrete step on 2026-10-30 (UTC). `daniellacosse` opened `are-we-dodo-yet/dodo` pull request 17, "chore: rename deno cli to dodo," whose description shows `./x build` now producing a `dodo` binary whose REPL prints "Dodo 2.9.7." He said the CI still needs fixing next, and told a newcomer who offered to maintain the standard library that the project is "a little stuck on not having a build for people to use" and that focus time is hard for him to find. On 2026-10-31 the GitHub API showed the pull request open and unmerged, 18 files changed, and the repository with no releases and 77 stars.[^1]
+
 ## Related
 
 - [Deno Core Working Group](Deno_Core_Working_Group.md): the group the roadmap is for.
@@ -55,3 +59,7 @@ The roadmap predates much of the discussion recorded elsewhere. The extensions i
 - [Deno Desktop and Laufey](Deno_Desktop_and_Laufey.md): the far goal of Deno Desktop and Mobile.
 - [TypeScript 7 and type-aware tooling](TypeScript_7_and_Tooling.md): the far goal of authoring its own dependency updates.
 - [Foundation outreach and Bart's reply](Foundation_Outreach.md): the foundation and fundraising items.
+
+## Sources
+
+[^1]: [`are-we-dodo-yet/dodo` pull request 17](https://github.com/are-we-dodo-yet/dodo/pull/17), read through the GitHub API on 2026-10-31: open, created 2026-10-30, 261 additions and 259 deletions in 18 files; the repository `are-we-dodo-yet/dodo` had 77 stars and no releases.
