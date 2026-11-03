@@ -1,8 +1,10 @@
 name: Discord ingest
 
 # One run = pull new channel activity over the Discord REST API, write it as an
-# append-only capture, let the model fold it into the wiki pages, then validate
-# and push. The connector refuses to write anything the repo's own gates reject:
+# append-only capture, and (on a manual dispatch) fold it into the wiki pages. The
+# scheduled run archives only and stops: it captures, advances the cursor, and
+# queues what the wiki still owes for the Muse fold (DAILY_CRON.md). The connector
+# refuses to write anything the repo's own gates reject:
 # if `fmt`, `check --strict`, `lint --strict`, `render --check`, the orphan
 # check, or the forum thread check fails, the page edits are reverted and the run
 # reports NEEDS_ATTENTION
@@ -43,10 +45,15 @@ name: Discord ingest
 # never accepts a token as a command-line argument.
 
 on:
-  # Manual only. The daily cron was removed on 2026-10-29: the wiki fold kept failing on the
-  # Gemini free tier and the automation needed repeated repair, so the archive and the fold
-  # are run by hand every few days instead. Dispatch this workflow to archive (tick
-  # skip_wiki to archive without a fold); the wiki is folded by hand from the captures.
+  # Daily archive only, 11:00 UTC (03:00 PST / 04:00 PDT). Two and a half hours of
+  # headroom before the Muse fold cron at 06:30 PT in both DST states, because both
+  # write `raw/discord/.cursor` and a rebase conflict there loses the day's capture.
+  # Scheduled runs archive only: they commit captures, the cursor, and the fold
+  # queue, and they never call a model. A manual dispatch is unchanged, and is the
+  # fallback: tick skip_wiki to archive without a fold, or leave it off for the old
+  # archive+fold behaviour.
+  schedule:
+    - cron: "0 11 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -249,19 +256,27 @@ jobs:
             run_venue archive "$venue" "$channel"
           done <<< "$VENUES"
 
-          # Phase 2: fold the queue. Without the provider's key the pass cannot run, so the
-          # fold stays queued for a run that has it; the archive above does not wait on one.
-          if [ "${PROVIDER:-anthropic}" = "gemini" ]; then key_name=GEMINI_API_KEY; else key_name=ANTHROPIC_API_KEY; fi
-          if [ "${SKIP_WIKI:-false}" = "true" ]; then
+          # Phase 2: fold the queue, manual dispatch only. A scheduled run stops at the
+          # archive above: that is the record, and the Muse cron folds it at 06:30 PT
+          # (DAILY_CRON.md). Letting the schedule fold here as well would fold the same
+          # captures twice and race the Muse commit for `raw/discord/.cursor`. Without
+          # the provider's key the pass cannot run, so the fold stays queued for a run
+          # that has it; the archive above does not wait on one.
+          if [ "${GITHUB_EVENT_NAME:-}" = "schedule" ]; then
+            echo "scheduled run: archived only; the Muse cron folds the queue"
+          elif [ "${SKIP_WIKI:-false}" = "true" ]; then
             echo "skip_wiki is set: archived without a wiki pass"
-          elif [ -z "${!key_name:-}" ]; then
-            echo "::warning::$key_name is not set; archived without a wiki pass"
           else
-            venue_index=0
-            while IFS='=' read -r venue channel; do
-              [ -z "$venue" ] && continue
-              run_venue fold "$venue" "$channel"
-            done <<< "$VENUES"
+            if [ "${PROVIDER:-anthropic}" = "gemini" ]; then key_name=GEMINI_API_KEY; else key_name=ANTHROPIC_API_KEY; fi
+            if [ -z "${!key_name:-}" ]; then
+              echo "::warning::$key_name is not set; archived without a wiki pass"
+            else
+              venue_index=0
+              while IFS='=' read -r venue channel; do
+                [ -z "$venue" ] && continue
+                run_venue fold "$venue" "$channel"
+              done <<< "$VENUES"
+            fi
           fi
           exit "$status"
 
