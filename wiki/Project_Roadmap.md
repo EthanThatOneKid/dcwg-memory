@@ -51,6 +51,8 @@ The roadmap predates much of the discussion recorded elsewhere. The extensions i
 
 The "release a runnable build" item had its first concrete step on 2026-10-30 (UTC). `daniellacosse` opened `are-we-dodo-yet/dodo` pull request 17, "chore: rename deno cli to dodo," whose description shows `./x build` now producing a `dodo` binary whose REPL prints "Dodo 2.9.7." He said the CI still needs fixing next, and told a newcomer who offered to maintain the standard library that the project is "a little stuck on not having a build for people to use" and that focus time is hard for him to find. On 2026-10-31 the GitHub API showed the pull request open and unmerged, 18 files changed, and the repository with no releases and 77 stars.[^1]
 
+On 2026-11-01 (UTC) the newcomer from 2026-10-30, `Soluble State`, replied in `#brainstorm` that they would discuss it with their team members, take a look at pull request 17, and start exploring the codebase. `daniellacosse` said, to set expectations, that he was working on getting his time back.
+
 ## Related
 
 - [Deno Core Working Group](Deno_Core_Working_Group.md): the group the roadmap is for.

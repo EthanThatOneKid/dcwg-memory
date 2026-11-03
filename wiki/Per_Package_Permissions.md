@@ -39,6 +39,23 @@ The thread was revived on 2026-10-24 by `davey`, who asked three things:
 
 On 2026-10-27 `daniellacosse` replied to `davey`'s transparent-layer suggestion that he was not sure what `davey` meant, and welcomed a sketch in code or pseudocode of the idea. Nothing came back in the capture.
 
+## Import attributes sketch (2026-10-31)
+
+On 2026-10-31 (UTC) `daniellacosse` revived the thread with a sketch of his own, asking "what if we used this somehow?" and pointing to the import attributes syntax documented by MDN.[^1] His sketch, which he said was not close to final, was:
+
+```ts
+import { fetch } from "runtime:fetch" with { newContext: true, net: "[::1]" };
+```
+
+He said it should work with another participant's compile-time optimization idea (named in the capture only by Discord user id), throw errors when the wrong attributes are used ("runtime:" only, and requiring an implementation of an IPC layer), and that browsers recognize the syntax. He added that it could potentially load multiple fetches with different permissions:
+
+```ts
+import { fetch as localFetch } from "runtime:fetch" with { net: "[::1]" };
+import { fetch as extFetch } from "runtime:fetch" with { sandbox: true };
+```
+
+This sketch answers `davey`'s 2026-10-27 request for code, but with a different mechanism than the transparent layer `davey` suggested: separate contexts declared per import, rather than one context that believes itself unlimited. No reply to the sketch is in the capture.
+
 ## Where it stands
 
 Nothing was decided. The two positions are that per-module permissions are not viable inside a shared context (`andy`, `Matthew`), and that separate contexts might make them possible (`daniellacosse`, `davey`). `daniellacosse` elsewhere called per-module permissions "sadly infeasible" and treated per-extension permissions as a possible middle ground; see the [extension boundary](Sandboxed_Extension_Boundary.md) page for how that fared.
@@ -55,3 +72,7 @@ Nothing was decided. The two positions are that per-module permissions are not v
 - [Runtime architecture proposals](Runtime_Architecture_Proposals.md): the extension design that frames the modules-versus-extensions distinction.
 - [Deno Core Working Group](Deno_Core_Working_Group.md): the group's position on keeping the permission model.
 - [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md): the handles in this thread.
+
+## Sources
+
+[^1]: [Import attributes, MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with#description): the `import ... with { ... }` syntax `daniellacosse` pointed to on 2026-10-31. The `runtime:` specifier and the `newContext`, `net`, and `sandbox` attributes in his sketch are his proposal, not part of the documented syntax.
