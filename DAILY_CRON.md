@@ -48,17 +48,19 @@ that one step is always a human's.
 
 ## Scope
 
-Fold only what the archive already produced, and do not widen the archive
-without a moderator stating it in the server. The rule lives in `AGENTS.md`
-("Adding a Discord capture"): pinned `#brainstorm` and `#propose`, plus
-discovered channels whose description says "This channel is indexed by AI."
-Public is not consent. The non-annotated channels captured on 2026-10-29
-(`#ende`, `#dodoer`, `#rules`, `#news`, `#roadmap`, `#rust-resources`,
-`#andromeda`, `#sandboxo`) and the `#general` backlog folded with them are
-grandfathered by Ethan's decision that day, not a licence to archive the rest.
-All-public widening is PR #39 and stays unmerged until a moderator says it.
-Exclusions come from the repository variable `DCWG_EXCLUDE_CHANNELS`; never
-assume a channel is excluded.
+Fold only what the archive already produced. The archive covers every public
+channel the bot can read: pinned `#brainstorm` and `#propose`, plus everything
+`tools/discord/discover.ts` lists. The rule and its history are `AGENTS.md`'s
+("Adding a Discord capture"): `@everyone` can view the channel and read its
+history, the bot can too, the channel is not age-restricted and holds messages,
+and no `DCWG_EXCLUDE_CHANNELS` entry names it. Such a channel is in scope
+whether or not its topic says "This channel is indexed by AI." — that
+per-channel requirement was dropped on 2026-11-03, when the server's main
+moderator confirmed with Ethan that archiving every public channel is fine
+because he had already assumed it was happening. The switch is the repository
+variable `DCWG_REQUIRE_ANNOTATION`, which is exactly `false`. Private channels,
+and whatever `DCWG_EXCLUDE_CHANNELS` names (`#github`, `#offtopic`), stay out;
+never assume a channel is excluded.
 
 ## The fold
 
@@ -101,7 +103,7 @@ commit that has not passed them does not go to `main`.
   "fix it tomorrow".
 - **An unfamiliar venue appears in the queue.** Fold it only because the archive
   produced it, name the venue in the report, and treat it as no licence to widen
-  scope.
+  scope past public channels.
 - **The fold parks on an approval card.** The GitHub connector asks before
   changing repository content, so the first runs wait for a human. That is
   expected. Fully unattended commits would mean relaxing that permission, which
