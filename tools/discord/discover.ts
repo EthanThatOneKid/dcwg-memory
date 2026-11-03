@@ -12,8 +12,10 @@
  * Discord's algorithm. A channel the bot cannot read is left out too, since it would fail
  * the job every day without recording anything.
  *
- * Public is not consent, so a public channel is archived only if it also opts in: its
- * description must say "This channel is indexed by AI." (see `INDEX_ANNOTATION`).
+ * Public is not consent, so by default a public channel is archived only if it also opts in: its
+ * description must say "This channel is indexed by AI." (see `INDEX_ANNOTATION`). A caller can
+ * turn that requirement off with `--require-annotation false` once the server's moderators have
+ * agreed to archive every public channel.
  *
  * Channels the workflow already names are pinned: they keep their venue names, which are
  * the filenames of existing captures, and they are kept whatever discovery decides. Their
@@ -163,6 +165,11 @@ export interface DiscoverInput {
   bot: Viewer;
   pinned: readonly Venue[];
   exclude?: ReadonlySet<string>;
+  /**
+   * Whether a channel must carry the opt-in annotation. Defaults to true: widening the archive to
+   * every public channel is a deliberate choice, made with a repository variable, not a default.
+   */
+  requireAnnotation?: boolean;
 }
 
 export interface Discovery {
@@ -173,6 +180,7 @@ export interface Discovery {
 /** Pinned venues, then every public channel the bot can read, in server order. */
 export function discoverVenues(input: DiscoverInput): Discovery {
   const exclude = input.exclude ?? new Set<string>();
+  const requireAnnotation = input.requireAnnotation ?? true;
   const venues: Venue[] = [...input.pinned];
   const taken = new Set(venues.map((v) => v.venue));
   const pinnedChannels = new Set(venues.map((v) => v.channel));
@@ -196,7 +204,7 @@ export function discoverVenues(input: DiscoverInput): Discovery {
       skip("not public: @everyone cannot view it and read its history");
     } else if (!canRead(permissionsFor(input.guildId, input.roles, channel, input.bot))) {
       skip("the bot cannot view it and read its history");
-    } else if (!isIndexed(channel.topic)) {
+    } else if (requireAnnotation && !isIndexed(channel.topic)) {
       skip("not annotated as indexed");
     } else {
       const venue = venueName(channel.name, channel.id, taken);
@@ -282,6 +290,8 @@ async function main(argv: string[]): Promise<number> {
   const pinned = parseVenues((pinnedEnv ? Deno.env.get(pinnedEnv) : opts.get("pinned")) ?? "");
   const guildId = opts.get("guild") || DEFAULT_GUILD;
   const exclude = parseIds(opts.get("exclude"));
+  // Only an explicit "false" widens the archive past the annotation; anything else keeps the rule.
+  const requireAnnotation = opts.get("require-annotation") !== "false";
 
   try {
     const token = Deno.env.get(opts.get("token-env") || "DCWG_DISCORD_BOT_TOKEN");
@@ -299,6 +309,7 @@ async function main(argv: string[]): Promise<number> {
       bot: { memberId: me.id, roleIds: member.roles },
       pinned,
       exclude,
+      requireAnnotation,
     });
     for (const p of pinnedStatus(channels, pinned)) {
       const state = p.indexed === undefined
