@@ -1,119 +1,133 @@
-# DCWG memory daily cron — runbook
+# DCWG memory daily cron
 
-Repo: `EthanThatOneKid/dcwg-memory`, branch `main`
-Muse cron: `dcwg-memory-daily-wiki-sync`, daily at about 06:30 PT
-Status: Muse cron is live; the Actions archive schedule is NOT in this PR's diff — it is in the PR review comment, for the reviewer to add to `.github/workflows/discord-ingest.yml` before merging.
+Repo `EthanThatOneKid/dcwg-memory`, branch `main`. Two halves of one daily loop:
+
+| Step | Runs at | Who |
+| --- | --- | --- |
+| Archive | 11:00 UTC (03:00 PST / 04:00 PDT) | GitHub Actions, `discord-ingest.yml` |
+| Fold | about 06:30 PT | Muse cron `dcwg-memory-daily-wiki-sync` |
+
+The gap is deliberate. Both write `raw/discord/.cursor`, and the archive's push
+handler aborts on a rebase conflict, so an archive still running when the fold
+starts loses that day's capture. Move one and you move the other.
 
 ## How the day works
 
-1. **13:00 UTC — GitHub Actions archive only** (05:00 PST / 06:00 PDT).
-   The Actions workflow pulls new Discord activity with the repo's existing
-   bot token, writes append-only captures to `raw/discord/`, advances
-   `raw/discord/.cursor`, and leaves the fold queue (`_pending` in `.cursor`)
-   on main. Scheduled runs never call a model.
-2. **06:30 PT — Muse fold.** The Muse cron reads only the queued captures,
-   edits `wiki/*.md` per the repo's `AGENTS.md` rules, updates
-   `wiki/Captures.md` if needed, runs the six gates, and commits the wiki
-   edits plus the cleared queue entries to `main`.
-3. **If nothing is queued**, the Muse run commits nothing and reports nothing.
+1. **11:00 UTC — archive only.** The Actions workflow pulls new Discord activity
+   with the repo's existing bot token, writes append-only captures to
+   `raw/discord/`, advances `raw/discord/.cursor`, and leaves the fold queue
+   (`_pending` in that same file) on `main`. Scheduled runs call no model and
+   need no API key.
+2. **06:30 PT — fold.** The Muse cron reads only the queued captures, edits
+   `wiki/*.md`, runs the six gates, and commits the wiki edits plus the cleared
+   queue entries to `main`.
+3. **Nothing queued** — the fold commits nothing and reports nothing. That is a
+   healthy day, not a skipped one.
 
-## Scope gate — do not widen without a server statement
+A manual `workflow_dispatch` is the fallback for both halves: tick `skip_wiki`
+to archive without a fold, or leave it off for the old archive+fold run.
 
-Fold only what the archive already produced. The archive on main is:
-pinned `#brainstorm` and `#propose`, plus discovered channels whose
-description says "This channel is indexed by AI."
+## Check the loop is alive
 
-Do NOT archive or fold a channel just because it is public. The all-public
-widening (open PR #39) stays unmerged until a moderator states all-public
-archiving in the server. Exclusions come from the repo variable
-`DCWG_EXCLUDE_CHANNELS`; do not assume any channel is excluded.
+The schedule has died twice — removed 2026-10-29, then the workflow disabled by
+hand — and both times the only symptom was a quietly stale archive. Check first:
 
-## Privacy and evidence rules for every fold run
-
-- Never edit, rename, or delete anything under `raw/`. Corrections go in `wiki/`.
-- Attribute claims to the Discord handle that made them. Separate what a
-  participant said from what is externally verifiable; cite published facts
-  with a footnote. Date any numeric or state-dependent claim.
-- New wiki filenames must match `[A-Za-z0-9_()-]+\.md`.
-- Never log a skipped/private channel by name in a public log; IDs and
-  reasons only.
-- If the six gates fail, revert the wiki edits, leave the queue intact,
-  commit nothing, and report the failing gate. Never commit broken pages
-  to "fix them tomorrow".
-
-## Gates (run before any wiki commit)
-
-Use the Deno binary at `~/.deno/bin/deno` (it is not on PATH):
-
+```sh
+gh workflow view "Discord ingest" --repo EthanThatOneKid/dcwg-memory
+gh run list --workflow "Discord ingest" --limit 3 --repo EthanThatOneKid/dcwg-memory
+gh api repos/EthanThatOneKid/dcwg-memory/contents/raw/discord/.cursor \
+  --jq .content | base64 -d | jq '{_lastRun, pending: (._pending | length)}'
 ```
+
+Healthy reads as `state: active`, a `schedule` run inside the last 24 hours,
+`_lastRun` inside the last day, and one `_pending` entry per venue that had new
+messages. If the workflow says `disabled_manually`, run
+`gh workflow enable "Discord ingest"`. Merging this repo's files does not enable
+it, and the Muse GitHub App cannot push anything under `.github/workflows/`, so
+that one step is always a human's.
+
+## Scope
+
+Fold only what the archive already produced, and do not widen the archive
+without a moderator stating it in the server. The rule lives in `AGENTS.md`
+("Adding a Discord capture"): pinned `#brainstorm` and `#propose`, plus
+discovered channels whose description says "This channel is indexed by AI."
+Public is not consent. The non-annotated channels captured on 2026-10-29
+(`#ende`, `#dodoer`, `#rules`, `#news`, `#roadmap`, `#rust-resources`,
+`#andromeda`, `#sandboxo`) and the `#general` backlog folded with them are
+grandfathered by Ethan's decision that day, not a licence to archive the rest.
+All-public widening is PR #39 and stays unmerged until a moderator says it.
+Exclusions come from the repository variable `DCWG_EXCLUDE_CHANNELS`; never
+assume a channel is excluded.
+
+## The fold
+
+The editorial rules — attribution to handles, dating state-dependent claims,
+separating evidence from claim, filename pattern, never touching `raw/` — are
+`AGENTS.md`'s. This page does not restate them; two copies drift. What is
+specific to a scheduled fold:
+
+- Run the gates before you stage anything, and again after page edits settle.
+- Stage only `wiki/` and `raw/discord/.cursor` (the queue entries for captures
+  this run actually folded). Never stage `raw/discord/*.md` in a fold commit.
+- One commit per run, message like `Fold the 2026-11-02 archive into the wiki`.
+- Check `main`'s head SHA immediately before pushing. Never force-push.
+- Read the commit back after pushing and confirm it landed exactly once. If the
+  push is rejected, pull/rebase and retry once; if that fails, stop and report
+  rather than re-committing the same fold.
+
+On the Muse host the Deno binary is not on `PATH`:
+
+```sh
 cd <repo checkout>
 ~/.deno/bin/deno task --config tools/discord/deno.json gates
 ```
 
 That runs `fmt` (which writes), `check --strict`, `lint --strict`,
-`render --check`, the orphan check, and the forum thread check, plus the
-connector checks in CI. A wiki commit that has not passed these gates
-does not go to main.
-
-## Committing
-
-- Check `main`'s head SHA immediately before pushing. Never force-push.
-- One commit per run, message like `Fold the 2026-11-02 archive into the wiki`.
-- Stage only `wiki/` and `raw/discord/.cursor` (queue entries for folded
-  captures only). Never stage `raw/discord/*.md` in a fold commit.
-- Read the commit back after pushing and confirm it landed exactly once.
-  If a push is rejected, pull/rebase and retry once; if that fails, stop
-  and report — do not re-commit the same fold.
-
-## One step the user must do by hand (and why)
-
-The Muse GitHub App cannot push files under `.github/workflows/`, so the
-archive schedule cannot be turned on by Muse. Apply the workflow change from the review comment on this PR by hand:
-
-- Replace `.github/workflows/discord-ingest.yml` with the patched version
-  in that comment, either in the GitHub web editor or from a local checkout.
-  (The Muse GitHub App cannot push files under `.github/workflows/`.)
-- Also re-enable the workflow in GitHub Settings if it was disabled
-  (it was disabled when the cron was removed on 2026-10-29).
-
-The patch only adds a `schedule: cron "0 13 * * *"` trigger and gates
-the old model fold to manual runs. Manual dispatch is unchanged as a
-fallback. No new secrets are needed: the archive still uses the repo's
-existing Discord bot token secret.
-
-Until that patch is applied, the Muse cron will still run each morning,
-but it will usually find an empty queue and do nothing — the archive
-is still manual-only. That is the safe failure mode, not a bug.
-
-## GitHub write approval
-
-The GitHub connector is currently set to ask before changing repository
-content. A Muse fold commit will therefore park on an approval card
-until it is approved. That is expected on the first runs. Fully
-unattended commits would require changing that connector permission
-to allow, which is a user decision — do not change it silently.
-
-## Phase 2 — deleting the old fold code (after the first green Muse fold)
-
-Do not delete this until the archive patch is live AND one Muse fold
-has committed cleanly through the gates. Then delete, in one change:
-
-- `tools/discord/anthropic.ts`, `anthropic_test.ts`
-- `tools/discord/gemini.ts`, `gemini_test.ts`
-- `tools/discord/providers.ts`, `providers_test.ts`, `model.ts`
-- `tools/discord/prompt/dcwg-pass.md`, `prompt_test.ts`
-- the fold branches in `tools/discord/ingest.ts`, and the provider /
-  model / spend-cap inputs and secrets in the workflow
-
-Keep: `discord.ts`, `discover.ts`, `capture.ts`, `pending.ts`,
-`index_page.ts`, the cursor, the gates, and `AGENTS.md`'s editorial rules.
+`render --check`, the orphan check, and the forum thread check, and exits
+non-zero on any failure. CI runs the same six plus the connector job. A wiki
+commit that has not passed them does not go to `main`.
 
 ## If a run fails
 
-- Archive failed in Actions: check the Actions log for that day; the
-  Muse run folds whatever is queued and does not re-pull Discord itself.
-- Fold gates failed: report the gate, leave the queue intact, commit nothing.
-- Push conflict: rebase once, then stop and report if it still fails.
-- A capture from an unfamiliar venue appears in the queue: fold it only
-  if the archive workflow produced it, note the venue in the report,
-  and do not treat it as permission to widen scope.
+- **Archive failed in Actions.** Read the log for that day. The fold will still
+  drain whatever is already queued; it never re-pulls Discord itself.
+- **Push conflict in the archive.** `push_main` aborts and the job fails, and
+  the ephemeral runner discards the commit, so the next run re-fetches that
+  range. Do not hand-edit `.cursor` to "catch up" — a duplicate capture is
+  allowed, a skipped range is not.
+- **A gate failed in the fold.** Revert the wiki edits, leave the queue intact,
+  commit nothing, and report the failing gate. Never commit a broken page to
+  "fix it tomorrow".
+- **An unfamiliar venue appears in the queue.** Fold it only because the archive
+  produced it, name the venue in the report, and treat it as no licence to widen
+  scope.
+- **The fold parks on an approval card.** The GitHub connector asks before
+  changing repository content, so the first runs wait for a human. That is
+  expected. Fully unattended commits would mean relaxing that permission, which
+  is a user decision — do not change it silently.
+
+## Phase 2 — delete the old fold code
+
+Nothing here is safe until the archive has run green once and one Muse fold has
+committed through the gates. Then, in one change:
+
+- Delete `tools/discord/anthropic.ts`, `anthropic_test.ts`, `gemini.ts`,
+  `gemini_test.ts`, `providers.ts`, `providers_test.ts`, `model.ts`,
+  `prompt/dcwg-pass.md`, and `prompt_test.ts`.
+- Remove the fold branches from `tools/discord/ingest.ts` and their assertions in
+  `ingest_test.ts`, including `readPassInstructions`, `makeClient`,
+  `runAnthropicPass`, and the provider resolution they pulled in.
+- Trim what only the deleted pass used: `PROMPT_FENCE` and
+  `carryFrontmatterForward` in `guard.ts`, `yamlStr` in `capture.ts`.
+- Remove the `provider`, `model`, `max_usd`, and `drain` inputs and their env from
+  the workflow, and the `--provider`, `--model`, `--max-usd` flags from the
+  connector.
+- Delete the then-unused repository secrets `GEMINI_API_KEY`,
+  `AI_GATEWAY_API_KEY`, and `OPENROUTER_API_KEY`, and the repository variables
+  `DCWG_PROVIDER`, `DCWG_MODEL`, `DCWG_MAX_USD`. Deleting the workflow inputs
+  does not delete the secret; leaving it set keeps a gate regression spendable.
+
+Keep `discord.ts`, `discover.ts`, `capture.ts`, `pending.ts`, `index_page.ts`,
+`thread_pages.ts` (the gates and `ingest.ts` need it), `guard.ts`, the cursor,
+the gates, and the editorial rules in `AGENTS.md`.
