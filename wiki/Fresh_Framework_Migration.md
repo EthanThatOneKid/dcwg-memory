@@ -50,6 +50,10 @@ The same asymmetry shows up on crates.io. `deno_core` last published 2026-09-16,
 
 Fresh is a framework on top of the runtime: it depends on Deno, is versioned independently, and its users pick it per project. Deno, `std`, and `rusty_v8` are the runtime, the standard library, and the V8 binding layer, and they carry release signing, registry scopes, and crate ownership with them. The group's own brief lists what has no Fresh equivalent: trademark licensing, binary signing certificates, and release pipeline secrets. See [Deno runtime handoff](Deno_Runtime_Handoff.md).
 
+## A late-October report on Fresh Next
+
+This is a participant report, not a checked fact about Fresh. In `#general` on 2026-10-30, `paula` said she tried Fresh Next on Deno, that it uses `package.json` and "doesnt even work", and that she will keep using Fresh 2. `davey` replied that it is sad they do not test against Deno. No follow-up, version, or error detail is in the capture, so this records only that one attempt and that reaction.
+
 ## Open questions
 
 - Whether the `freshframework` organization is the model to copy, or whether a new organization is cleaner than reusing one.

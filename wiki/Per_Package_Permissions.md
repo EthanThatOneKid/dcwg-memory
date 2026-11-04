@@ -56,6 +56,12 @@ import { fetch as extFetch } from "runtime:fetch" with { sandbox: true };
 
 This sketch answers `davey`'s 2026-10-27 request for code, but with a different mechanism than the transparent layer `davey` suggested: separate contexts declared per import, rather than one context that believes itself unlimited. No reply to the sketch is in the capture.
 
+## Per-package, not per-module (2026-11-03)
+
+On 2026-11-03 (UTC) `CaptainLach` corrected the record in the same thread: he was never proposing per-module permissions, he was proposing per-package. `daniellacosse` replied that he had not meant to imply `CaptainLach` was proposing per-module; he himself had been trying to move `CaptainLach`'s ideas to the module level, and then dropped that move: "scratch that idea then."
+
+`CaptainLach`'s reason, given the same day, was that ESM modules are deduplicated in the graph, so using `with` attributes for such a thing is "just wrong". `daniellacosse` had reasoned that because `{ type: "json" }` occurs after the module is deduplicated, a similar mechanism might work, with each module `with` instance placed in a sandbox as a sort of post-processing in the way `{ type: "json" }` works. He then said that is a runtime behavior, not a compile-time one, unless the sandbox could somehow be "compiled in" per module. For that he pointed to the TC39 proposal for source-phase imports,[^2] which he said even mentions Deno as a use case. No reply to that pointer is in the capture, and nothing was decided.
+
 ## Where it stands
 
 Nothing was decided. The two positions are that per-module permissions are not viable inside a shared context (`andy`, `Matthew`), and that separate contexts might make them possible (`daniellacosse`, `davey`). `daniellacosse` elsewhere called per-module permissions "sadly infeasible" and treated per-extension permissions as a possible middle ground; see the [extension boundary](Sandboxed_Extension_Boundary.md) page for how that fared.
@@ -76,3 +82,5 @@ Nothing was decided. The two positions are that per-module permissions are not v
 ## Sources
 
 [^1]: [Import attributes, MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with#description): the `import ... with { ... }` syntax `daniellacosse` pointed to on 2026-10-31. The `runtime:` specifier and the `newContext`, `net`, and `sandbox` attributes in his sketch are his proposal, not part of the documented syntax.
+
+[^2]: [Proposal to enable importing modules at the source phase](https://github.com/tc39/proposal-source-phase-imports): the TC39 proposal `daniellacosse` pointed to on 2026-11-03. Whether it mentions Deno as a use case is his claim, not checked here.
