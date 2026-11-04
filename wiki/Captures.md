@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 45 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 46 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -56,6 +56,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #propose — 2026-10-31](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-10-31_dcwg-propose.md): Append-only capture of #propose from 2026-10-31T21:07:01Z to 2026-10-31T21:20:43Z, pulled from the Discord REST API. 4 messages, 1 participants, across 1 thread.
 - [Discord #brainstorm — 2026-11-01](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-01_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-11-01T05:16:43Z to 2026-11-01T15:30:59Z, pulled from the Discord REST API. 4 messages, 2 participants.
 - [Discord #sandboxo — 2026-11-01](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-01_dcwg-sandboxo.md): Append-only capture of #sandboxo from 2026-11-01T05:28:44Z to 2026-11-01T05:28:44Z, pulled from the Discord REST API. 1 messages, 1 participants.
+- [Discord #brainstorm — 2026-11-03](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-03_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-11-03T23:42:35Z to 2026-11-04T02:19:26Z, pulled from the Discord REST API. 3 messages, 2 participants.
 - [Discord #propose — 2026-11-03](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-03_dcwg-propose.md): Append-only capture of #propose from 2026-11-03T07:43:48Z to 2026-11-03T08:38:54Z, pulled from the Discord REST API. 9 messages, 2 participants, across 1 thread.
 
 ## Pasted briefs
@@ -74,7 +75,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Deno Core Working Group](Deno_Core_Working_Group.md): An informal group of Deno users organizing on Discord to keep the runtime alive after Cloudflare acquired Deno Land Inc. and Deno ended its own runtime development.
 - [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md): The Discord handles visible in the group's #talk capture, with the public identity behind each handle where one could be confirmed.
 - [Deno Deploy Architecture](Deno_Deploy_Architecture.md): An analysis of Deno Deploy's architecture, including historical insights, current operating mechanisms, and discussions on resource usage and feasibility of replication.
-- [Deno Desktop and Laufey](Deno_Desktop_and_Laufey.md): The 2026-10-16 to 2026-10-27 discussion of Deno Desktop's webview layer Laufey, a contributor's open fixes, whether to switch to wry, the licensing and CLA question, and a competing fork.
+- [Deno Desktop and Laufey](Deno_Desktop_and_Laufey.md): The 2026-10-16 to 2026-10-31 discussion of Deno Desktop's webview layer Laufey, a contributor's open fixes, whether to switch to wry, the licensing and CLA question, a competing fork, and webview permissions.
 - [Deno fork options and naming](Deno_Fork_Options.md): The two-fork thesis, the naming candidates weighed on 2026-10-11 (Ende, dodo, endo, noend, Pteryx), and what the group agreed a fork must preserve.
 - [Deno JavaScriptCore Compatibility](Deno_JavaScriptCore_Compatibility.md): CaptainLach reported that Deno works perfectly fine with JavaScriptCore, based on manual checks.
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): What a community handoff of the Deno runtime, std, and rusty_v8 would have to transfer, split into what is possible, what needs negotiation, and what is not on the table.
