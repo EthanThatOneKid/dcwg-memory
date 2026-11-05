@@ -49,6 +49,12 @@ On 2026-10-18, `w` asked `CaptainLach` to review `are-we-dodo-yet/dodo/pull/11`,
 
 That is the thread's sharpest question and it is a direct challenge to the modular architecture the group is pursuing. Deno's current build gets LTO across everything in one binary. A minimal core with separately built extension components may not, and nobody in this capture addressed whether the measured cost of that is acceptable. It is the same boundary question the architecture threads argue about from the other direction, and it is the one place where performance work would settle a design argument rather than merely report on it.
 
+## The macOS dyld hacks question (2026-11-03)
+
+On 2026-11-03 (UTC) `CaptainLach` asked in `#brainstorm` for someone on macOS to check whether [dodo pull request #15](https://github.com/are-we-dodo-yet/dodo/pull/15) really slows launch significantly enough to matter. The pull request would drop the macOS `dyld` hacks Deno uses to improve startup time, which `CaptainLach` said would remove things he considers significant for security: he named `deno_native_certs` as "a potential security liability". Dropping them would also let the project bump `reqwest` and other packages he said are "not good to be sitting outdated", and after the merge he said Dependabot could be enabled.
+
+`daniellacosse` volunteered to test it on 2026-11-04 (UTC). No result is in the capture, so whether the launch cost is real, and how large it is, is still open.
+
 ## Where it stands
 
 A benchmark suite is running in the dodo repository with a workflow to publish pages, at `benches` rather than the repository root, and the group has a noise-tolerant threshold in `davey`'s 25 percent. The published Deno page is current and was judged unclear, missing cold-start disclosure and percentile breakdowns. The question of what modularization costs in lost link-time optimization is open and unmeasured.
@@ -61,6 +67,7 @@ On 2026-10-20 (UTC) `CaptainLach` posted a link to the published results, `https
 - Whether percentiles are added, since an average hides the tail that predicts behaviour.
 - Whether the extension system adds startup cost, and whether the group measures it before or after building it.
 - Whether LTO benefits survive modularization, which is the design question the harness could answer.
+- Whether dropping the macOS `dyld` hacks costs launch time, which `CaptainLach` asked `daniellacosse` to measure for dodo pull request #15 on 2026-11-03.
 - Which benchmarks matter for the modular design specifically, which `daniellacosse` raised as the way to avoid measuring code that is about to be rewritten.
 
 ## Related

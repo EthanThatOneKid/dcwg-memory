@@ -28,27 +28,5 @@
   "1560372147136888832": "1560381886230958192",
   "1559276145835253921": "1567598036501270569",
   "1562265796929916938": "1566323085324451952",
-  "_pending": [
-    {
-      "capture": "raw/discord/2026-11-03_dcwg-brainstorm.md",
-      "venue": "dcwg-brainstorm",
-      "messages": 3,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
-      "capture": "raw/discord/2026-11-04_dcwg-propose.md",
-      "venue": "dcwg-propose",
-      "messages": 7,
-      "offset": 0,
-      "stalls": 0
-    },
-    {
-      "capture": "raw/discord/2026-11-04_dcwg-ende.md",
-      "venue": "dcwg-ende",
-      "messages": 2,
-      "offset": 0,
-      "stalls": 0
-    }
-  ]
+  "_pending": []
 }

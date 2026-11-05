@@ -62,9 +62,19 @@ On 2026-11-03 (UTC) `CaptainLach` corrected the record in the same thread: he wa
 
 `CaptainLach`'s reason, given the same day, was that ESM modules are deduplicated in the graph, so using `with` attributes for such a thing is "just wrong". `daniellacosse` had reasoned that because `{ type: "json" }` occurs after the module is deduplicated, a similar mechanism might work, with each module `with` instance placed in a sandbox as a sort of post-processing in the way `{ type: "json" }` works. He then said that is a runtime behavior, not a compile-time one, unless the sandbox could somehow be "compiled in" per module. For that he pointed to the TC39 proposal for source-phase imports,[^2] which he said even mentions Deno as a use case. No reply to that pointer is in the capture, and nothing was decided.
 
+## Package scope, and the prototype-pollution warning (2026-11-04)
+
+`davey` revived the thread on 2026-11-04 (UTC), saying per-module or per-package permissions "would be huge". He pointed to how emdash CMS had to go "off the happy path" for plugin isolation, linking a Cloudflare blog post about it,[^3] and to his own project's workers setup as a similar case,[^4] and said he would support any approach that enables isolation natively. He offered to help evaluate options from a developer-experience perspective.
+
+`daniellacosse` answered that the first big decision is package or module: package "makes sense and is the cleanest (doable)", while module is "kinda messy and kinda crazy (compile-in isolates wtf)", but even more flexible. He added that he would hate to do both and support both.
+
+`CaptainLach` then gave the enforcement argument against per-module permissions: you "can't really have per-module permissions, you don't even have a place to put permissions for module in, and no real way to enforce them". The import-attributes `with { }` idea from 2026-10-31 does not work either, he said, because the attributes would somehow need to be unified in the module graph. For packages, by contrast, "you can easily scope permissions to package". He warned to be wary of leaking things through prototype pollution, giving primordials as the example of how to guard against it.
+
+That warning lands on the same ground as `andy`'s 2026-10-21 objection, that modules share one context so code called into can interfere with higher-permission code, but now as an implementation caution for the package-scoped design rather than an objection to it.
+
 ## Where it stands
 
-Nothing was decided. The two positions are that per-module permissions are not viable inside a shared context (`andy`, `Matthew`), and that separate contexts might make them possible (`daniellacosse`, `davey`). `daniellacosse` elsewhere called per-module permissions "sadly infeasible" and treated per-extension permissions as a possible middle ground; see the [extension boundary](Sandboxed_Extension_Boundary.md) page for how that fared.
+Nothing was decided. The two positions are that per-module permissions are not viable inside a shared context (`andy`, `Matthew`), and that separate contexts might make them possible (`daniellacosse`, `davey`). `daniellacosse` elsewhere called per-module permissions "sadly infeasible" and treated per-extension permissions as a possible middle ground; see the [extension boundary](Sandboxed_Extension_Boundary.md) page for how that fared. The 2026-11-04 exchange narrowed the scope question: package, not module, with `davey` offering to evaluate the options from a developer-experience perspective.
 
 ## Open questions
 
@@ -84,3 +94,7 @@ Nothing was decided. The two positions are that per-module permissions are not v
 [^1]: [Import attributes, MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with#description): the `import ... with { ... }` syntax `daniellacosse` pointed to on 2026-10-31. The `runtime:` specifier and the `newContext`, `net`, and `sandbox` attributes in his sketch are his proposal, not part of the documented syntax.
 
 [^2]: [Proposal to enable importing modules at the source phase](https://github.com/tc39/proposal-source-phase-imports): the TC39 proposal `daniellacosse` pointed to on 2026-11-03. Whether it mentions Deno as a use case is his claim, not checked here.
+
+[^3]: [emdash and WordPress](https://blog.cloudflare.com/emdash-wordpress/): the Cloudflare blog post `davey` linked on 2026-11-04 for how emdash CMS handled plugin isolation off the happy path. Not read here; the claim about what it shows is his.
+
+[^4]: [hotsauce workers README](https://github.com/smallhoursorg/hotsauce/blob/main/packages/workers/README.md): `davey`'s own project, linked on 2026-11-04 as a similar case. Not read here.
