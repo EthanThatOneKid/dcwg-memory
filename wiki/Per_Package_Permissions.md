@@ -72,15 +72,48 @@ On 2026-11-03 (UTC) `CaptainLach` corrected the record in the same thread: he wa
 
 That warning lands on the same ground as `andy`'s 2026-10-21 objection, that modules share one context so code called into can interfere with higher-permission code, but now as an implementation caution for the package-scoped design rather than an objection to it.
 
+## Implementation sketches (2026-11-04 to 2026-11-05)
+
+The thread continued the same day with concrete sketches of how per-package permissions could be enforced, and what a producer-side manifest would look like.
+
+`daniellacosse` first tested the import-attributes mechanism the thread had been circling. Importing the same JSON file with `with { type: "text" }` logs `"{}"`, and with `with { type: "json" }` logs `{}`; importing it both ways in one module fails with the error "Expected a JavaScript or TypeScript module, but identified a Json module. Consider importing Json modules with an import attribute with the type of "json"." He called that error "very confusing and bad", and said it was why he had not realized the mechanism worked the way it does. He also said he did not think Deno supports `?raw`, so query parameters would not be an option.
+
+He then sketched two directions. One was a `Deno.isolateModule()` call, similar to the web workers API, which he thought could live alongside per-package permissions, with per-package covering "maybe 90%+ of use cases". The other was extending the `imports` map in `deno.json` so an import could carry permissions:
+
+```json
+"imports": {
+  "local:serve": {
+    module: "runtime:serve",
+    permissions: {
+      net: "[::1]"
+    }
+  },
+  "ext:serve": "runtime:serve"
+}
+```
+
+He said that was "really just as good as per-module", but "just not dynamic in the way something like `isolateModules` could be".
+
+`davey` liked the `imports` sketch and proposed the producer-side counterpart: a third-party package would hardcode the permissions it requires, and optionally some, in its own manifest. On install the developer would be prompted to accept them, and on upgrade prompted again if they drifted; the agreed permissions would be stored in `deno.json` or the lockfile. He noted the prompts could work exactly as Deno does now for the root module, and that done right, a registry like JSR could show the permissions a package needs, with code as the source of truth. He added he could not tell whether the idea was "cursed".
+
+`daniellacosse` answered that the producer-side manifest is a slightly different feature from consumer-side allows: one declares producer intent, the other consumer permission, and the two can co-exist. He thought consumer-side would probably come first, as the quickest impact, then producer-side. Another participant, named in the capture only by Discord user id `1136701682131144714`, had also mentioned writing accepted permissions to `deno.json` as a way to get the same effect without a producer-side manifest. `daniellacosse` added that an explicit manifest would still be useful as JSR metadata, "but it can, of course, lie".
+
+`andy` then said per-package permissions "might actually be somewhat doable": introduce a step when loading a module, after TypeScript transpilation, that replaces references to the `Deno` global with a call to a function with a random name per location, which checks that the location (line, file) it was invoked from is correct. That makes `window["Deno"]` impossible, and he reckoned it would be "nearly impossible to bypass, as the name is never known, it changes every time, and the function is location-specific". A local variable scoped to the module would also be possible, he said, but then bundled code would all have the same privileges, while his method can understand sourcemaps.
+
+`CaptainLach` preferred a different mechanism: hook the import of the runtime package for all packages, and only add a `Deno` import override, so the enforcement works at the level of synthetic modules and the module graph, with "a dumb transpiler that is not aware of permission system". On bundled code he was blunt: "I don't think it can be solved reasonably in bundled code". He allowed that every package could use its own `Deno_<random-number>` global, but noted local variables can be enumerated with `with(new Proxy(...)){}` and called that "a solution in search for a problem, why would you bundle such code in the first place..."
+
+On 2026-11-05 `CaptainLach` tried a quick demo of how the permission system might look and found that `module.registerHooks`, which he said is the only way to do this from JS, lets a hook skip imports of the referenced module. He linked dodo pull request #18, titled in the embed "fix: op_import_sync_with_source skips loading file imports".[^5] `daniellacosse` replied: "looks good, small nit you can ignore".
+
 ## Where it stands
 
-Nothing was decided. The two positions are that per-module permissions are not viable inside a shared context (`andy`, `Matthew`), and that separate contexts might make them possible (`daniellacosse`, `davey`). `daniellacosse` elsewhere called per-module permissions "sadly infeasible" and treated per-extension permissions as a possible middle ground; see the [extension boundary](Sandboxed_Extension_Boundary.md) page for how that fared. The 2026-11-04 exchange narrowed the scope question: package, not module, with `davey` offering to evaluate the options from a developer-experience perspective.
+Nothing was decided. The two positions are that per-module permissions are not viable inside a shared context (`andy`, `Matthew`), and that separate contexts might make them possible (`daniellacosse`, `davey`). `daniellacosse` elsewhere called per-module permissions "sadly infeasible" and treated per-extension permissions as a possible middle ground; see the [extension boundary](Sandboxed_Extension_Boundary.md) page for how that fared. The 2026-11-04 exchange narrowed the scope question: package, not module, with `davey` offering to evaluate the options from a developer-experience perspective. The same exchange produced the first implementation sketches — `andy`'s transpiler rewrite of `Deno` references, `CaptainLach`'s runtime-import hook, and `daniellacosse`'s `imports`-map sketch — plus the producer-side manifest idea, but no sketch was chosen.
 
 ## Open questions
 
 - Whose permissions apply when one package hands a function or object to another. `Varad` raised it and no reply addressed it.
 - How npm packages without a manifest would be treated.
 - Whether a worker-per-package design is acceptable given the serialization cost raised by `Matthew`.
+- Which enforcement mechanism to use: `andy`'s per-location transpiler rewrite or `CaptainLach`'s runtime-import hook.
 
 ## Related
 
@@ -98,3 +131,5 @@ Nothing was decided. The two positions are that per-module permissions are not v
 [^3]: [emdash and WordPress](https://blog.cloudflare.com/emdash-wordpress/): the Cloudflare blog post `davey` linked on 2026-11-04 for how emdash CMS handled plugin isolation off the happy path. Not read here; the claim about what it shows is his.
 
 [^4]: [hotsauce workers README](https://github.com/smallhoursorg/hotsauce/blob/main/packages/workers/README.md): `davey`'s own project, linked on 2026-11-04 as a similar case. Not read here.
+
+[^5]: [dodo pull request #18](https://github.com/are-we-dodo-yet/dodo/pull/18): the PR `CaptainLach` linked on 2026-11-05 for `module.registerHooks` skipping imports. Its contents were not read here; the title is as shown in the capture's embed.
