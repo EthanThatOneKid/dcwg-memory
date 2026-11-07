@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 57 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 58 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -69,6 +69,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #ende — 2026-11-06](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-06_dcwg-ende.md): Append-only capture of #ende from 2026-11-06T23:45:19Z to 2026-11-07T00:26:02Z, pulled from the Discord REST API. 3 messages, 1 participants.
 - [Discord #general — 2026-11-06](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-06_dcwg-general-2.md): Append-only capture of #general from 2026-11-06T18:19:00Z to 2026-11-06T18:29:07Z, pulled from the Discord REST API. 2 messages, 2 participants.
 - [Discord #general — 2026-11-06](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-06_dcwg-general.md): Append-only capture of #general from 2026-11-06T16:08:39Z to 2026-11-06T17:08:11Z, pulled from the Discord REST API. 2 messages, 2 participants.
+- [Discord #sandboxo — 2026-11-06](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-06_dcwg-sandboxo.md): Append-only capture of #sandboxo from 2026-11-06T19:54:05Z to 2026-11-06T19:59:49Z, pulled from the Discord REST API. 4 messages, 1 participants.
 
 ## Pasted briefs
 
