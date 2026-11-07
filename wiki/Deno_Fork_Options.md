@@ -23,6 +23,10 @@ The compatibility fork is the one with a constituency. `davey` asked for Deno un
 
 The stripped fork is where the disagreement is. `netop://ウィビ` wants to strip everything, keeps only the namespace for compatibility, and considers Node compatibility a historical adoption tactic rather than a feature. `daniellacosse` offered the synthesis: a core runtime with KV, Deploy, and Node compatibility as modules you turn on per project, which `netop://ウィビ` said matches the plugin ecosystem he was already planning.
 
+## KV as a standalone library
+
+On 2026-11-05 `paula` asked in `#brainstorm` whether Deno KV does anything special besides using `node:v8` serialize and deserialize with a SQLite backend, and suggested it would be nice to have as a JSR library if possible. `CaptainLach` answered that the API is quite nice for what it does, but that the open-source backend implementation is not, and said he would like a FoundationDB implementation of it at some point. That is a third shape for KV's future — neither kept in a fork nor dropped with it, but extracted as a library — and it is the participants' suggestion, not a plan anyone has committed to. See [Ende vs Dodo](Ende_vs_Dodo.md) for where KV stands in each fork.
+
 ## Dodo's Emerging Identity and Philosophy
 
 Participants articulated a more defined vision for the Dodo compatibility fork during discussions.
@@ -60,11 +64,19 @@ One correction is worth keeping, because it is the only check anyone ran on the 
 
 `netop://ウィビ` shipped first, with [Ende](Ende_Runtime.md), a drop-in fork with no Node compatibility. While `dodo` has emerged as the favored name for a compatibility fork, with an evolving identity and philosophical direction, it still lacks a dedicated repository and owner as of the 2026-10-18 capture. See [Ende vs Dodo](Ende_vs_Dodo.md) for the two positions side by side.
 
+## An earlier fork: Den
+
+On 2026-11-06 `netop://ウィビ` noted in `#general` that he had become aware of another Deno fork, "much earlier than ours": [stevefan1999-personal/den](https://github.com/stevefan1999-personal/den), described on the repository as "Den - One word less than Deno!" The GitHub API read on 2026-11-07 confirms the timing: the repository was created 2023-04-08, is written in Rust, had 17 stars, and was last pushed 2026-09-25.[^1] It predates the working group's forks by about three and a half years, so the group's naming debate and its forks were not the first attempt at a Deno fork. Nothing in the capture says what Den keeps or drops, or whether the group has looked at it further.
+
 ## Open questions
 
 - Whether the compatibility fork is a separate project or a configuration of Ende, now that a plugin ecosystem is on the table. See [Runtime architecture proposals](Runtime_Architecture_Proposals.md).
 - Who maintains the compatibility fork if `netop://ウィビ` is maintaining the stripped one, since nobody in the log volunteered.
 - Whether the fork keeps Deno's compiled-in extension set or adopts the loadable one argued about later the same day. [Prior art for a minimal-core runtime](Prior_Art_Runtimes.md) covers who has already built the latter.
+
+## Sources
+
+[^1]: GitHub API, read 2026-11-07: `stevefan1999-personal/den` (created 2023-04-08, Rust, 17 stars, last pushed 2026-09-25).
 
 ## Related
 
