@@ -1,7 +1,7 @@
 ---
 "@type": schema:TechArticle
 schema:name: Self-hosted deploy platform
-schema:description: CaptainLach's standalone, self-hosted implementation of a Deno Deploy-style platform, as described in #sandboxo on 2026-10-22 to 2026-10-24 and in #ende on 2026-10-20, with the naming ideas and what is not yet public.
+schema:description: CaptainLach's standalone, self-hosted implementation of a Deno Deploy-style platform, as described in #sandboxo on 2026-10-22 to 2026-11-06 and in #ende on 2026-10-20, with the naming ideas and what is not yet public.
 wazoo:source: dcwg
 wiki:priority: low
 ---
@@ -15,6 +15,7 @@ wiki:priority: low
 - **2026-10-20, in `#ende`.** `CaptainLach` said he had copied the Deno documentation for his Deno Deploy implementation, showed a screenshot of it, and said he was not sure how to name it. `daniellacosse` suggested "Dodo Doploy" and `CaptainLach` "Dodo Nest." He added that he had accidentally leaked the domain of the first production instance, and that the docs section had been reconstructed by an AI model from his notes, so he had not reviewed it much.
 - **2026-10-22, in `#sandboxo`.** When a new participant asked what the channel was for, `daniellacosse` described it as a self-hosted Deno Deploy adapter of sorts. `CaptainLach` corrected him: it is not an adapter but a self-contained implementation of such a platform. It was based on internal company work, and he is replacing parts of it to make it fully standalone. "Stay tuned."
 - **2026-10-24, in `#sandboxo`.** Ethan (handle `Ethan:Print"Ethan";:GoTo Ethan`) wrote that it sounds exciting and that he was thinking of "coolify but for Deno Deploy."
+- **2026-11-06, in `#sandboxo`.** `CaptainLach` shared eight screenshots of the platform (images, with no accompanying text) and said it is "still a very early version," offering closed alpha access to anyone who wants to test it. The images themselves are not in the record, so what they show is not recorded here, and no repository or release was linked.
 
 ## Why it matters to the group
 
@@ -23,7 +24,7 @@ The group's [analysis of Deno Deploy's architecture](Deno_Deploy_Architecture.md
 ## Open questions
 
 - Its name, which was undecided as of 2026-10-20.
-- Whether it will be public, and under what license.
+- Whether it will be public, and under what license. Closed alpha access was offered on 2026-11-06.
 - How much of it depends on the internal work it came from.
 
 ## Related

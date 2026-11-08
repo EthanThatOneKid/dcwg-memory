@@ -1,7 +1,7 @@
 ---
 "@type": schema:TechArticle
 schema:name: TypeScript 7 and type-aware tooling
-schema:description: The 2026-10-17 to 2026-10-21 discussion of how a Dodo fork keeps up with TypeScript 7, the Rust port tsrs, and what type-aware linting needs, and why TypeScript upgrades fall outside Deno's promised maintenance.
+schema:description: The 2026-10-17 to 2026-11-07 discussion of how a Deno fork keeps up with TypeScript 7, the Rust port tsrs, and what type-aware linting needs, and why TypeScript upgrades fall outside Deno's promised maintenance.
 wazoo:source: dcwg
 wiki:priority: low
 ---
@@ -22,6 +22,10 @@ On 2026-10-20 `netop://ウィビ` shared a Cloudflare blog post introducing `tsr
 
 `lishaduck`'s view was that it is "pretty much ideal from a technical standpoint" for his tooling, and a decent option if the group stays with unforking, since there is no Go runtime to embed. He said he was watching how well it is stewarded, and guessed it will last because it serves `oxlint`, while noting it was brand new. `daniellacosse` agreed it was too early but worth watching. `CaptainLach` hoped its stewards would not "do anything stupid like bun," pointing to a post from Bun about language changes if TypeScript types become real, and `lishaduck` answered that it is in their best interest not to diverge much. A tangent followed about a library called Effect and an `ESLint` limitation that led its fans to fork the Go-based compiler to add checks; `CaptainLach` said he did not see why, since to him it is mostly web streams but worse. None of this bears on a decision.
 
+## Ende plans to add it; Deno reverts the native compiler (2026-11-06 to 2026-11-07)
+
+`netop://ウィビ` said on 2026-11-07 that after Ende's current round of fixes lands, he will look at adding TypeScript 7 to Ende. He noted Deno had started on a native TypeScript compiler and reverted it, linking [denoland/deno#37088](https://github.com/denoland/deno/pull/37088) and [#37057](https://github.com/denoland/deno/pull/37057): the first removes the native TypeScript compiler module, the second restores the in-process checker as the `deno check` backend, as the first step in rolling back the migration for compatible canary builds.[^2] That puts Ende's TypeScript 7 work after the port of Deno's remaining fixes, not alongside it. See [Ende](Ende_Runtime.md).
+
 ## Open questions
 
 - Whether Dodo adopts TypeScript 7, a Rust port, or stays on Deno's current support, and when.
@@ -36,3 +40,5 @@ On 2026-10-20 `netop://ウィビ` shared a Cloudflare blog post introducing `tsr
 ## Sources
 
 [^1]: [`oxc-project/tsrs`](https://github.com/oxc-project/tsrs), read through the GitHub API on 2026-10-29: described as a Rust port of the TypeScript 7 type checker, created 2026-10-01, about 2,500 stars, last pushed 2026-10-28.
+
+[^2]: [denoland/deno#37057](https://github.com/denoland/deno/pull/37057), "revert: type-check with native tsc by default", read 2026-11-08: reverts #35938 to restore the in-process TypeScript checker for `deno check`. [denoland/deno#37088](https://github.com/denoland/deno/pull/37088), "revert: remove the native TypeScript compiler module": title and open state read through the GitHub API on 2026-11-08; its merged state was not read.
