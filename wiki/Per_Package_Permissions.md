@@ -118,6 +118,7 @@ Nothing was decided. The two positions are that per-module permissions are not v
 ## Related
 
 - [Sandboxed extension boundary](Sandboxed_Extension_Boundary.md): where this conversation continued, and where CaptainLach described a per-package runtime object.
+- [Deno permission-model security](Deno_Permission_Model_Security.md): the 2026-11-08 #general thread on the permission model's footguns, kernel enforcement, and worker permission introspection.
 - [Runtime architecture proposals](Runtime_Architecture_Proposals.md): the extension design that frames the modules-versus-extensions distinction.
 - [Deno Core Working Group](Deno_Core_Working_Group.md): the group's position on keeping the permission model.
 - [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md): the handles in this thread.

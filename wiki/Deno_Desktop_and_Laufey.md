@@ -37,6 +37,12 @@ Asked by `daniellacosse` what she is having to harden, `Summer` pointed to a wri
 
 `daniellacosse` asked to what extent it makes sense for the extension system the group has been discussing to apply to the webview as well, giving `dodo --ext=fetch` as an example of the shape. `Summer` replied that it is principle of least privilege but probably more a defense-in-depth matter, and that implementing WebKit content blockers[^4] is more likely to catch the many ways a resource can be reached — image, script, stylesheet, XHR, DNS preloads, and others — while loading a web extension into the webview could also help enforce such things.
 
+## Desktop security issues, and Ende's WebView2 fix (2026-11-07 to 2026-11-08)
+
+In `#general` on 2026-11-08, `Summer` linked three upstream Deno items, saying “its more these issues”:[^5] a discussion proposing traversal-resistant file APIs modeled on Go's `openRoot` ([denoland/deno #36651](https://github.com/denoland/deno/discussions/36651)), and two desktop issues, one for verifying the sender of messages over desktop bindings ([denoland/deno #36861](https://github.com/denoland/deno/issues/36861)) and one for a `will-navigate` event with `preventDefault` support ([denoland/deno #36860](https://github.com/denoland/deno/issues/36860)). The two desktop issues quote Electron's security checklist items 17 and 13 — the same two items `Summer` said on 2026-10-30 were impossible in Deno Desktop. `SpaceMonkey` replied that he would do all three in his fork, estimating “a couple weeks (AI's guess).” See [Deno permission-model security](Deno_Permission_Model_Security.md) for the thread.
+
+Separately, in `#ende` on 2026-11-07, `netop://ウィビ` reported that Ende fixed the Windows desktop issues upstream: each app now gets its own WebView2 user data folder, so an MSI-installed app under Program Files no longer fails with `E_ACCESSDENIED` and a blank window — the `#36768` problem `Tadda` cited on 2026-10-17. See [Ende](Ende_Runtime.md).
+
 ## Open questions
 
 - Whether Dodo keeps Laufey, forks it, or moves to `wry`.
@@ -48,6 +54,8 @@ Asked by `daniellacosse` what she is having to harden, `Summer` pointed to a wri
 - [Dodo project roadmap](Project_Roadmap.md): Deno Desktop and Mobile as a far goal.
 - [Killer App Framework](Killer_App_Framework.md): the other place `SpaceMonkey`'s framework project appears.
 - [Dodo's identity and the economic reality](Dodo_Identity_and_Economics.md): the earlier discussion of replacing Laufey's backends with `wry`.
+- [Deno permission-model security](Deno_Permission_Model_Security.md): the #general thread behind the three linked upstream issues.
+- [Ende](Ende_Runtime.md): the WebView2 user-data-folder fix for Windows desktop apps.
 
 ## Sources
 
@@ -58,3 +66,5 @@ Asked by `daniellacosse` what she is having to harden, `Summer` pointed to a wri
 [^3]: [Security, Electron](https://www.electronjs.org/docs/latest/tutorial/security#checklist-security-recommendations): the checklist `Summer` pointed to on 2026-10-30. Which of its items are impossible in Deno Desktop is her claim, not checked here.
 
 [^4]: [Content Blockers: First Look, WebKit](https://webkit.org/blog/3476/content-blockers-first-look/): the WebKit content-blocker approach `Summer` pointed to on 2026-10-31.
+
+[^5]: The three upstream items `Summer` linked on 2026-11-08: [denoland/deno discussions #36651](https://github.com/denoland/deno/discussions/36651), [issues #36861](https://github.com/denoland/deno/issues/36861), [issues #36860](https://github.com/denoland/deno/issues/36860). Titles read 2026-11-09; their open/closed state was not checked.
