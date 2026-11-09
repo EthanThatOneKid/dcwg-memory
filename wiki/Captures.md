@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 60 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 61 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -72,6 +72,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #sandboxo — 2026-11-06](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-06_dcwg-sandboxo.md): Append-only capture of #sandboxo from 2026-11-06T19:54:05Z to 2026-11-06T19:59:49Z, pulled from the Discord REST API. 4 messages, 1 participants.
 - [Discord #ende — 2026-11-07](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-07_dcwg-ende.md): Append-only capture of #ende from 2026-11-07T18:02:13Z to 2026-11-07T18:02:40Z, pulled from the Discord REST API. 2 messages, 1 participants.
 - [Discord #general — 2026-11-07](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-07_dcwg-general.md): Append-only capture of #general from 2026-11-07T18:31:02Z to 2026-11-08T14:39:18Z, pulled from the Discord REST API. 18 messages, 3 participants.
+- [Discord #brainstorm — 2026-11-08](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-08_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-11-08T20:42:33Z to 2026-11-09T17:02:02Z, pulled from the Discord REST API. 2 messages, 2 participants.
 
 ## Pasted briefs
 
@@ -92,6 +93,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Deno Desktop and Laufey](Deno_Desktop_and_Laufey.md): The 2026-10-16 to 2026-10-31 discussion of Deno Desktop's webview layer Laufey, a contributor's open fixes, whether to switch to wry, the licensing and CLA question, a competing fork, and webview permissions.
 - [Deno fork options and naming](Deno_Fork_Options.md): The two-fork thesis, the naming candidates weighed on 2026-10-11 (Ende, dodo, endo, noend, Pteryx), and what the group agreed a fork must preserve.
 - [Deno JavaScriptCore Compatibility](Deno_JavaScriptCore_Compatibility.md): CaptainLach reported that Deno works perfectly fine with JavaScriptCore, based on manual checks.
+- [Deno permission-model security](Deno_Permission_Model_Security.md): The 2026-11-08
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): What a community handoff of the Deno runtime, std, and rusty_v8 would have to transfer, split into what is possible, what needs negotiation, and what is not on the table.
 - [Deno versus Node features](Deno_vs_Node_Features.md): The 2026-10-16
 - [Dodo branding, namespaces, and website](Dodo_Branding_and_Namespaces.md): How the group claimed JSR scopes, chose and hunted for a domain, designed the Dodo logo, and started the website between 2026-10-12 and 2026-10-23.
