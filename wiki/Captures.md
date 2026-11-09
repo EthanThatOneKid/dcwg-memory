@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 62 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 63 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -73,6 +73,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #ende — 2026-11-07](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-07_dcwg-ende.md): Append-only capture of #ende from 2026-11-07T18:02:13Z to 2026-11-07T18:02:40Z, pulled from the Discord REST API. 2 messages, 1 participants.
 - [Discord #general — 2026-11-07](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-07_dcwg-general.md): Append-only capture of #general from 2026-11-07T18:31:02Z to 2026-11-08T14:39:18Z, pulled from the Discord REST API. 18 messages, 3 participants.
 - [Discord #brainstorm — 2026-11-08](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-08_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-11-08T20:42:33Z to 2026-11-09T17:02:02Z, pulled from the Discord REST API. 2 messages, 2 participants.
+- [Discord #general — 2026-11-08](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-08_dcwg-general.md): Append-only capture of #general from 2026-11-08T18:30:50Z to 2026-11-08T18:30:50Z, pulled from the Discord REST API. 1 messages, 1 participants.
 - [Discord #propose — 2026-11-08](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-08_dcwg-propose.md): Append-only capture of #propose from 2026-11-08T21:30:05Z to 2026-11-08T21:32:53Z, pulled from the Discord REST API. 2 messages, 1 participants, across 1 thread.
 
 ## Pasted briefs
