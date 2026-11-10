@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 66 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 67 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -77,6 +77,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #propose — 2026-11-08](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-08_dcwg-propose.md): Append-only capture of #propose from 2026-11-08T21:30:05Z to 2026-11-08T21:32:53Z, pulled from the Discord REST API. 2 messages, 1 participants, across 1 thread.
 - [Discord #sandboxo — 2026-11-09](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-09_dcwg-sandboxo.md): Append-only capture of #sandboxo from 2026-11-09T06:21:43Z to 2026-11-09T08:51:01Z, pulled from the Discord REST API. 2 messages, 1 participants.
 - [Discord #brainstorm — 2026-11-10](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-10_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-11-10T04:23:05Z to 2026-11-10T16:58:19Z, pulled from the Discord REST API. 3 messages, 1 participants.
+- [Discord #dodoer — 2026-11-10](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-10_dcwg-dodoer.md): Append-only capture of #dodoer from 2026-11-10T10:41:38Z to 2026-11-10T10:41:38Z, pulled from the Discord REST API. 1 messages, 1 participants.
 - [Discord #general — 2026-11-10](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-10_dcwg-general.md): Append-only capture of #general from 2026-11-10T08:18:18Z to 2026-11-10T18:12:36Z, pulled from the Discord REST API. 25 messages, 8 participants.
 
 ## Pasted briefs
