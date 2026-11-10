@@ -1,7 +1,7 @@
 ---
 "@type": schema:TechArticle
 schema:name: CI and release cadence
-schema:description: The 2026-10-14 to 2026-10-17 #ende discussion of how long the forks' CI runs, what Ende did to cut it from 34 to 13 minutes, the options for Dodo, and whether nightlies are worth keeping.
+schema:description: The 2026-10-14 to 2026-10-17 #ende discussion of how long the forks' CI runs, what Ende did to cut it from 34 to 13 minutes, the options for Dodo, and whether nightlies are worth keeping; plus a 2026-11-08 #general note on Dependabot and CodeQL being turned off for noise.
 wazoo:source: dcwg
 wiki:priority: medium
 ---
@@ -39,6 +39,10 @@ He reported 34 minutes before and 13 minutes after, linking a run for each, and 
 `daniellacosse` observed that Dodo probably cannot make Ende's weekly-macOS trade if it wants nightlies. `netop://ウィビ` said he sees no point in nightlies or canaries and was ending them, and `daniellacosse` answered that some people like them.
 
 The question comes back through extensions. `daniellacosse` asked on 2026-10-15 whether dynamic extensions would require nightlies to keep up with V8's changes, "unless we do some napi-esque thing." `w` said that is still undecided and that the extension crates and `op2` macros are not "not napi-like." On 2026-10-17, after `netop://ウィビ` reported that Ende's release workflow ran for almost an hour even with about half the code removed, and predicted Dodo's would take longer, `daniellacosse` concluded that Dodo probably has to compile extensions dynamically and rebuild only the ones that changed. That is his inference from the reported build time, not a decision. See [Standard libraries and extensions](Std_Libraries_and_Extensions.md) and [Runtime architecture proposals](Runtime_Architecture_Proposals.md).
+
+## Automated tooling turned off for noise
+
+On 2026-11-08 `netop://ウィビ` said in `#general`, replying to `Summer`, that he had turned off Dependabot and CodeQL because they added too much noise. The capture does not name the repository, so this records the decision and the reason, not which project it applied to.
 
 ## Where it stands
 

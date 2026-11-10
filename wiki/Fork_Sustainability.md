@@ -1,7 +1,7 @@
 ---
 "@type": schema:TechArticle
 schema:name: Sustaining the fork
-schema:description: The 2026-10-12 #propose thread on how a fork gets funded and maintained past one volunteer, covering the cloud-hosting proposal, the foundation and sponsorship routes, and which companies were named as prospects.
+schema:description: The 2026-10-12 #propose thread on how a fork gets funded and maintained past one volunteer, covering the cloud-hosting proposal, the foundation and sponsorship routes, which companies were named as prospects, and the self-hosted platform CaptainLach offered in the thread on 2026-11-08.
 wazoo:source: dcwg
 wazoo:thread: "1559236057663414383"
 wiki:priority: high
@@ -41,9 +41,15 @@ One adjacent wish was recorded and not acted on. `strmnn` said he wishes they wo
 
 `daniellacosse` answered with an instruction rather than an argument: he would recommend going to talk to some customers and reporting back, and named security as a big consideration `Ooker` had not mentioned. That is the thread's only concrete next action, and nobody reported doing it.
 
+## A self-hosted platform, offered rather than sold
+
+On 2026-11-08 `CaptainLach` returned to the thread with something built rather than proposed: he said he had researched how Deno Deploy works and made a Deno Deploy-compatible thing, which he would open-source at some point but make self-hosted much sooner, once he was sure the architecture would not drift much more. He linked its UI, offered access to a couple of people any time, and said he was not planning on monetizing it — he liked the idea for minimalistic websites. His chatbots already use the platform, he said, to build features chats ask for: someone can ask his chatbot to implement a leveling system in the chat, and it builds it using sandboxo to accept webhooks and show the user leveling progress on the website.
+
+That is a different shape from the cloud product the thread rejected in October: self-hosted, not sold, and already running for his own chatbots rather than pitched as a funding route. See [Self-hosted deploy platform](Self_Hosted_Deploy_Platform.md) for the platform itself.
+
 ## Where it stands
 
-No cloud product, no foundation, no sponsor, and no bounty program. The one decision the thread contains is the rejection of the cloud route, which `davey` accepted. Open Collective is the option everyone agreed is easiest and nobody has set up. The corporate list exists in the server rather than in this capture, and the outreach has not started because `daniellacosse` judged the project not ready.
+No cloud product, no foundation, no sponsor, and no bounty program. The one decision the thread contains is the rejection of the cloud route, which `davey` accepted. Open Collective is the option everyone agreed is easiest and nobody has set up. The corporate list exists in the server rather than in this capture, and the outreach has not started because `daniellacosse` judged the project not ready. `CaptainLach`'s self-hosted platform exists and is in closed alpha, but it is not a funding route — he said he is not planning to monetize it.
 
 The structural point is worth separating from the funding question: the group's concern is a fork with one maintainer, and every route discussed here either requires more project to sell or more trust than the project has. Nothing in the thread addresses what happens to the fork if the person who is building it stops.
 

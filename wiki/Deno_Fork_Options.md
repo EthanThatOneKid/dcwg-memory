@@ -27,6 +27,8 @@ The stripped fork is where the disagreement is. `netop://ウィビ` wants to str
 
 On 2026-11-05 `paula` asked in `#brainstorm` whether Deno KV does anything special besides using `node:v8` serialize and deserialize with a SQLite backend, and suggested it would be nice to have as a JSR library if possible. `CaptainLach` answered that the API is quite nice for what it does, but that the open-source backend implementation is not, and said he would like a FoundationDB implementation of it at some point. That is a third shape for KV's future — neither kept in a fork nor dropped with it, but extracted as a library — and it is the participants' suggestion, not a plan anyone has committed to. See [Ende vs Dodo](Ende_vs_Dodo.md) for where KV stands in each fork.
 
+On 2026-11-08 `CaptainLach` reported in `#brainstorm` that while fuzzing he had found `v8_valueserializer` does not always output the same values as the V8 implementation, breaking the v8x roundtrip in some cases. His example: serializing an array with a deleted element — `const a = []; a[5] = 1; delete a[5];` — should produce an array of five holes after a roundtrip, but the denokv serializer produced an empty array instead. He said he had forked denokv to fix that. `daniellacosse` asked which cases are affected and whether they should wrap it and fix them. The fix had not been reported as landed as of the capture.
+
 ## Dodo's Emerging Identity and Philosophy
 
 Participants articulated a more defined vision for the Dodo compatibility fork during discussions.
