@@ -26,6 +26,8 @@ On 2026-10-20 `netop://ウィビ` shared a Cloudflare blog post introducing `tsr
 
 `netop://ウィビ` said on 2026-11-07 that after Ende's current round of fixes lands, he will look at adding TypeScript 7 to Ende. He noted Deno had started on a native TypeScript compiler and reverted it, linking [denoland/deno#37088](https://github.com/denoland/deno/pull/37088) and [#37057](https://github.com/denoland/deno/pull/37057): the first removes the native TypeScript compiler module, the second restores the in-process checker as the `deno check` backend, as the first step in rolling back the migration for compatible canary builds.[^2] That puts Ende's TypeScript 7 work after the port of Deno's remaining fixes, not alongside it. See [Ende](Ende_Runtime.md).
 
+It shipped three days later: `netop://ウィビ` announced Ende release `v2026.11.10` on 2026-11-10, which adds TypeScript 7 type checking behind `--unstable-tsc7`. The GitHub API read on 2026-11-11 shows the release published 2026-11-10T02:43:12Z.[^3] See [Ende](Ende_Runtime.md).
+
 ## Open questions
 
 - Whether Dodo adopts TypeScript 7, a Rust port, or stays on Deno's current support, and when.
@@ -42,3 +44,5 @@ On 2026-10-20 `netop://ウィビ` shared a Cloudflare blog post introducing `tsr
 [^1]: [`oxc-project/tsrs`](https://github.com/oxc-project/tsrs), read through the GitHub API on 2026-10-29: described as a Rust port of the TypeScript 7 type checker, created 2026-10-01, about 2,500 stars, last pushed 2026-10-28.
 
 [^2]: [denoland/deno#37057](https://github.com/denoland/deno/pull/37057), "revert: type-check with native tsc by default", read 2026-11-08: reverts #35938 to restore the in-process TypeScript checker for `deno check`. [denoland/deno#37088](https://github.com/denoland/deno/pull/37088), "revert: remove the native TypeScript compiler module": title and open state read through the GitHub API on 2026-11-08; its merged state was not read.
+
+[^3]: [theende/ende `v2026.11.10`](https://github.com/theende/ende/releases/tag/v2026.11.10), read through the GitHub API on 2026-11-11: published 2026-11-10T02:43:12Z.

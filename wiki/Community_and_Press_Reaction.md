@@ -21,6 +21,7 @@ wiki:priority: low
 - **A RedMonk post, 2026-10-27.** `netop://ウィビ` said it mentions Dodo and Ende. Its embed title is "The Web Can't Afford a JavaScript Runtime Monoculture," and its description says Deno announced its whole team is joining Cloudflare and that development of the runtime stops after one year, leaving two major general-purpose runtimes.
 - **Mozilla, 2026-10-21.** `Leokuma` asked whether Mozilla might take over Deno development. `Seally` and `Sandeep Kumar Kuanar✌🏼` said Mozilla is in enough financial trouble and no longer owns Rust, so they did not expect it. Those are opinions.
 - **JSR's future, 2026-10-27.** `paula` asked what happens to JSR, since its frontend is built on Deno's Fresh framework, and quoted the announcement's line that "JSR will continue operating, with its infrastructure moving to Cloudflare." `netop://ウィビ` said they had said little beyond Bart mentioning foundations. See [JSR and the package registry](JSR_and_Package_Registry.md).
+- **Val Town winding down, 2026-11-10.** Ethan shared [his own post on X](https://x.com/etok_me/status/2120217494690689122?a=9Sz7DqZQkxr1F6sE33Y&s=20), calling Val Town "the first major @deno_land-native product I've seen shut down" and saying that, given the funding landscape for developer tools, he expects it will not be the last. The shutdown itself is confirmed by Val Town's own blog post the same day, "Val Town is winding down": new sign-ups and plan upgrades stop 2026-11-10, the service becomes read-only 2026-12-10, all remaining services shut down 2027-01-10, and Val Town's code is released as open source 2027-02-01.[^1] Ethan's expectation of further shutdowns is his own, not a fact in the post.
 
 ## Which forks exist, as the group describes them
 
@@ -31,3 +32,7 @@ On 2026-10-20 `Doctor 🤖` asked whether three forks of Deno were being discuss
 - [Foundation outreach and Bart's reply](Foundation_Outreach.md): the contact with the Deno team.
 - [Dodo branding, namespaces, and website](Dodo_Branding_and_Namespaces.md): the website and README work after the Socket post.
 - [Deno Core Working Group](Deno_Core_Working_Group.md): the group these reactions are about.
+
+## Sources
+
+[^1]: [Val Town is winding down](https://blog.val.town/winding-down), Val Town blog, published 2026-11-10, read 2026-11-11: the wind-down timeline above.
