@@ -140,9 +140,9 @@ day's capture. A scheduled run archives only: it captures, advances the cursor, 
 the fold, and never calls a model. The fold is the Muse cron (`DAILY_CRON.md`); a manual
 `workflow_dispatch` is the fallback and keeps the old archive+fold behaviour (tick
 `skip_wiki` to archive without a fold). A run covers every venue discovery lists.
-`VENUES` in the workflow is the pinned
-list (`#brainstorm`, `#propose`, the two channels the server was told are archived): those keep their venue names, which are the filenames of
-existing captures, and are archived even if discovery fails. `tools/discord/discover.ts` adds the rest
+`VENUES` in the workflow is the pinned list — all 11 public channels
+(`#brainstorm`, `#propose`, `#general`, `#news`, `#rules`, `#ende`, `#dodoer`, `#rust-resources`, `#andromeda`, `#roadmap`, `#sandboxo`): those keep their venue names, which are the filenames of
+existing captures, and are archived even if discovery fails. `tools/discord/discover.ts` still adds any new public channel
 by asking the server. Because everything here is published, "public" is decided conservatively: a channel
 is listed only when `@everyone` can view it and read its history (role permissions plus the channel's own
 overwrites, Discord's algorithm) and the bot can too; age-restricted channels, voice, category and stage
