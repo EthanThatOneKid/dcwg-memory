@@ -94,7 +94,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Benchmarking dodo](Dodo_Benchmarks.md): The 2026-10-13
 - [Celld Runtime](Celld_Runtime.md): An explanation of Celld as a lightweight, secure runtime for single-threaded JavaScript processors, its benefits for microservices, and its limited applications outside of backend environments.
 - [CI and release cadence](CI_and_Release_Cadence.md): The 2026-10-14 to 2026-10-17
-- [Community and press reaction](Community_and_Press_Reaction.md): The videos, articles, and posts about Deno's move to Cloudflare and about the forks that `#general` participants shared between 2026-10-15 and 2026-10-28, and what the group said about them.
+- [Community and press reaction](Community_and_Press_Reaction.md): The videos, articles, and posts about Deno's move to Cloudflare and about the forks that `#general` participants shared between 2026-10-15 and 2026-11-11, and what the group said about them.
 - [Deno](Deno.md): A JavaScript, TypeScript, and WebAssembly runtime built on V8 and Rust, created by Ryan Dahl and Bert Belder, whose own development ends about a year after Cloudflare acquired Deno Land Inc. on 2026-10-09.
 - [Deno Core Working Group](Deno_Core_Working_Group.md): An informal group of Deno users organizing on Discord to keep the runtime alive after Cloudflare acquired Deno Land Inc. and Deno ended its own runtime development.
 - [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md): The Discord handles visible in the group's #talk capture, with the public identity behind each handle where one could be confirmed.
