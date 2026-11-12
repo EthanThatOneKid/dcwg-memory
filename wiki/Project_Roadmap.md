@@ -49,11 +49,17 @@ The roadmap predates much of the discussion recorded elsewhere. The extensions i
 
 On 2026-11-10 `daniellacosse` updated the `#roadmap` channel post and asked the group how they felt about it; no objections were recorded in the capture. He also described where the work stands: he is currently only able to give partial focus, so he is in a better position to coordinate and review code, while another participant, named only by Discord mention in the capture, knows the codebase and has been doing maintenance work. He said he is learning the codebase himself while renaming the binary and getting a release CI working, since the current one assumes access to URLs the project does not own. He added that all pull requests are welcome and he is happy to review anything, within reason. The update followed `SpaceMonkey`'s offer of his Denext fork's work for Dodo; see [Deno fork options and naming](Deno_Fork_Options.md).
 
+On 2026-11-11 `andy` said in `#general` that he is probably not going to be super active in Dodo for a while, though he expects to be a lot more active around Christmas and Thanksgiving, and that he is busy rather than anything being wrong. `daniellacosse` answered that he himself has only been able to give roughly 25%, and expects that to be the case for the next 3–6 months, and that the community has to find a way to be resilient to what life throws at each contributor: "apes together strong."
+
 ## First step toward a build
 
 The "release a runnable build" item had its first concrete step on 2026-10-30 (UTC). `daniellacosse` opened `are-we-dodo-yet/dodo` pull request 17, "chore: rename deno cli to dodo," whose description shows `./x build` now producing a `dodo` binary whose REPL prints "Dodo 2.9.7." He said the CI still needs fixing next, and told a newcomer who offered to maintain the standard library that the project is "a little stuck on not having a build for people to use" and that focus time is hard for him to find. On 2026-10-31 the GitHub API showed the pull request open and unmerged, 18 files changed, and the repository with no releases and 77 stars.[^1]
 
 On 2026-11-01 (UTC) the newcomer from 2026-10-30, `Soluble State`, replied in `#brainstorm` that they would discuss it with their team members, take a look at pull request 17, and start exploring the codebase. `daniellacosse` said, to set expectations, that he was working on getting his time back.
+
+## A WebRTC milestone, suggested 2026-11-10
+
+On 2026-11-10 in `#brainstorm` `daniellacosse` said he can't host a local server because Deno doesn't implement WebRTC. `𐑛𐑦𐑕𐑣𐑸𐑥𐑦𐑯𐑦 | 最不調和の伝播者 | 異議の元素` replied that it sounds like a potential Dodo milestone. Nothing was decided, and WebRTC is not in the roadmap above.
 
 ## Related
 

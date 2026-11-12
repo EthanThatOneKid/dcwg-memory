@@ -1,7 +1,7 @@
 ---
 "@type": schema:TechArticle
 schema:name: CI and release cadence
-schema:description: The 2026-10-14 to 2026-10-17 #ende discussion of how long the forks' CI runs, what Ende did to cut it from 34 to 13 minutes, the options for Dodo, and whether nightlies are worth keeping; plus a 2026-11-08 #general note on Dependabot and CodeQL being turned off for noise.
+schema:description: The 2026-10-14 to 2026-10-17 #ende discussion of how long the forks' CI runs, what Ende did to cut it from 34 to 13 minutes, the options for Dodo, and whether nightlies are worth keeping; plus a 2026-11-08 #general note on Dependabot and CodeQL being turned off for noise, and a 2026-11-11 #general note on Dodo pull request 17's failing checks and the Node 20 CI.
 wazoo:source: dcwg
 wiki:priority: medium
 ---
@@ -44,9 +44,13 @@ The question comes back through extensions. `daniellacosse` asked on 2026-10-15 
 
 On 2026-11-08 `netop://ウィビ` said in `#general`, replying to `Summer`, that he had turned off Dependabot and CodeQL because they added too much noise. The capture does not name the repository, so this records the decision and the reason, not which project it applied to.
 
+## Dodo's CI on pull request 17 (2026-11-11)
+
+On 2026-11-11 `daniellacosse` reported in `#general` that the failing checks on `are-we-dodo-yet/dodo` pull request 17 were down to 23, linking [the run](https://github.com/are-we-dodo-yet/dodo/actions/runs/42963363171?pr=17), and invited anyone to push to the branch as long as the work stays coordinated. He noted that a lot of the CI checks are still using Node v20 and should be fixed. `davey` answered that Node 20 did not get patched for the emudhra certificate leak, though probably not a big deal for tests, and offered to look at bumping from Node 20 over the next few days. `CaptainLach` added that it is not just Node.js but the version that matters: many GitHub Actions, including checkout, are written using Node.js.
+
 ## Where it stands
 
-Nothing was decided for Dodo. Ende's numbers are a single before-and-after on a different codebase. The record does not show Dodo's own CI duration, or whether any of these changes were applied to it.
+Nothing was decided for Dodo. Ende's numbers are a single before-and-after on a different codebase. The record does not show Dodo's own CI duration, or whether any of these changes were applied to it. On 2026-11-11 the record does show Dodo's CI state on pull request 17: 23 checks failing, with the Node 20 bump offered but not done.
 
 ## Related
 

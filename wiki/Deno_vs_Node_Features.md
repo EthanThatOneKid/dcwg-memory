@@ -55,6 +55,14 @@ In `#general` on 2026-11-02, `𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調�
 
 Asked by `Ooker` whether this means the program calls another process and the runtime takes that process's stdout, and whether that would be a security hole, `𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調和の伝播者 | 異議の元素` answered that it is not really the Deno runtime in there: they had re-implemented part of the API, not run Deno as a subprocess. `Ooker` then asked whether it has any benefit or is just for fun. `𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調和の伝播者 | 異議の元素` gave two possible uses: as a contingency plan, or as a way to write code that "targets" several runtimes at once without paying much attention to which one runs it. They also said they picked the idea up from an abandoned project of theirs from about three years ago, because they now want automated checks for whether the same ESM behaves the same under different runtimes, or at least produces identical output. They recalled an earlier attempt called `@cross` that did similar things but said it has been abandoned for a long time. Whether the experiment works beyond the proof of concept is not shown in the capture.
 
+## Timer namespaces and `Deno.(un)?refTimer` (2026-11-10)
+
+In `#general` on 2026-11-10, `𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調和の伝播者 | 異議の元素` reported that `Deno.refTimer` expects a `NodeJS.Timeout` rather than the `number | NodeJS.Timeout` its documentation states, and that `Deno.unrefTimer` did nothing with the numeric id returned by `setTimeout` on Deno 2.9.8. They linked plumbing in their own `ltgcgo/octavia` commit to work around it.
+
+`CaptainLach` explained the cause: there are two implementations of `setTimeout`, one from `ext/web` and one from `ext/node`, and web timers and Node timers live in different namespaces — different id maps, in `ext/web/02_timers.js` and `ext/node/polyfills/internal/timers.mjs`. `Deno.unrefTimer` does not call `toPrimitive`, while `clearInterval` and `clearTimeout` do (a WebIDL cast), so converting a `NodeJS.Timeout` to a number with `[Symbol.toPrimitive]()` yields an index into the Node map, not the web map the method looks in. The `number` in the documented type comes from the `ext/web` timers, which `ext/node` overrides. He said he would prepare a fix for Dodo to unify the namespaces.
+
+`𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調和の伝播者 | 異議の元素` added that Ende removed the Node.js timer objects, so it returns plain web timer numbers that work with `Deno.unrefTimer`, and that the compatibility layer they are writing forces numbers precisely to avoid relying on Node.js conventions. They said they look forward to the Dodo fix nonetheless.
+
 ## Trust and governance
 
 `Matthew` returned to the thread on 2026-10-21 (UTC) with a different objection from his earlier one, and it is about who maintains the result rather than the architecture. His points, as he made them:

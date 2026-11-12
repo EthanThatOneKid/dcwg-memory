@@ -80,6 +80,10 @@ One correction is worth keeping, because it is the only check anyone ran on the 
 
 On 2026-11-06 `netop://ウィビ` noted in `#general` that he had become aware of another Deno fork, "much earlier than ours": [stevefan1999-personal/den](https://github.com/stevefan1999-personal/den), described on the repository as "Den - One word less than Deno!" The GitHub API read on 2026-11-07 confirms the timing: the repository was created 2023-04-08, is written in Rust, had 17 stars, and was last pushed 2026-09-25.[^1] It predates the working group's forks by about three and a half years, so the group's naming debate and its forks were not the first attempt at a Deno fork. Nothing in the capture says what Den keeps or drops, or whether the group has looked at it further.
 
+## Another fork: OpenDeno
+
+On 2026-11-11 `SpaceMonkey` shared a Reddit post about Dodo in `#general`; a reply in it spoke of "OpenDeno", which `SpaceMonkey` said was news to him and suggested the group investigate. `netop://ウィビ` answered that OpenDeno was created three days earlier, at [kanryu/opendeno-servo-boa](https://github.com/kanryu/opendeno-servo-boa), described in its embed as "An experimental Rust browser prototype combining Servo's HTML rendering engine with Boa for sandboxed Deno-style script execution." Nothing in the capture says whether the group looked at it further.
+
 ## Open questions
 
 - Whether the compatibility fork is a separate project or a configuration of Ende, now that a plugin ecosystem is on the table. See [Runtime architecture proposals](Runtime_Architecture_Proposals.md).

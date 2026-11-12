@@ -1,7 +1,7 @@
 ---
 "@type": schema:TechArticle
 schema:name: Per-package (module-level) permissions
-schema:description: The 2026-10-21 #propose thread in which Varad proposed per-package permission manifests, andy and Matthew objected that modules share one context, and davey and daniellacosse later asked whether separate contexts could make it work, before the conversation moved to the extension-boundary thread.
+schema:description: The 2026-10-21 #propose thread in which Varad proposed per-package permission manifests, andy and Matthew objected that modules share one context, and davey and daniellacosse later asked whether separate contexts could make it work, before the conversation moved to the extension-boundary thread; plus a 2026-11-11 #general sketch of an IPC extension runtime.
 wazoo:source: dcwg
 wazoo:thread: "1562324423615184897"
 wiki:priority: medium
@@ -104,9 +104,15 @@ He said that was "really just as good as per-module", but "just not dynamic in t
 
 On 2026-11-05 `CaptainLach` tried a quick demo of how the permission system might look and found that `module.registerHooks`, which he said is the only way to do this from JS, lets a hook skip imports of the referenced module. He linked dodo pull request #18, titled in the embed "fix: op_import_sync_with_source skips loading file imports".[^5] `daniellacosse` replied: "looks good, small nit you can ignore".
 
+## An IPC extension runtime (2026-11-11)
+
+On 2026-11-11 `Summer` sketched a different shape in `#general`: take just a JavaScript engine, and put the start and end of the non-web APIs — file access and the rest — behind IPC with other processes, for example `runtime --ext=stdio:runtime-stdio script.js`, or with permissioned access as `runtime --ext stdio:'runtime-stdio --rw ./some/folder' script.js`, and the script importing the extension as `import stdio from 'ext:stdio'`. She pointed to MDN's native-messaging documentation as the rough shape for the IPC.
+
+`daniellacosse` read it as the per-extension permissioning proposal the group had been circling and asked `andy` where that had landed. `andy` answered that he had not finished his experiment, had been swept up with other things in life, and that the group still has no clear answer. Nothing was decided, and the sketch has no verdict in the capture.
+
 ## Where it stands
 
-Nothing was decided. The two positions are that per-module permissions are not viable inside a shared context (`andy`, `Matthew`), and that separate contexts might make them possible (`daniellacosse`, `davey`). `daniellacosse` elsewhere called per-module permissions "sadly infeasible" and treated per-extension permissions as a possible middle ground; see the [extension boundary](Sandboxed_Extension_Boundary.md) page for how that fared. The 2026-11-04 exchange narrowed the scope question: package, not module, with `davey` offering to evaluate the options from a developer-experience perspective. The same exchange produced the first implementation sketches — `andy`'s transpiler rewrite of `Deno` references, `CaptainLach`'s runtime-import hook, and `daniellacosse`'s `imports`-map sketch — plus the producer-side manifest idea, but no sketch was chosen.
+Nothing was decided. The two positions are that per-module permissions are not viable inside a shared context (`andy`, `Matthew`), and that separate contexts might make them possible (`daniellacosse`, `davey`). `daniellacosse` elsewhere called per-module permissions "sadly infeasible" and treated per-extension permissions as a possible middle ground; see the [extension boundary](Sandboxed_Extension_Boundary.md) page for how that fared. The 2026-11-04 exchange narrowed the scope question: package, not module, with `davey` offering to evaluate the options from a developer-experience perspective. The same exchange produced the first implementation sketches — `andy`'s transpiler rewrite of `Deno` references, `CaptainLach`'s runtime-import hook, and `daniellacosse`'s `imports`-map sketch — plus the producer-side manifest idea, but no sketch was chosen. `Summer`'s 2026-11-11 IPC sketch is a third shape for the same boundary, a JavaScript engine with the non-web APIs behind IPC, and it has no verdict either.
 
 ## Open questions
 

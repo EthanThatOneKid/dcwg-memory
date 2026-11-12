@@ -18,7 +18,7 @@ A JavaScript, TypeScript, and WebAssembly runtime built on V8 and Rust, created 
 
 ## What happened
 
-On 2026-10-09 Cloudflare announced it is acquiring Deno, and the whole Deno team is joining Cloudflare. The announcement post is signed by Kenton Varda and Ryan Dahl and frames the move around self-hosting Workers and Durable Objects. Cloudflare did not disclose terms; Deno had raised $26M in total, including a $21M Series A led by Sequoia in 2022.
+On 2026-10-09 Cloudflare announced it is acquiring Deno, and the whole Deno team is joining Cloudflare. The announcement post is signed by Kenton Varda and Ryan Dahl and frames the move around self-hosting Workers and Durable Objects. Cloudflare did not disclose terms at the announcement; its Form 10-Q filed 2026-11-05 later disclosed that it acquired Deno Land Inc. on 2026-10-08 for approximately $26.5 million in cash.[^1] Deno had raised $26M in total, including a $21M Series A led by Sequoia in 2022; `netop://ウィビ` read the price as the minimal one investors would agree to, which is his reading, not a fact in the filing.
 
 The part that matters to anyone building on Deno was not in the Cloudflare post. Deno stated separately that it will ship monthly bug-fix and security releases for one more year, then end its own development of the runtime, and that it welcomes others to continue it. The runtime stays open source.
 
@@ -54,6 +54,8 @@ An MIT runtime that nobody will develop is not dead code, it is an unowned one. 
 Discussions have explored various technical aspects relevant to Deno and its future, including the potential of [WebGPU and LLM Performance](WebGPU_and_LLM_Performance.md), the characteristics of the [Porffor JavaScript Engine](Porffor_JavaScript_Engine.md), and different [File System APIs for Deno](File_System_APIs_for_Deno.md).
 
 ## Sources
+
+[^1]: Cloudflare, Inc., Form 10-Q for the quarterly period ended 2026-09-30, filed 2026-11-05, Note 16 (Subsequent Events): "On October 8, 2026, the Company acquired Deno Land Inc. which has developed an open-source JavaScript and TypeScript runtime and related developer infrastructure, for approximately $26.5 million in cash." Read 2026-11-12: [Form 10-Q (PDF)](https://d18rn0p25nwr6d.cloudfront.net/CIK-0001477333/a505e6ba-1e41-4435-91ab-3ba8082bc05e.pdf).
 
 - [Deno is joining Cloudflare](https://deno.com/blog/cloudflare), Deno, 2026-10-09. The source of the release schedule and the runtime, Deploy, JSR, and `rusty_v8` commitments quoted above.
 - [Deno is joining Cloudflare](https://blog.cloudflare.com/deno-joins-cloudflare), by Kenton Varda and Ryan Dahl, Cloudflare, 2026-10-09.

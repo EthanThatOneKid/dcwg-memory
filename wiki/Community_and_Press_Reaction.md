@@ -1,7 +1,7 @@
 ---
 "@type": schema:TechArticle
 schema:name: Community and press reaction
-schema:description: The videos, articles, and posts about Deno's move to Cloudflare and about the forks that `#general` participants shared between 2026-10-15 and 2026-10-28, and what the group said about them.
+schema:description: The videos, articles, and posts about Deno's move to Cloudflare and about the forks that `#general` participants shared between 2026-10-15 and 2026-11-11, and what the group said about them.
 wazoo:source: dcwg
 wiki:priority: low
 ---
@@ -22,6 +22,8 @@ wiki:priority: low
 - **Mozilla, 2026-10-21.** `Leokuma` asked whether Mozilla might take over Deno development. `Seally` and `Sandeep Kumar Kuanar✌🏼` said Mozilla is in enough financial trouble and no longer owns Rust, so they did not expect it. Those are opinions.
 - **JSR's future, 2026-10-27.** `paula` asked what happens to JSR, since its frontend is built on Deno's Fresh framework, and quoted the announcement's line that "JSR will continue operating, with its infrastructure moving to Cloudflare." `netop://ウィビ` said they had said little beyond Bart mentioning foundations. See [JSR and the package registry](JSR_and_Package_Registry.md).
 - **Val Town winding down, 2026-11-10.** Ethan shared [his own post on X](https://x.com/etok_me/status/2120217494690689122?a=9Sz7DqZQkxr1F6sE33Y&s=20), calling Val Town "the first major @deno_land-native product I've seen shut down" and saying that, given the funding landscape for developer tools, he expects it will not be the last. The shutdown itself is confirmed by Val Town's own blog post the same day, "Val Town is winding down": new sign-ups and plan upgrades stop 2026-11-10, the service becomes read-only 2026-12-10, all remaining services shut down 2027-01-10, and Val Town's code is released as open source 2027-02-01.[^1] Ethan's expectation of further shutdowns is his own, not a fact in the post.
+- **A Reddit post about Dodo, 2026-11-11.** `SpaceMonkey` shared a Reddit post about Dodo that Reddit had notified him about. A reply in it spoke of "OpenDeno", which `netop://ウィビ` said was created three days earlier. See [Deno fork options and naming](Deno_Fork_Options.md).
+- **Leaving the Deno server, 2026-11-11.** `netop://ウィビ` said a sign of a dead server is constant spam, and that he had just left the Deno Discord.
 
 ## Which forks exist, as the group describes them
 
