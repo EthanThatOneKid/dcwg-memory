@@ -84,6 +84,8 @@ On 2026-11-06 `netop://ウィビ` noted in `#general` that he had become aware o
 
 On 2026-11-11 `SpaceMonkey` shared a Reddit post about Dodo in `#general`; a reply in it spoke of "OpenDeno", which `SpaceMonkey` said was news to him and suggested the group investigate. `netop://ウィビ` answered that OpenDeno was created three days earlier, at [kanryu/opendeno-servo-boa](https://github.com/kanryu/opendeno-servo-boa), described in its embed as "An experimental Rust browser prototype combining Servo's HTML rendering engine with Boa for sandboxed Deno-style script execution." Nothing in the capture says whether the group looked at it further.
 
+`SpaceMonkey` then added his own assessment in the same thread: OpenDeno had only two commits and was failing its CI checks, so he was "not too worried", and proposed trying to win its authors over to Dodo and get them to abandon their fork in favour of Dodo. `netop://ウィビ` answered that Dodo's CI was not passing either — the record on pull request 17 that day was 23 checks failing; see [CI and release cadence](CI_and_Release_Cadence.md) — and took the opposite view: "I think there should be MORE forks tbh. May the best one win." The commit and CI counts are the participants' claims as of 2026-11-11, not checked here.
+
 ## Open questions
 
 - Whether the compatibility fork is a separate project or a configuration of Ende, now that a plugin ecosystem is on the table. See [Runtime architecture proposals](Runtime_Architecture_Proposals.md).

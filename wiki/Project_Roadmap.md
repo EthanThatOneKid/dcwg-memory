@@ -51,6 +51,10 @@ On 2026-11-10 `daniellacosse` updated the `#roadmap` channel post and asked the 
 
 On 2026-11-11 `andy` said in `#general` that he is probably not going to be super active in Dodo for a while, though he expects to be a lot more active around Christmas and Thanksgiving, and that he is busy rather than anything being wrong. `daniellacosse` answered that he himself has only been able to give roughly 25%, and expects that to be the case for the next 3–6 months, and that the community has to find a way to be resilient to what life throws at each contributor: "apes together strong."
 
+On 2026-11-11 `daniellacosse` announced in `#news` that the `#roadmap` post had been updated again, and asked for feedback in `#brainstorm`. `lishaduck` replied there that he could not see at first glance what had changed, and asked whether the roadmap made sense somewhere other than Discord — GitHub, or anywhere with revision history. `daniellacosse` answered that in a way that was a good thing, and invited someone to populate a `.github` page so the roadmap could live on the organization's page (`are-we-dodo-yet`), linking an explainer on GitHub profile repositories and the `.github/profile` path. The repository was created the same evening: the GitHub API read on 2026-11-13 shows `are-we-dodo-yet/.github`, described as "About the Dodo Community", created 2026-11-11T18:52:06Z with a `profile/README.md`.[^2]
+
+Later on 2026-11-11 `daniellacosse` asked in `#general` whether anyone could look into the release before he could get to it, and on 2026-11-12 he said he was working on the release.
+
 ## First step toward a build
 
 The "release a runnable build" item had its first concrete step on 2026-10-30 (UTC). `daniellacosse` opened `are-we-dodo-yet/dodo` pull request 17, "chore: rename deno cli to dodo," whose description shows `./x build` now producing a `dodo` binary whose REPL prints "Dodo 2.9.7." He said the CI still needs fixing next, and told a newcomer who offered to maintain the standard library that the project is "a little stuck on not having a build for people to use" and that focus time is hard for him to find. On 2026-10-31 the GitHub API showed the pull request open and unmerged, 18 files changed, and the repository with no releases and 77 stars.[^1]
@@ -73,3 +77,5 @@ On 2026-11-10 in `#brainstorm` `daniellacosse` said he can't host a local server
 ## Sources
 
 [^1]: [`are-we-dodo-yet/dodo` pull request 17](https://github.com/are-we-dodo-yet/dodo/pull/17), read through the GitHub API on 2026-10-31: open, created 2026-10-30, 261 additions and 259 deletions in 18 files; the repository `are-we-dodo-yet/dodo` had 77 stars and no releases.
+
+[^2]: [`are-we-dodo-yet/.github`](https://github.com/are-we-dodo-yet/.github), read through the GitHub API on 2026-11-13: created 2026-11-11T18:52:06Z, last pushed 2026-11-11T18:55:16Z, description "About the Dodo Community", `profile/README.md` present.

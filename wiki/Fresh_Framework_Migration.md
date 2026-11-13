@@ -54,6 +54,10 @@ Fresh is a framework on top of the runtime: it depends on Deno, is versioned ind
 
 This is a participant report, not a checked fact about Fresh. In `#general` on 2026-10-30, `paula` said she tried Fresh Next on Deno, that it uses `package.json` and "doesnt even work", and that she will keep using Fresh 2. `davey` replied that it is sad they do not test against Deno. No follow-up, version, or error detail is in the capture, so this records only that one attempt and that reaction.
 
+## A participant's own Fresh fork (2026-11-11)
+
+This is a participant report, not a checked fact about Fresh. In `#general` on 2026-11-11, `paula` said she had forked Fresh so she could change partials to support any HTTP methods, because Fresh 3 had moved away from Deno and JSR. She added that she hoped "the deno foundation thing works out so deno doesnt actually die". The fork and the hope are hers; nothing in the capture says whether anyone else picked either up.
+
 ## Open questions
 
 - Whether the `freshframework` organization is the model to copy, or whether a new organization is cleaner than reusing one.
