@@ -63,7 +63,21 @@ On 2026-11-01 (UTC) the newcomer from 2026-10-30, `Soluble State`, replied in `#
 
 ## A WebRTC milestone, suggested 2026-11-10
 
-On 2026-11-10 in `#brainstorm` `daniellacosse` said he can't host a local server because Deno doesn't implement WebRTC. `𐑛𐑦𐑕𐑣𐑸𐑥𐑦𐑯𐑦 | 最不調和の伝播者 | 異議の元素` replied that it sounds like a potential Dodo milestone. Nothing was decided, and WebRTC is not in the roadmap above.
+On 2026-11-10 in `#brainstorm` `daniellacosse` said he can't host a local server because Deno doesn't implement WebRTC. `𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調和の伝播者 | 異議の元素` replied that it sounds like a potential Dodo milestone. Nothing was decided, and WebRTC is not in the roadmap above.
+
+On 2026-11-13 `SpaceMonkey` said he is working on WebRTC in his own Deno fork, and that he had already implemented WebRTC in Rust for another project, `Brainwires/webrtc-rs-rtc`, whose last commit was seven months earlier and which he is auditing and fixing. That is his account of his own work, not checked here.
+
+## A Web MIDI API milestone, suggested 2026-11-13
+
+On 2026-11-13 in `#brainstorm` `𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調和の伝播者 | 異議の元素` raised the Web MIDI API as a potential Dodo milestone as well, saying there is no MIDI 2.0 support yet and the Web MIDI API is therefore still strictly MIDI 1.0. `SpaceMonkey` said he is looking at it too. Nothing was decided, and it is not in the roadmap above.
+
+## Populating the triage board, 2026-11-13
+
+On 2026-11-13 in `#brainstorm` `SpaceMonkey` suggested starting a project board, saying he had started using one for Denext a few weeks earlier. `daniellacosse` answered that the board already exists — the `are-we-dodo-yet` organization's project 2, "Dodo Triage" — but that he had not had time to fill it out, and offered write access to anyone who asked.
+
+`SpaceMonkey` offered to have Claude transfer the contents of the `#roadmap` channel into tasks on the board, and said he is `nightness` on GitHub. He also proposed a community-to-code bot to manage the board, with guardrails on what gets added, and offered to start one.
+
+`daniellacosse` said using LLMs for project management is not a bad idea overall, as long as they are well supervised. He suggested starting by transferring issues from the Deno codebase onto the board, with everything the bot transfers labeled `bot suggestion` first so one of the group can go over and confirm it, and starting with the triage that `#ende` has already done. They agreed to start by using Claude to populate the board and see how that goes. `daniellacosse` then added `SpaceMonkey` to the board with write access.
 
 ## Related
 
