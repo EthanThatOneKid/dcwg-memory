@@ -40,6 +40,10 @@ Two captures so far: `raw/discord/2026-10-11_dcwg-talk.md`, the group's `#talk` 
 - **Who does release engineering.** Nobody has volunteered for builds, signing, release automation, or a CI matrix.
 - **Decision process.** No stated way to make decisions, no roster, no meeting.
 
+## Archiving channels with AI, and asking first
+
+On 2026-11-14 in `#brainstorm` `daniellacosse` raised the consent question for this record itself: before indexing a channel with AI, ask the group first. Only a couple of channels carry "This channel is indexed by AI" in their descriptions, and `SpaceMonkey`'s Claude pass over the indexed channels had gone further than `daniellacosse` had asked for — he had in mind the `#roadmap` channel alone, cross-referenced with Deno's current issues, but had not said so. He took part of the blame for that, and said the result was probably fine to keep: messages are not used to train Claude, which he said was everyone's primary concern. The agreement coming out of it was to double-check with the group before ingesting people's information next time. No channel list was settled in that exchange. See [Dodo project roadmap](Project_Roadmap.md) for what the pass put on the triage board.
+
 ## Outreach
 
 Ethan reported on 2026-10-11 that he had reached out to Divy and Crowl: Divy Srivastava (`littledivy`) and Leo Kettmeir (`crowlKats`), both of Deno. Whether they responded is not in the capture. The later contact with Bart, the Deno team member who runs the foundation effort, and his 2026-10-28 reply are in [Foundation outreach and Bart's reply](Foundation_Outreach.md). `daniellacosse` asked whether anyone already has a relationship with the current core maintainers; nobody answered before the capture ends. Reaching out to Luca Casonato, raised by `W7T2A` and seconded by Max P., was still just a proposal. See [Luca Casonato](Luca_Casonato.md) and [Deno Core Working Group participants](Deno_Core_Working_Group_Participants.md).
