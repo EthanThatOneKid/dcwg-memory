@@ -89,6 +89,8 @@ Later the same day `SpaceMonkey` reported the dedup follow-up `daniellacosse` ha
 
 The next step `SpaceMonkey` proposed was transferring Deno issues: Ende has no published triage list, but its release notes include a long list of Deno bug fixes, so the plan is a "port from Ende" card for each one that applies to Dodo, then cards for recent `denoland/deno` issues, all marked `bot suggestion` the same way. `daniellacosse` noted there is only one issue open against Ende currently, so the release notes, not Ende's issue list, are the source for that step.
 
+On 2026-11-15 in `#brainstorm` `daniellacosse` proposed making the `bot suggestion` marker a GitHub label instead of text in the issue descriptions, so the board can be filtered by what has and has not been triaged by a human. With a label marking issues that still need human review, he said, Claude could safely add as many issues as it likes without overwhelming the group, and the group could review them in batches, removing the label from each issue as it is verified. `SpaceMonkey` agreed. `daniellacosse` said he did not have time to review `SpaceMonkey`'s draft of the next step his agent had recommended — shared as a [gist](https://gist.github.com/nightness/d3031e0b15785234b476eea98bf9bf9c) — right then, and that the draft and the board changes would be reviewed together, in batches.
+
 ## Related
 
 - [Deno Core Working Group](Deno_Core_Working_Group.md): the group the roadmap is for.
