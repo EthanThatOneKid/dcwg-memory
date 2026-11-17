@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1296.6 624" width="1296.6" height="624" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, Menlo, 'DejaVu Sans Mono', 'MS Gothic', ui-monospace, monospace">
+<title>The DCWG daily loop</title>
+<style>
+.bg{fill:#fafafa}
+.card{fill:#ffffff;stroke:#ececec}
+.f-card{fill:#ffffff}
+.k-card{stroke:#ffffff}
+.f-ink{fill:#1f1f1f}
+.k-ink{stroke:#1f1f1f}
+.f-gray{fill:#8a8a8a}
+.k-gray{stroke:#8a8a8a}
+.f-blue{fill:#4a7bf7}
+.k-blue{stroke:#4a7bf7}
+.f-orange{fill:#f0a030}
+.k-orange{stroke:#f0a030}
+.f-red{fill:#e5484d}
+.k-red{stroke:#e5484d}
+.f-green{fill:#2f9e5b}
+.k-green{stroke:#2f9e5b}
+.f-purple{fill:#8b5cf6}
+.k-purple{stroke:#8b5cf6}
+.f-teal{fill:#0f9fa8}
+.k-teal{stroke:#0f9fa8}
+.f-pink{fill:#e04f9b}
+.k-pink{stroke:#e04f9b}
+@media (prefers-color-scheme: dark) {
+.bg{fill:#141414}
+.card{fill:#1b1b1b;stroke:#2a2a2a}
+.f-card{fill:#1b1b1b}
+.k-card{stroke:#1b1b1b}
+.f-ink{fill:#e8e8e8}
+.k-ink{stroke:#e8e8e8}
+.f-gray{fill:#8f8f8f}
+.k-gray{stroke:#8f8f8f}
+.f-blue{fill:#7aa2ff}
+.k-blue{stroke:#7aa2ff}
+.f-orange{fill:#f5b04a}
+.k-orange{stroke:#f5b04a}
+.f-red{fill:#ff6b6f}
+.k-red{stroke:#ff6b6f}
+.f-green{fill:#4cc47e}
+.k-green{stroke:#4cc47e}
+.f-purple{fill:#a98bff}
+.k-purple{stroke:#a98bff}
+.f-teal{fill:#3cc4cc}
+.k-teal{stroke:#3cc4cc}
+.f-pink{fill:#f27ab8}
+.k-pink{stroke:#f27ab8}
+}</style>
+<rect class="bg" width="100%" height="100%"/>
+<text x="24" y="32" font-size="20" font-weight="650" class="f-ink">The DCWG daily loop</text>
+<rect class="card" x="8" y="52" width="1280.6" height="90" rx="10"/>
+<path d="M24 78L94 78" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<text x="106" y="83" font-size="15" text-anchor="start" class="f-ink">GitHub Actions code runs</text>
+<path d="M314.8 78L316.3 80.5L317.8 82.5L319.3 83.7L320.8 83.9L322.3 83.1L323.8 81.3L325.3 79L326.8 76.5L328.3 74.2L329.7 72.6L331.2 72L332.7 72.5L334.2 73.9L335.7 76.1L337.2 78.6L338.7 81L340.2 82.9L341.7 83.9L343.1 83.8L344.6 82.8L346.1 80.8L347.6 78.4L349.1 75.9L350.6 73.8L352.1 72.4L353.6 72L355.1 72.7L356.6 74.3L358 76.6L359.5 79.2L361 81.5L362.5 83.2L364 84L365.5 83.7L367 82.4L368.5 80.3L370 77.8L371.4 75.4L372.9 73.4L374.4 72.2L375.9 72.1L377.4 73L378.9 74.8L380.4 77.2L381.9 79.7L383.4 81.9L384.8 83.5" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-blue"/>
+<text x="396.8" y="83" font-size="15" text-anchor="start" class="f-ink">Muse (a model) decides</text>
+<path d="M590.8 78L660.8 78" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-dasharray="9 7" class="k-orange"/>
+<text x="672.8" y="83" font-size="15" text-anchor="start" class="f-ink">Ethan decides</text>
+<path d="M799.7 78L869.7 78" fill="none" stroke-linejoin="round" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 7" class="k-gray"/>
+<text x="881.7" y="83" font-size="15" text-anchor="start" class="f-ink">waiting, nothing runs</text>
+<circle cx="1078.16" cy="78" r="7.5" class="f-card k-ink" stroke-width="2.5" stroke-linejoin="round"/>
+<text x="1098.2" y="83" font-size="15" text-anchor="start" class="f-ink">reads</text>
+<path d="M34 106L44 116L34 126L24 116Z" class="f-ink"/>
+<text x="54" y="121" font-size="15" text-anchor="start" class="f-ink">revisable write</text>
+<path d="M205.8 106L215.8 116L205.8 126L195.8 116Z" class="f-red"/>
+<text x="225.8" y="121" font-size="15" text-anchor="start" class="f-ink">public and append-only</text>
+<path d="M438.7 116L434.2 123.8L425.2 123.8L420.7 116L425.2 108.2L434.2 108.2Z" class="f-green"/>
+<text x="449.7" y="121" font-size="15" text-anchor="start" class="f-ink">six gates</text>
+<path d="M548.7 107.9L564.9 107.9L564.9 124.1L548.7 124.1Z" class="f-card k-orange" stroke-width="2.5" stroke-linejoin="round"/>
+<text x="576.8" y="121" font-size="15" text-anchor="start" class="f-ink">asks Ethan</text>
+<rect x="689.312" y="101" width="4" height="30" rx="1" class="f-ink"/>
+<text x="711.3" y="121" font-size="15" text-anchor="start" class="f-ink">stops</text>
+<rect class="card" x="8" y="160" width="1280.6" height="456" rx="12"/>
+<g transform="translate(4 363)">
+<path d="M40 0L201 0" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M201 0L271 0" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M271 0L436 0" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M436 0L692.6 0" fill="none" stroke-linejoin="round" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 7" class="k-gray"/>
+<path d="M692.6 0L694.1 2.5L695.6 4.5L697.1 5.8L698.6 5.9L700.1 5.1L701.6 3.3L703.1 0.9L704.6 -1.6L706.1 -3.9L707.6 -5.4L709.1 -6L710.6 -5.5L712.1 -4L713.6 -1.8L715.1 0.8L716.6 3.2L718.1 5L719.6 5.9L721.1 5.8L722.6 4.6L724.1 2.6L725.6 0.1L727 -2.4L728.5 -4.4L730 -5.7L731.5 -6L733 -5.1L734.5 -3.4L736 -1L737.5 1.5L739 3.8L740.5 5.4L742 6L743.5 5.5L745 4.1L746.5 1.9L748 -0.6L749.5 -3L751 -4.9L752.5 -5.9L754 -5.8L755.5 -4.7L757 -2.8L758.5 -0.3L760 2.2L761.5 4.3L763 5.7L764.5 6L765.9 5.2L767.4 3.5L768.9 1.2L770.4 -1.4L771.9 -3.7L773.4 -5.3L774.9 -6L776.4 -5.6L777.9 -4.2L779.4 -2.1L780.9 0.5L782.4 2.9L783.9 4.8L785.4 5.9L786.9 5.9L788.4 4.8L789.9 2.9L791.4 0.4L792.9 -2.1L794.4 -4.2L795.9 -5.6L797.4 -6L798.9 -5.3L800.4 -3.6L801.9 -1.3L803.3 1.2L804.8 3.5L806.3 5.2L807.8 6L809.3 5.7L810.8 4.3L812.3 2.2L813.8 -0.3L815.3 -2.8L816.8 -4.7L818.3 -5.8L819.8 -5.9L821.3 -4.9L822.8 -3L824.3 -0.6L825.8 1.9L827.3 4.1L828.8 5.6L830.3 6L831.8 5.4L833.3 3.8L834.8 1.5L836.3 -1.1L837.8 -3.4L839.3 -5.2L840.8 -6L842.2 -5.7L843.7 -4.4L845.2 -2.3L846.7 0.2L848.2 2.6L849.7 4.6L851.2 5.8L852.7 5.9L854.2 5L855.7 3.1L857.2 0.7L858.7 -1.8L860.2 -4L861.7 -5.5L863.2 -6L864.7 -5.4L866.2 -3.9L867.7 -1.6L869.2 0.9L870.7 3.3L872.2 5.1L873.7 5.9L875.2 5.7L876.7 4.5L878.2 2.5L879.6 0L881.1 -2.5L882.6 -4.5" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-blue"/>
+<path d="M882.6 0L982.6 0" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M982.6 0L1082.6 0" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-dasharray="9 7" class="k-orange"/>
+<path d="M1082.6 0L1182.6 0" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M1182.6 0L1238.6 0" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M271 0L274.2 0.2L277.2 0.7L280.2 1.5L283 2.7L285.7 4.2L288.3 5.9L290.7 7.9L293.1 10.2L295.4 12.7L297.7 15.5L299.8 18.4L301.9 21.6L303.9 24.9L305.8 28.4L307.7 32L309.5 35.8L311.3 39.7L313 43.7L314.7 47.7L316.4 51.9L318.1 56.1L319.7 60.4L321.4 64.7L323 69L324.6 73.3L326.2 77.6L327.9 81.9L329.5 86.1L331.2 90.3L332.9 94.3L334.7 98.3L336.5 102.2L338.3 106L340.2 109.6L342.1 113.1L344.1 116.4L346.2 119.6L348.3 122.5L350.5 125.3L352.8 127.8L355.2 130.1L357.7 132.1L360.3 133.8L363 135.3L365.8 136.5L368.7 137.3L371.8 137.8L375 138" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M375 138L435 138" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M692.6 0L693.8 1.7L695 3.3L696.3 4.5L697.8 5.2L698.9 5.4L700.2 5L701.3 4L702 2.7L702.7 1L703.2 -0.9L703.4 -2.9L703.6 -4.8L703.7 -6.5L704 -8.1L704.3 -9.1L704.8 -9.7L705.8 -10.1L706.9 -9.9L708.4 -9.5L710.2 -9L712.1 -8.2L714.2 -7.6L716.2 -7.1L718.1 -7L719.7 -7.3L720.7 -7.8L721.5 -9L721.6 -10.6L721.3 -12.4L720.6 -14.5L719.7 -16.7L718.8 -18.8L718.1 -20.8L717.6 -22.4L717.8 -23.8L718.6 -24.6L720 -25.2L722 -25.5L724.4 -25.5L727.1 -25.5L729.6 -25.7L731.7 -26.1L733.2 -26.9L734 -28.1L733.9 -29.7L733.1 -31.7L731.8 -33.9L730.3 -36.2L728.8 -38.4L727.8 -40.4L727.5 -42.1L728.1 -43.3L729.7 -44.3L731.9 -44.8L734.7 -45.2L737.6 -45.6L740.2 -46.2L742.1 -47.1L743.1 -48.3L743.1 -49.9L742.4 -51.4L741.4 -53L740.1 -54.8L738.7 -56.5L737.4 -58.2L736.4 -59.9L735.8 -61.3L735.8 -62.5L736.3 -63.5L737.5 -64.3L739.1 -64.9L741.1 -65.4L743.3 -65.8L745.6 -66.2L747.6 -66.6L749.3 -67.2L750.4 -68L751 -69L751 -70.3L750.5 -71.7L749.5 -73.3L748.1 -75L746.7 -76.8L745.4 -78.6L744.3 -80.2L743.7 -81.7L743.6 -82.9L744 -84L745.1 -84.8L746.6 -85.4L748.6 -85.9L750.7 -86.3L753.6 -86.7L756.2 -87.3L758 -88.1L759 -89.3L758.9 -90.9L758 -92.9L756.6 -95.1L754.9 -97.4L753.4 -99.7L752.4 -101.7L752.1 -103.4L752.8 -104.7L754.3 -105.6L756.5 -106.1L759.1 -106.4L761.8 -106.6L764.3 -106.8L766.3 -107.2L767.6 -107.9L768.2 -109.1L768.1 -110.6L767.4 -112.4L766.3 -114.6L765.1 -116.8L764.1 -119L763.4 -121L763.2 -122.8L763.7 -124.1L764.6 -124.9L766.2 -125.4L768.2 -125.5L770.3 -125.2L772.6 -124.9L774.7 -124.4L776.7 -124.2L778.2 -124.1L779.3 -124.3L780.2 -125L780.4 -126L780.4 -127.3L780.4 -129.1L780.1 -131.1L779.9 -133.1L779.8 -135.1L780 -137.1L780.5 -138.7L781 -139.8L782 -140.7L783.4 -141L784.6 -140.7L786.1 -140.2L787.7 -139.1L789.2 -137.8L790.6 -136.4L791.8 -134.9L793.1 -133.6L794 -132.7L794.8 -132L795.9 -132L796.9 -132.4" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-blue"/>
+<path d="M796.6 -138L798.1 -135.5L799.6 -133.5L801.1 -132.3L802.6 -132.1L804.1 -132.9L805.6 -134.7L807.1 -137.1L808.6 -139.6L810 -141.9L811.5 -143.4L813 -144L814.5 -143.5L816 -142L817.5 -139.8L819 -137.3L820.5 -134.9L822 -133L823.5 -132.1L825 -132.2L826.5 -133.3L828 -135.3L829.5 -137.8L831 -140.3L832.5 -142.4L834 -143.7L835.5 -144L836.9 -143.2L838.4 -141.5L839.9 -139.1L841.4 -136.6L842.9 -134.3L844.4 -132.7L845.9 -132L847.4 -132.4L848.9 -133.8L850.4 -136L851.9 -138.5L853.4 -140.9L854.9 -142.8L856.4 -143.9L857.9 -143.9L859.4 -142.8L860.9 -140.9L862.3 -138.4L863.8 -135.9L865.3 -133.8L866.8 -132.4L868.3 -132L869.8 -132.7L871.3 -134.4L872.8 -136.7L874.3 -139.2L875.8 -141.5L877.3 -143.2L878.8 -144L880.3 -143.7L881.8 -142.3L883.3 -140.2L884.8 -137.7L886.3 -135.3L887.7 -133.3L889.2 -132.2L890.7 -132.1L892.2 -133.1L893.7 -134.9L895.2 -137.4L896.7 -139.9L898.2 -142.1L899.7 -143.5L901.2 -144L902.7 -143.4L904.2 -141.8L905.7 -139.6L907.2 -137L908.7 -134.7L910.2 -132.9L911.7 -132L913.2 -132.3L914.6 -133.5L916.1 -135.6L917.6 -138.1L919.1 -140.5L920.6 -142.6L922.1 -143.8L923.6 -143.9L925.1 -143L926.6 -141.2" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-blue"/>
+<path d="M882.6 0L885.8 0.2L888.9 0.7L891.8 1.5L894.6 2.7L897.3 4.2L899.9 5.9L902.4 7.9L904.8 10.2L907.1 12.7L909.3 15.5L911.4 18.4L913.5 21.6L915.5 24.9L917.4 28.4L919.3 32L921.1 35.8L922.9 39.7L924.7 43.7L926.4 47.7L928.1 51.9L929.7 56.1L931.4 60.4L933 64.7L934.6 69L936.2 73.3L937.9 77.6L939.5 81.9L941.2 86.1L942.9 90.3L944.6 94.3L946.3 98.3L948.1 102.2L949.9 106L951.8 109.6L953.7 113.1L955.7 116.4L957.8 119.6L959.9 122.5L962.2 125.3L964.5 127.8L966.9 130.1L969.3 132.1L971.9 133.8L974.6 135.3L977.4 136.5L980.4 137.3L983.4 137.8L986.6 138" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M986.6 138L1036.6 138" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<path d="M1036.6 138L1092.6 138" fill="none" stroke-linejoin="round" stroke-width="2.2" stroke-linecap="round" class="k-ink"/>
+<circle cx="201" cy="0" r="7.5" class="f-card k-ink" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M271 -8.5L279.5 0L271 8.5L262.5 0Z" class="f-ink"/>
+<path d="M436 -10L446 0L436 10L426 0Z" class="f-red"/>
+<path d="M692.6 -8.5L701.1 0L692.6 8.5L684.1 0Z" class="f-blue"/>
+<path d="M891.6 0L887.1 7.8L878.1 7.8L873.6 0L878.1 -7.8L887.1 -7.8Z" class="f-green"/>
+<path d="M974.5 -8.1L990.7 -8.1L990.7 8.1L974.5 8.1Z" class="f-card k-orange" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M1082.6 -10L1092.6 0L1082.6 10L1072.6 0Z" class="f-ink"/>
+<path d="M1182.6 -10L1192.6 0L1182.6 10L1172.6 0Z" class="f-ink"/>
+<rect x="1236.6399999999999" y="-15" width="4" height="30" rx="1" class="f-ink"/>
+<rect x="432.96000000000004" y="123" width="4" height="30" rx="1" class="f-ink"/>
+<rect x="924.6" y="-153" width="4" height="30" rx="1" class="f-ink"/>
+<path d="M1036.6 128L1046.6 138L1036.6 148L1026.6 138Z" class="f-ink"/>
+<rect x="1090.6" y="123" width="4" height="30" rx="1" class="f-ink"/>
+<text x="36" y="-14" font-size="15" text-anchor="start" class="f-ink" font-weight="600">11:00 UTC</text>
+<text x="201" y="32" font-size="15" text-anchor="middle" class="f-ink">pull Discord</text>
+<text x="201" y="49" font-size="13" text-anchor="middle" class="f-gray">public channels</text>
+<text x="353.5" y="-16" font-size="15" text-anchor="middle" class="f-ink" font-weight="600">pushed</text>
+<text x="436" y="32" font-size="15" text-anchor="middle" class="f-red" font-weight="600">captures</text>
+<text x="436" y="49" font-size="13" text-anchor="middle" class="f-gray">raw/ on main</text>
+<text x="436" y="66" font-size="13" text-anchor="middle" class="f-gray">+ fold queue</text>
+<text x="564.3" y="-16" font-size="15" text-anchor="middle" class="f-ink">~6.5 h</text>
+<text x="589.4" y="30" font-size="13" text-anchor="middle" class="f-gray">keeps .cursor writes apart</text>
+<text x="787.6" y="-16" font-size="15" text-anchor="middle" class="f-blue" font-weight="600">Fold</text>
+<text x="772.4" y="30" font-size="13" text-anchor="middle" class="f-gray">queued captures</text>
+<text x="772.4" y="47" font-size="13" text-anchor="middle" class="f-gray">into wiki/</text>
+<text x="882.6" y="32" font-size="15" text-anchor="middle" class="f-ink">gates</text>
+<text x="932.6" y="-16" font-size="15" text-anchor="middle" class="f-ink">pass</text>
+<text x="982.6" y="32" font-size="15" text-anchor="middle" class="f-orange">approval</text>
+<text x="1032.6" y="-16" font-size="15" text-anchor="middle" class="f-orange" font-weight="600">approves</text>
+<text x="1082.6" y="32" font-size="15" text-anchor="middle" class="f-ink">commit</text>
+<text x="1082.6" y="49" font-size="13" text-anchor="middle" class="f-gray">wiki/ + queue</text>
+<text x="1082.6" y="66" font-size="13" text-anchor="middle" class="f-gray">one commit</text>
+<text x="1182.6" y="32" font-size="15" text-anchor="middle" class="f-ink">deploy</text>
+<text x="1182.6" y="49" font-size="13" text-anchor="middle" class="f-gray">Pages site</text>
+<text x="405" y="124" font-size="15" text-anchor="middle" class="f-ink" font-weight="600">conflict</text>
+<text x="449" y="143" font-size="13" text-anchor="start" class="f-gray">discarded</text>
+<text x="449" y="160" font-size="13" text-anchor="start" class="f-gray">next run re-fetches</text>
+<text x="861.6" y="-152" font-size="15" text-anchor="middle" class="f-blue" font-weight="600">nothing queued</text>
+<text x="940.6" y="-133" font-size="13" text-anchor="start" class="f-gray">a healthy day</text>
+<text x="1011.6" y="124" font-size="15" text-anchor="middle" class="f-ink" font-weight="600">fail</text>
+<text x="1036.6" y="170" font-size="15" text-anchor="middle" class="f-ink">revert</text>
+<text x="1036.6" y="187" font-size="13" text-anchor="middle" class="f-gray">queue kept</text>
+<text x="1106.6" y="143" font-size="13" text-anchor="start" class="f-gray">report</text>
+</g>
+<text x="30" y="600" font-size="13" text-anchor="start" class="f-gray">time <tspan font-family="Menlo, 'DejaVu Sans Mono', 'MS Gothic', ui-monospace, monospace">→</tspan></text>
+</svg>

@@ -1,0 +1,214 @@
+{
+  "title": "The DCWG daily loop",
+  "lines": {
+    "actions": {
+      "stroke": "solid",
+      "color": "ink",
+      "legend": "GitHub Actions code runs",
+      "len": 80
+    },
+    "muse": {
+      "stroke": "wave",
+      "color": "blue",
+      "legend": "Muse (a model) decides",
+      "len": 150
+    },
+    "ethan": {
+      "stroke": "dashed",
+      "color": "orange",
+      "legend": "Ethan decides",
+      "len": 90
+    },
+    "wait": {
+      "stroke": "dotted",
+      "color": "gray",
+      "legend": "waiting, nothing runs",
+      "len": 110
+    }
+  },
+  "vertices": {
+    "read": {
+      "shape": "circle",
+      "fill": "hollow",
+      "legend": "reads"
+    },
+    "write": {
+      "shape": "diamond",
+      "legend": "revisable write"
+    },
+    "public": {
+      "shape": "diamond",
+      "color": "red",
+      "legend": "public and append-only",
+      "labelColor": true,
+      "bold": true
+    },
+    "gates": {
+      "shape": "hexagon",
+      "color": "green",
+      "legend": "six gates"
+    },
+    "ask": {
+      "shape": "square",
+      "fill": "hollow",
+      "color": "orange",
+      "legend": "asks Ethan",
+      "labelColor": true
+    }
+  },
+  "tracks": [
+    {
+      "id": "main",
+      "lane": 0,
+      "line": "actions",
+      "start": {
+        "label": "11:00 UTC"
+      },
+      "steps": [
+        {
+          "vertex": "read",
+          "label": "pull Discord",
+          "note": "public channels"
+        },
+        {
+          "line": "actions",
+          "len": 70
+        },
+        {
+          "vertex": "branch",
+          "id": "push",
+          "by": "actions"
+        },
+        {
+          "line": "actions",
+          "label": "pushed",
+          "len": 165
+        },
+        {
+          "vertex": "public",
+          "label": "captures",
+          "note": [
+            "raw/ on main",
+            "+ fold queue"
+          ]
+        },
+        {
+          "line": "wait",
+          "label": "~6.5 h",
+          "note": "keeps .cursor writes apart"
+        },
+        {
+          "vertex": "branch",
+          "id": "queue",
+          "by": "muse"
+        },
+        {
+          "line": "muse",
+          "label": "Fold",
+          "note": [
+            "queued captures",
+            "into wiki/"
+          ],
+          "len": 190
+        },
+        {
+          "vertex": "gates",
+          "id": "gates",
+          "by": "actions",
+          "label": "gates"
+        },
+        {
+          "line": "actions",
+          "label": "pass",
+          "len": 100
+        },
+        {
+          "vertex": "ask",
+          "label": "approval"
+        },
+        {
+          "line": "ethan",
+          "label": "approves",
+          "len": 100
+        },
+        {
+          "vertex": "write",
+          "label": "commit",
+          "note": [
+            "wiki/ + queue",
+            "one commit"
+          ]
+        },
+        {
+          "line": "actions",
+          "len": 100
+        },
+        {
+          "vertex": "write",
+          "label": "deploy",
+          "note": "Pages site"
+        },
+        {
+          "vertex": "stop"
+        }
+      ]
+    },
+    {
+      "id": "conflict",
+      "lane": 1.2,
+      "from": "push",
+      "label": "conflict",
+      "steps": [
+        {
+          "line": "actions",
+          "len": 60
+        },
+        {
+          "vertex": "stop",
+          "note": [
+            "discarded",
+            "next run re-fetches"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "empty",
+      "lane": -1.2,
+      "from": "queue",
+      "label": "nothing queued",
+      "line": "muse",
+      "steps": [
+        {
+          "line": "muse",
+          "len": 130
+        },
+        {
+          "vertex": "stop",
+          "note": "a healthy day"
+        }
+      ]
+    },
+    {
+      "id": "fail",
+      "lane": 1.2,
+      "from": "gates",
+      "label": "fail",
+      "steps": [
+        {
+          "line": "actions",
+          "len": 50
+        },
+        {
+          "vertex": "write",
+          "label": "revert",
+          "note": "queue kept"
+        },
+        {
+          "vertex": "stop",
+          "note": "report"
+        }
+      ]
+    }
+  ]
+}
