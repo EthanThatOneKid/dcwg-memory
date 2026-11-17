@@ -91,6 +91,8 @@ The next step `SpaceMonkey` proposed was transferring Deno issues: Ende has no p
 
 On 2026-11-15 in `#brainstorm` `daniellacosse` proposed making the `bot suggestion` marker a GitHub label instead of text in the issue descriptions, so the board can be filtered by what has and has not been triaged by a human. With a label marking issues that still need human review, he said, Claude could safely add as many issues as it likes without overwhelming the group, and the group could review them in batches, removing the label from each issue as it is verified. `SpaceMonkey` agreed. `daniellacosse` said he did not have time to review `SpaceMonkey`'s draft of the next step his agent had recommended — shared as a [gist](https://gist.github.com/nightness/d3031e0b15785234b476eea98bf9bf9c) — right then, and that the draft and the board changes would be reviewed together, in batches.
 
+On 2026-11-16 `SpaceMonkey` reported he had added a "Review" field to the board, with two options — "Needs human review" and "Reviewed" — and set "Needs human review" on all 43 bot-added cards. Anything Claude adds from here on gets "Needs human review" automatically, he said, so the group can filter by it and flip each card to "Reviewed" as it is verified. That is a board field; the day before, `daniellacosse` had proposed a GitHub label for the same purpose.
+
 ## Related
 
 - [Deno Core Working Group](Deno_Core_Working_Group.md): the group the roadmap is for.
