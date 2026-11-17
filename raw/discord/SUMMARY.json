@@ -1,11 +1,11 @@
 {
   "status": "OK",
   "connector": "discord",
-  "fetched": 2,
+  "fetched": 1,
   "ingested": 0,
   "skipped_by_appraisal": 0,
-  "actionable_candidates": 2,
-  "cursor": "1572327112939933848",
-  "lastRun": "2026-11-17T19:30:34Z",
-  "captures": 82
+  "actionable_candidates": 1,
+  "cursor": "1572323649875218504",
+  "lastRun": "2026-11-17T19:30:40Z",
+  "captures": 83
 }
