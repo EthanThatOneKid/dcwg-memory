@@ -42,6 +42,16 @@ Two pieces, deliberately split so the record never waits on a model:
 `DAILY_CRON.md` is the runbook: the verification commands, what to do when a run
 fails, and the cleanup that waits until the loop has run green once.
 
+![The DCWG daily loop. At 11:00 UTC GitHub Actions pulls new Discord messages from public channels and pushes the captures and fold queue to main, where they are public and append-only; a push conflict discards the run and the next run re-fetches. About 6.5 hours later Muse folds the queued captures into wiki/, or stops if nothing is queued. The six gates either fail, reverting the wiki edits and keeping the queue, or pass to an approval card; once Ethan approves, one commit lands the wiki edits and cleared queue, and the Pages site deploys.](docs/diagrams/daily-loop.svg)
+
+Time runs left to right; the stroke shows who is acting. The red diamond is the
+step that cannot be taken back: once a capture is pushed it is public and
+append-only. Everything after it (the wiki, the queue, the site) can still be
+corrected. The diagram is generated from
+[`docs/diagrams/daily-loop.feynman.json`](docs/diagrams/daily-loop.feynman.json)
+with the [`feynman-diagram`](https://github.com/EthanThatOneKid/feynman-diagram)
+skill.
+
 ## Layout
 
 ```
