@@ -63,6 +63,8 @@ In `#general` on 2026-11-10, `𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調�
 
 `𐑛𐑦𐑕𐑣𐑸𐑥𐑩𐑯𐑦 | 最不調和の伝播者 | 異議の元素` added that Ende removed the Node.js timer objects, so it returns plain web timer numbers that work with `Deno.unrefTimer`, and that the compatibility layer they are writing forces numbers precisely to avoid relying on Node.js conventions. They said they look forward to the Dodo fix nonetheless.
 
+On 2026-11-17 in `#general` `CaptainLach` said he had finished the fix, linking [`are-we-dodo-yet/dodo` pull request 23, "fix: handle timer tracking in core"](https://github.com/are-we-dodo-yet/dodo/pull/23) by CertainLach. He said Deno used two separate `activeTimers` maps, one for `ext/node` and one for `ext/web`, which caused a discrepancy when trying to use timer ids obtained from `ext/node` timers, and that the new implementation is "a little bit more than I planned, because nodejs still wants its methods to be called," but is "more fair with regard to system/non-system timer separation". A review `SpaceMonkey` posted on the pull request, read 2026-11-18 and noted as written by Claude at his request, agreed the one-map shape is right but raised a concern: system timers become reachable from user code, since a stray `clearTimeout(n)` could now close or unref an internal Node system timer. Whether that concern was addressed is not in the record.
+
 ## Trust and governance
 
 `Matthew` returned to the thread on 2026-10-21 (UTC) with a different objection from his earlier one, and it is about who maintains the result rather than the architecture. His points, as he made them:

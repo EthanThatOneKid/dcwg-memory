@@ -48,6 +48,14 @@ On 2026-11-08 `netop://ウィビ` said in `#general`, replying to `Summer`, that
 
 On 2026-11-11 `daniellacosse` reported in `#general` that the failing checks on `are-we-dodo-yet/dodo` pull request 17 were down to 23, linking [the run](https://github.com/are-we-dodo-yet/dodo/actions/runs/42963363171?pr=17), and invited anyone to push to the branch as long as the work stays coordinated. He noted that a lot of the CI checks are still using Node v20 and should be fixed. `davey` answered that Node 20 did not get patched for the emudhra certificate leak, though probably not a big deal for tests, and offered to look at bumping from Node 20 over the next few days. `CaptainLach` added that it is not just Node.js but the version that matters: many GitHub Actions, including checkout, are written using Node.js.
 
+## Pulling in Deno 2.9.8, and issue 37008 (2026-11-16)
+
+On 2026-11-16 in `#brainstorm` `CaptainLach` said `denoland/deno#37008` can be closed, because it will be covered by the v8x update he still needs to finish. `daniellacosse` removed it from the project. The issue, read 2026-11-18, is a Deno Desktop 2.9.7 regression: `node:net` from an npm package fails to resolve `ext:core/mod.js` at runtime, leaving a packaged desktop app with a blank window. Whether the v8x update does cover it is `CaptainLach`'s claim, not checked here.
+
+`daniellacosse` also said he wished it were possible to say why draft issues are being closed, and that two board cards are redundant with "Publish CD artifacts to GitHub Releases instead of dl.deno.land": "Get CI green on trunk" and "Release a runnable Dodo build". Reading a conversation `CaptainLach` had with another participant, he said the group probably just needs a ticket for pulling in the latest Deno (2.9.8), and that new tickets can be added as new versions are released for the group to pull in.
+
+`CaptainLach` answered that the latest Deno is just Deno including a partial fix for eMudhra, and that he had an issue with a couple of things the group might want to cherry-pick that were also released in 2.9.8, but he had looked into them and was not confident those fixes are correct and acceptable to be merged as-is. `daniellacosse` answered: "Alright. We'll just do it case by case then."
+
 ## Where it stands
 
 Nothing was decided for Dodo. Ende's numbers are a single before-and-after on a different codebase. The record does not show Dodo's own CI duration, or whether any of these changes were applied to it. On 2026-11-11 the record does show Dodo's CI state on pull request 17: 23 checks failing, with the Node 20 bump offered but not done.
