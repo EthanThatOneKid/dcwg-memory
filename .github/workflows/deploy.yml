@@ -46,10 +46,9 @@ jobs:
         run: deno run -A build.ts
       - uses: actions/upload-pages-artifact@v3
         with:
-          # Published at /dcwg-memory/; build.ts nests its output under
+          # Published at /dodo-memory/; build.ts nests its output under
           # _site/<base_url>/, so upload the repo-prefixed directory.
-          path: _site/dcwg-memory
-
+          path: _site/dodo-memory
   deploy:
     needs: build
     runs-on: ubuntu-latest
