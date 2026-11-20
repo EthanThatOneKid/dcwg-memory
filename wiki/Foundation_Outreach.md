@@ -43,10 +43,11 @@ Read plainly, the reply promises nothing beyond willingness to take upstream pat
 
 - Whether a Deno foundation forms, who would be in it, and when. Nothing public beyond Bart's two comments says so.
 - Whether Dodo is an upstream playground or an independent fork, which `andy`, `daniellacosse`, and `netop://ウィビ` answered differently and the group has not ratified.
-- Who has authority to decide, which the group acknowledged is unclear.
+- Who has authority to decide, which the group acknowledged is unclear. On 2026-11-19 Ethan opened a `#propose` thread on formalizing the community; see [Formalizing the community](Formalizing_the_Community.md).
 
 ## Related
 
+- [Formalizing the community](Formalizing_the_Community.md): Ethan's 2026-11-19 proposal for a W3C group, a foundation, an informal board, or the status quo.
 - [Sustaining the fork](Fork_Sustainability.md): the funding side of the same question.
 - [Deno runtime handoff](Deno_Runtime_Handoff.md): what a handoff could transfer.
 - [Deno dependents](Deno_Dependents.md): the list of projects `w` compiled as potential allies.

@@ -93,6 +93,8 @@ Nothing was decided, and no design was adopted. The state of the argument:
 - **Per-package runtime objects** were proposed by `CaptainLach` as a way to get the permission model without extensions as a security boundary, with no recorded verdict from `andy` or `w`.
 - `netop://ウィビ` said he might publish examples that weekend.
 
+On 2026-11-19 `SpaceMonkey` said in `#brainstorm` that he was a few days to a week away from finishing the kernel sandboxed permissions another participant (handle `130117195102552065`) had outlined, and offered to add that to Dodo as well. That participant is not named in the capture, and the design itself is not in it, so this records the claim and the offer, not the design. See [CI and release cadence](CI_and_Release_Cadence.md) for the runner work he mentioned in the same message.
+
 ## Open questions
 
 - Whether untrusted extensions are in scope at all, which `andy` and `daniellacosse` answered differently.

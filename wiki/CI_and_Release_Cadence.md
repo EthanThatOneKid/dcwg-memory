@@ -56,6 +56,10 @@ On 2026-11-16 in `#brainstorm` `CaptainLach` said `denoland/deno#37008` can be c
 
 `CaptainLach` answered that the latest Deno is just Deno including a partial fix for eMudhra, and that he had an issue with a couple of things the group might want to cherry-pick that were also released in 2.9.8, but he had looked into them and was not confident those fixes are correct and acceptable to be merged as-is. `daniellacosse` answered: "Alright. We'll just do it case by case then."
 
+## Self-hosted runners and a dispatch system (2026-11-19)
+
+On 2026-11-19 `SpaceMonkey` said in `#brainstorm`, replying to `daniellacosse`, that an addition could not really be considered until it passes the respective tests, and that he was closing the gap on tests, expecting something stable the next day. He was also writing a self-hosted runner dispatching system to keep jobs moving on the most powerful runner available first: GitHub's Mac runner limitations had almost required the use of self-hosted runners, which he called the first bottleneck. See [Sandboxed extension boundary](Sandboxed_Extension_Boundary.md) for the permissions work he mentioned in the same message.
+
 ## Where it stands
 
 Nothing was decided for Dodo. Ende's numbers are a single before-and-after on a different codebase. The record does not show Dodo's own CI duration, or whether any of these changes were applied to it. On 2026-11-11 the record does show Dodo's CI state on pull request 17: 23 checks failing, with the Node 20 bump offered but not done.
