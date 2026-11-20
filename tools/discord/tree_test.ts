@@ -44,8 +44,8 @@ Deno.test("the scratch directories are outside the snapshot", async () => {
     const before = await snapshotTree(root);
     await Deno.mkdir(`${root}/.dcwg`, { recursive: true });
     await Deno.writeTextFile(`${root}/.dcwg/brief.md`, "the brief");
-    await Deno.mkdir(`${root}/_site/dcwg-memory`, { recursive: true });
-    await Deno.writeTextFile(`${root}/_site/dcwg-memory/index.html`, "built");
+    await Deno.mkdir(`${root}/_site/dodo-memory`, { recursive: true });
+    await Deno.writeTextFile(`${root}/_site/dodo-memory/index.html`, "built");
     assertEquals(diffTree(before, await snapshotTree(root)), []);
   });
 });

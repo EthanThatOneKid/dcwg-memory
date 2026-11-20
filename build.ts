@@ -55,7 +55,7 @@ export function buildSiteToOutputDir(
 ): Promise<number> {
   return buildThemedSite(config, outputDir, {
     dir: SITE_DIR,
-    title_suffix: " - DCWG Memory",
+    title_suffix: " - Dodo Memory",
     metadata: { highlight: highlightRdf },
   });
 }

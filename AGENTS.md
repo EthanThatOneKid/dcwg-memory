@@ -1,4 +1,4 @@
-# dcwg-memory: agent instructions
+# dodo-memory: agent instructions
 
 Public repo as of 2026-10-11, by Ethan's decision, including the captures. Discord
 captures name third parties and record coordination about approaching individual
@@ -61,7 +61,7 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
   `buildThemedSite` (`@wazoo/wiki/theme`), so `build.ts` is ~80 lines of theme
   config: the layout path, the title suffix, and Prism highlighting for the
   metadata panels. It writes `_site/<base_url>/`, and `deploy.yml` uploads
-  `_site/dcwg-memory` because the site is a project page at `/dcwg-memory/`.
+  `_site/dodo-memory` because the site is a project page at `/dodo-memory/`.
   `deno.json` pins the engine exactly and sets `minimumDependencyAge: 0`, because
   Deno's default 24-hour age policy refuses a pin published the same day and
   would fail the deploy.
@@ -69,7 +69,7 @@ stewardship of the Deno runtime after Cloudflare acquired Deno Land Inc. on
   panel's RDF/XML tab is gone, because the engine cannot serialize RDF/XML yet
   and says so in the panel rather than offering a format it cannot produce.
 - `wiki.assets` lists `raw`, so the captures are copied verbatim into the
-  published site at `/dcwg-memory/raw/`. They are copied, never parsed, which is
+  published site at `/dodo-memory/raw/`. They are copied, never parsed, which is
   what keeps `wiki fmt` from rewriting an append-only capture. Do not add `raw` to
   `wiki.input`, and do not link to a capture with a markdown `.md` link: `wiki lint --strict` treats `.md`, `.yaml`, `.yml`, and `.json` targets as wiki pages
   and fails on a capture that is not one. The generated index links each capture by
@@ -325,7 +325,7 @@ repair the wiki's own structure when links or names have drifted.
 Fill the placeholders and run it:
 
 ```markdown
-You are the dcwg-memory maintainer, a proactive memory agent managing a
+You are the dodo-memory maintainer, a proactive memory agent managing a
 personal knowledge base. Your primary directive is to process new information
 and integrate it cleanly.
 

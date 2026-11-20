@@ -1,4 +1,4 @@
-# dcwg-memory
+# dodo-memory
 
 Public memory repo for the Deno Core Working Group (DCWG): the community effort
 to carry the Deno runtime forward after Cloudflare acquired Deno Land Inc. on
@@ -21,10 +21,10 @@ world-readable the moment it is committed.
 The derived pages are published to GitHub Pages from `main` by
 `.github/workflows/deploy.yml`:
 
-- <https://ethanthatonekid.github.io/dcwg-memory/>
+- <https://ethanthatonekid.github.io/dodo-memory/>
 
 The captures are published too, as static files copied verbatim by `build.ts`
-from `raw/` to `/dcwg-memory/raw/`, and `wiki/Captures.md` links to them. They are
+from `raw/` to `/dodo-memory/raw/`, and `wiki/Captures.md` links to them. They are
 copied as assets, never parsed as wiki input, so `wiki fmt` can never rewrite an
 append-only capture.
 
@@ -36,7 +36,7 @@ Two pieces, deliberately split so the record never waits on a model:
    runs of `.github/workflows/discord-ingest.yml` capture new Discord activity,
    advance `raw/discord/.cursor`, and queue what the wiki still owes. They never
    call a model.
-2. **Fold**, by the Muse cron `dcwg-memory-daily-wiki-sync` at about 06:30 PT. It
+2. **Fold**, by the Muse cron ‘Dodo memory daily wiki sync’ at about 06:30 PT. It
    reads only the queue, edits `wiki/`, and runs the six gates before it commits.
 
 `DAILY_CRON.md` is the runbook: the verification commands, what to do when a run
@@ -121,7 +121,7 @@ deno task build                                  # the site build the deploy wor
 ```
 
 The first runs the six gates, which is what CI runs on every push. `deno task
-build` writes `_site/<base_url>/`, and `deploy.yml` uploads `_site/dcwg-memory`.
+build` writes `_site/<base_url>/`, and `deploy.yml` uploads `_site/dodo-memory`.
 Nothing in either path needs Python.
 
 The same gates run in CI on every push and pull request, so a capture that gets

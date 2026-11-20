@@ -1,11 +1,11 @@
-# DCWG memory daily cron
+# Dodo memory daily cron
 
-Repo `EthanThatOneKid/dcwg-memory`, branch `main`. Two halves of one daily loop:
+Repo `EthanThatOneKid/dodo-memory`, branch `main`. Two halves of one daily loop:
 
 | Step | Runs at | Who |
 | --- | --- | --- |
 | Archive | 11:00 UTC (03:00 PST / 04:00 PDT) | GitHub Actions, `discord-ingest.yml` |
-| Fold | about 06:30 PT | Muse cron `dcwg-memory-daily-wiki-sync` |
+| Fold | about 06:30 PT | Muse cron ‘Dodo memory daily wiki sync’ |
 
 The gap is deliberate. Both write `raw/discord/.cursor`, and the archive's push
 handler aborts on a rebase conflict, so an archive still running when the fold
@@ -33,9 +33,9 @@ The schedule has died twice — removed 2026-10-29, then the workflow disabled b
 hand — and both times the only symptom was a quietly stale archive. Check first:
 
 ```sh
-gh workflow view "Discord ingest" --repo EthanThatOneKid/dcwg-memory
-gh run list --workflow "Discord ingest" --limit 3 --repo EthanThatOneKid/dcwg-memory
-gh api repos/EthanThatOneKid/dcwg-memory/contents/raw/discord/.cursor \
+gh workflow view "Discord ingest" --repo EthanThatOneKid/dodo-memory
+gh run list --workflow "Discord ingest" --limit 3 --repo EthanThatOneKid/dodo-memory
+gh api repos/EthanThatOneKid/dodo-memory/contents/raw/discord/.cursor \
   --jq .content | base64 -d | jq '{_lastRun, pending: (._pending | length)}'
 ```
 

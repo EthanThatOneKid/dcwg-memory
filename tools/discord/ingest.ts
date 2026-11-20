@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run -A
 /**
- * The dcwg-memory Discord connector.
+ * The dodo-memory Discord connector.
  *
  * One run = fetch new channel activity over the Discord REST API, record it as an
  * append-only capture, then let the wiki pass fold it into the pages. The capture
@@ -53,7 +53,7 @@ type PassRun = Awaited<ReturnType<typeof runAnthropicPass>>;
 /** Small queued captures are folded together up to this many characters (about 10k tokens). */
 const DEFAULT_BATCH_CHARS = 40_000;
 
-const USAGE = `dcwg-memory Discord connector
+const USAGE = `dodo-memory Discord connector
 
 Usage:
   deno run -A ingest.ts --channel <id> --venue <venue> [options]

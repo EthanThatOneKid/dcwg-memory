@@ -1,5 +1,5 @@
 const API = "https://discord.com/api/v10";
-const USER_AGENT = "dcwg-memory/1.0 (+https://github.com/EthanThatOneKid/dcwg-memory)";
+const USER_AGENT = "dodo-memory/1.0 (+https://github.com/EthanThatOneKid/dodo-memory)";
 
 export interface DiscordAuthor {
   id: string;
