@@ -8,7 +8,7 @@ wiki:priority: medium
 
 # Captures
 
-Everything in this memory is derived from the 89 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
+Everything in this memory is derived from the 90 captures below. They are reproduced verbatim, including Discord handles, message timestamps, and the parts where people disagree with each other, because a record that only keeps the conclusions cannot be checked.
 
 The repository is public, so these files are readable in place. The same files are also served verbatim by this site under the repository's `raw/` path, so the evidence travels with the pages that cite it.
 
@@ -98,6 +98,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Discord #general — 2026-11-16](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-16_dcwg-general.md): Append-only capture of #general from 2026-11-16T22:27:17Z to 2026-11-17T19:06:36Z, pulled from the Discord REST API. 2 messages, 2 participants.
 - [Discord #ende — 2026-11-17](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-17_dcwg-ende-2.md): Append-only capture of #ende from 2026-11-17T22:07:23Z to 2026-11-17T22:07:23Z, pulled from the Discord REST API. 1 messages, 1 participants.
 - [Discord #ende — 2026-11-17](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-17_dcwg-ende.md): Append-only capture of #ende from 2026-11-17T18:52:50Z to 2026-11-17T18:52:50Z, pulled from the Discord REST API. 1 messages, 1 participants.
+- [Discord #brainstorm — 2026-11-19](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-19_dcwg-brainstorm-2.md): Append-only capture of #brainstorm from 2026-11-19T23:48:29Z to 2026-11-19T23:54:12Z, pulled from the Discord REST API. 2 messages, 1 participants.
 - [Discord #brainstorm — 2026-11-19](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-19_dcwg-brainstorm.md): Append-only capture of #brainstorm from 2026-11-19T14:59:16Z to 2026-11-19T14:59:16Z, pulled from the Discord REST API. 1 messages, 1 participants.
 - [Discord #general — 2026-11-19](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-19_dcwg-general.md): Append-only capture of #general from 2026-11-19T01:35:55Z to 2026-11-19T16:58:49Z, pulled from the Discord REST API. 2 messages, 2 participants.
 - [Discord #propose — 2026-11-19](https://EthanThatOneKid.github.io/dcwg-memory/raw/discord/2026-11-19_dcwg-propose.md): Append-only capture of #propose from 2026-11-19T01:34:39Z to 2026-11-19T01:56:19Z, pulled from the Discord REST API. 3 messages, 2 participants, across 1 thread.
@@ -130,6 +131,7 @@ The repository is public, so these files are readable in place. The same files a
 - [Ende](Ende_Runtime.md): A Deno fork by Paul Anthony Webb that keeps the Deno namespace and drops Node compatibility, Deno Deploy, KV, and Jupyter; public since 2026-10-13, first release v2026.10.14, with its own docs site and standard library.
 - [Ende vs Dodo](Ende_vs_Dodo.md): Why Ende and Dodo are not competing runtimes. Ende is a fork with an owner, a registered namespace, and a published roadmap; Dodo is a name the group liked for a compatibility fork that nobody has started.
 - [File System APIs for Deno](File_System_APIs_for_Deno.md): Discussions on potential file system APIs for Deno, comparing Origin Private File System (OPFS) with object storage and IndexedDB, considering portability, performance, and user experience.
+- [Formalizing the community](Formalizing_the_Community.md): The 2026-11-19 #propose thread on giving the Deno Core Working Group a formal structure: Ethan's four options, lishaduck's OpenCollective counter, and the poll planned after Fri Nov 20, 5pm PT.
 - [Foundation outreach and Bart's reply](Foundation_Outreach.md): The working group's contact with Deno's Bartek Iwańczuk from 2026-10-15 to 2026-10-28, what he said about a Deno foundation and about upstreaming fork changes, and how the group reacted, including whether Dodo should exist if a foundation does.
 - [Fresh framework migration](Fresh_Framework_Migration.md): Fresh, Deno's full-stack web framework, moved out of the denoland GitHub organization into freshframework. The verified facts of that move, and which of them transfer to a runtime handoff.
 - [JSR and the package registry](JSR_and_Package_Registry.md): What the 2026-10-16 to 2026-10-21
